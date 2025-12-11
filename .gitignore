@@ -30,6 +30,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# database
+*.db
+dev.db
+
 # Internal Documentation
 docs/
 
