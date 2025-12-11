@@ -1,0 +1,50 @@
+[
+  {
+    "url": "https://www.youtube.com/watch?v=FusIKjztap8&list=RDFusIKjztap8&start_radio=1",
+    "platform": "youtube",
+    "startTime": "1",
+    "endTime": "1:13",
+    "note": "such a smooth transition",
+    "title": "Neon Nights",
+    "artist": "Future Synth",
+    "artwork": "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=1000&auto=format&fit=crop",
+    "id": "8f4cfm",
+    "createdAt": "2025-11-27T02:13:53.830Z"
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "platform": "youtube",
+    "startTime": "0:43",
+    "endTime": "1:00",
+    "note": "I like the words and melody",
+    "title": "Neon Nights",
+    "artist": "Future Synth",
+    "artwork": "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=1000&auto=format&fit=crop",
+    "id": "rjddb",
+    "createdAt": "2025-11-27T03:01:51.426Z"
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "platform": "youtube",
+    "startTime": "0:47",
+    "endTime": "1:13",
+    "note": "Test Playback",
+    "title": "Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)",
+    "artist": "",
+    "artwork": "https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
+    "id": "5bt88f",
+    "createdAt": "2025-11-27T03:15:27.347Z"
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=xFrGuyw1V8s",
+    "platform": "youtube",
+    "startTime": "0:44",
+    "endTime": "0:51",
+    "note": "i love her voice.",
+    "title": "ABBA - Dancing Queen (Official Music Video)",
+    "artist": "",
+    "artwork": "https://img.youtube.com/vi/xFrGuyw1V8s/maxresdefault.jpg",
+    "id": "orlpz",
+    "createdAt": "2025-11-27T03:25:37.880Z"
+  }
+]

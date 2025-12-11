@@ -1,0 +1,71 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  image     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  moments   Moment[]
+}
+
+model TrackSource {
+  id          String   @id @default(cuid())
+  service     String   // "youtube" | "spotify" | "apple-music" | ...
+  sourceUrl   String   @unique
+  title       String?
+  artist      String?  // channelTitle for YouTube, normal artist for Spotify
+  artwork     String?
+  durationSec Int?     // full track/video duration in seconds
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  moments     Moment[]
+}
+
+model Moment {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Relation to TrackSource
+  trackSourceId    String?  // Optional for migration, but should be required eventually
+  trackSource      TrackSource? @relation(fields: [trackSourceId], references: [id])
+
+  // Legacy Source tracking (keeping for backward compatibility/migration)
+  service          String   // "youtube" | "spotify" | "apple-music" | "unknown" | "legacy"
+  sourceUrl        String   // Original URL
+  canonicalTrackId String?  // Future: unified track identifier across services
+  
+  // Timing (stored as integer seconds)
+  startSec         Int
+  endSec           Int
+  momentDurationSec Int?    // derived: endSec - startSec (Optional for migration)
+  
+  // Metadata (Moment-specific or override)
+  title            String?
+  artist           String?
+  artwork          String?
+  note             String?
+  
+  likeCount        Int      @default(0)
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  // Indices for performance
+  @@index([service, sourceUrl])
+  @@index([userId, createdAt])
+}
