@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Moment } from '@/types';
 import TrackCard from './TrackCard';
-import { RefreshCw, X, Heart, MessageSquare, Play } from 'lucide-react';
+import { RefreshCw, X, Heart, MessageSquare, Play, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface MomentCardProps {
@@ -240,10 +240,21 @@ export default function MomentCard({
                     )}
 
                     {/* Comment Button (if note exists) */}
-                    {moment.note && (
-                        <div className="absolute bottom-3 right-3 z-20">
+                    <div className="absolute bottom-3 right-3 z-20 flex flex-col gap-2 items-end">
+                        {/* Saved By Count */}
+                        {moment.savedByCount !== undefined && moment.savedByCount > 1 && (
+                            <div
+                                className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/5 text-[10px] text-orange-200/80 shadow-lg"
+                                title={`Saved by ${moment.savedByCount} users`}
+                            >
+                                <Users size={10} className="stroke-current" />
+                                <span className="font-medium">{moment.savedByCount}</span>
+                            </div>
+                        )}
+
+                        {moment.note && (
                             <button
-                                className="p-1.5 rounded-full bg-white/5 hover:bg-white/10 text-purple-300 hover:text-purple-200 transition-colors"
+                                className="p-1.5 rounded-full bg-white/5 hover:bg-white/10 text-purple-300 hover:text-purple-200 transition-colors backdrop-blur-md"
                                 title={moment.note}
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -252,8 +263,8 @@ export default function MomentCard({
                             >
                                 <MessageSquare size={14} />
                             </button>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
 
                 {/* Actions (Top Right) */}

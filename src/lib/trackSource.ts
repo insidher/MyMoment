@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { getYouTubeVideoMetadata } from './youtube';
+import { generateCanonicalId } from './canonical';
 
 export async function findOrCreateTrackSource(
     service: string,
@@ -54,14 +55,24 @@ export async function findOrCreateTrackSource(
     }
 
     // 4. Create new TrackSource
+    const finalTitle = title || 'Unknown Title';
+    const finalArtist = artist || 'Unknown Artist';
+
+    // Import dynamically or at top-level. Top-level preferred.
+    // I'll assume I can add the import at the top in a separate edit or let the user do it, 
+    // but for this tool I must be precise.
+    // Actually, I should add the import first. But I can do it in one go if I change the whole file or use multi_replace.
+    // Since I'm using replace_file_content for a chunk, I'll add the import in a separate call or use multi_replace.
+    // I'll use multi_replace to do both.
     return await prisma.trackSource.create({
         data: {
             service,
             sourceUrl,
-            title: title || 'Unknown Title',
-            artist: artist || 'Unknown Artist',
+            title: finalTitle,
+            artist: finalArtist,
             artwork,
             durationSec,
+            canonicalTrackId: generateCanonicalId(finalArtist, finalTitle),
         },
     });
 }

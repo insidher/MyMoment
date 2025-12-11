@@ -28,6 +28,7 @@ model TrackSource {
   artist      String?  // channelTitle for YouTube, normal artist for Spotify
   artwork     String?
   durationSec Int?     // full track/video duration in seconds
+  canonicalTrackId String? // Unified track identifier (e.g., can_hash)
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -61,6 +62,7 @@ model Moment {
   note             String?
   
   likeCount        Int      @default(0)
+  savedByCount     Int      @default(0) // Added for community aggregation
   
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
