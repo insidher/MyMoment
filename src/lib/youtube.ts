@@ -53,6 +53,7 @@ function parseISODuration(duration: string): number {
 export interface YouTubeMetadata {
     title: string;
     channelTitle: string;
+    description: string;
     thumbnails: {
         default?: string;
         medium?: string;
@@ -91,6 +92,7 @@ export async function getYouTubeVideoMetadata(videoId: string): Promise<YouTubeM
         return {
             title: snippet.title,
             channelTitle: snippet.channelTitle,
+            description: snippet.description || '',
             thumbnails: {
                 default: snippet.thumbnails?.default?.url,
                 medium: snippet.thumbnails?.medium?.url,

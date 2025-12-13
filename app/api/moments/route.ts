@@ -36,12 +36,7 @@ export async function POST(request: Request) {
                 { status: 400 }
             );
         }
-        if (duration > 60) {
-            return NextResponse.json(
-                { error: 'Moment duration cannot exceed 60 seconds' },
-                { status: 400 }
-            );
-        }
+        // Duration limit removed
 
         // Detect service
         const service = body.service || detectService(body.sourceUrl);
@@ -54,10 +49,41 @@ export async function POST(request: Request) {
             durationSec: body.duration, // Capture duration from client
         });
 
+        // Detect Canonical ID
+        const canonicalTrackId = trackSource.canonicalTrackId;
+
+        // Neighbor Search (SavedBy Logic)
+        // Find moments that share the canonical ID (or trackSourceId) and overlap in time
+        // Matching Strategy: Start/End within +/- 2 seconds
+        const TOLERANCE_SEC = 2;
+
+        const neighbors = await prisma.moment.findMany({
+            where: {
+                // Match by Canonical ID if available, else exact TrackSource
+                OR: [
+                    { trackSourceId: trackSource.id },
+                    ...(canonicalTrackId ? [{ canonicalTrackId }] : [])
+                ],
+                // Time Overlap Logic: 
+                // Neighbor Start is near New Start AND Neighbor End is near New End
+                startSec: {
+                    gte: body.startSec - TOLERANCE_SEC,
+                    lte: body.startSec + TOLERANCE_SEC,
+                },
+                endSec: {
+                    gte: body.endSec - TOLERANCE_SEC,
+                    lte: body.endSec + TOLERANCE_SEC,
+                }
+            },
+            select: { id: true }
+        });
+
+        const initialSavedByCount = neighbors.length + 1;
+
         const momentData = {
             sourceUrl: body.sourceUrl,
             service,
-            title: trackSource.title || body.title, // Prefer TrackSource but fallback
+            title: trackSource.title || body.title,
             artist: trackSource.artist || body.artist,
             artwork: trackSource.artwork || body.artwork,
             startSec: body.startSec,
@@ -65,17 +91,33 @@ export async function POST(request: Request) {
             momentDurationSec: duration,
             note: body.note,
             trackSourceId: trackSource.id,
+            canonicalTrackId, // Store on moment for faster reads
+            savedByCount: initialSavedByCount,
         };
 
-        const newMoment = await prisma.moment.create({
-            data: {
-                ...momentData,
-                userId: session.user.id,
-            },
-            include: {
-                trackSource: true,
-            }
-        });
+        // Transaction: Create Moment + Update Neighbors
+        const [newMoment] = await prisma.$transaction([
+            prisma.moment.create({
+                data: {
+                    ...momentData,
+                    userId: session.user.id,
+                },
+                include: {
+                    trackSource: true,
+                }
+            }),
+            // Increment savedByCount for all neighbors
+            ...(neighbors.length > 0 ? [
+                prisma.moment.updateMany({
+                    where: {
+                        id: { in: neighbors.map(n => n.id) }
+                    },
+                    data: {
+                        savedByCount: { increment: 1 }
+                    }
+                })
+            ] : [])
+        ]);
 
         console.log('[API] Moment saved successfully:', newMoment.id);
         return NextResponse.json({ success: true, moment: newMoment });
@@ -125,8 +167,29 @@ export async function GET(request: Request) {
             }
         });
 
+        // Check for likes if user is logged in
+        let momentsWithLikes = moments;
+        const session = await getServerSession(authOptions);
+
+        if (session?.user?.id) {
+            const likedMomentIds = await prisma.like.findMany({
+                where: {
+                    userId: session.user.id,
+                    momentId: { in: moments.map(m => m.id) }
+                },
+                select: { momentId: true }
+            });
+
+            const likedSet = new Set(likedMomentIds.map(l => l.momentId));
+
+            momentsWithLikes = moments.map(m => ({
+                ...m,
+                isLiked: likedSet.has(m.id)
+            }));
+        }
+
         console.log(`[API] Found ${moments.length} moments`);
-        return NextResponse.json({ moments });
+        return NextResponse.json({ moments: momentsWithLikes });
     } catch (error) {
         console.error('[API] GET /api/moments Error:', error);
         return NextResponse.json(

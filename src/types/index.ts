@@ -8,6 +8,7 @@ export interface TrackSource {
   artist?: string;
   artwork?: string;
   durationSec?: number;
+  canonicalTrackId?: string;
 }
 
 export interface Moment {
@@ -34,6 +35,8 @@ export interface Moment {
   note?: string;
 
   likeCount?: number;
+  isLiked?: boolean; // Add this
+  savedByCount?: number;
 
   createdAt: string | Date;
   updatedAt?: string | Date;

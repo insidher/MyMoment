@@ -1,12 +1,13 @@
-import { Play, TrendingUp, Music, Heart, User, ArrowLeft } from 'lucide-react';
+import { Play, TrendingUp, Music, Heart, User, ArrowLeft, Clock } from 'lucide-react';
 import Link from 'next/link';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import SongCard from '@/components/SongCard';
+import MomentCard from '@/components/MomentCard';
 import ArtistCard from '@/components/ArtistCard';
-import { getGroupedSongs, getUserArtistStats, getArtistSongs } from './actions';
+import { getGroupedSongs, getUserArtistStats, getArtistSongs, getRecentMoments } from './actions';
 
-import { SongGroup, ArtistStats } from '@/types';
+import { SongGroup, ArtistStats, Moment } from '@/types';
 
 export default async function Explore({ searchParams }: { searchParams: Promise<{ artist?: string }> }) {
     const session = await getServerSession(authOptions);
@@ -14,12 +15,14 @@ export default async function Explore({ searchParams }: { searchParams: Promise<
     const artistFilter = params.artist;
 
     let songs: SongGroup[] = [];
+    let moments: Moment[] = [];
     let artistStats: ArtistStats[] = [];
 
     if (artistFilter) {
         songs = await getArtistSongs(session?.user?.id || '', artistFilter);
     } else {
-        songs = await getGroupedSongs();
+        // Main Plaza View: Show recent individual moments
+        moments = await getRecentMoments(50);
     }
 
     if (session?.user?.id && !artistFilter) {
@@ -77,24 +80,54 @@ export default async function Explore({ searchParams }: { searchParams: Promise<
                     </section>
                 )}
 
-                {/* Song Grid */}
+                {/* Content Grid */}
                 <section className="space-y-6">
                     <div className="flex items-center gap-2 text-xl font-semibold text-white/90">
-                        <TrendingUp size={24} className="text-purple-400" />
-                        <h2>{artistFilter ? `Songs by ${artistFilter}` : 'Trending Songs'}</h2>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {songs.length === 0 ? (
-                            <p className="text-white/30 italic col-span-full">
-                                {artistFilter ? `No songs found for ${artistFilter}.` : 'No songs yet. Be the first to capture a moment!'}
-                            </p>
+                        {artistFilter ? (
+                            <>
+                                <TrendingUp size={24} className="text-purple-400" />
+                                <h2>Songs by {artistFilter}</h2>
+                            </>
                         ) : (
-                            songs.map((song) => (
-                                <SongCard key={song.sourceUrl} song={song} />
-                            ))
+                            <>
+                                <Clock size={24} className="text-orange-400" />
+                                <h2>Latest Moments</h2>
+                            </>
                         )}
                     </div>
+
+                    {artistFilter ? (
+                        // Artist View: Show grouped SongCards
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {songs.length === 0 ? (
+                                <p className="text-white/30 italic col-span-full">
+                                    No songs found for {artistFilter}.
+                                </p>
+                            ) : (
+                                songs.map((song) => (
+                                    <SongCard key={song.sourceUrl} song={song} />
+                                ))
+                            )}
+                        </div>
+                    ) : (
+                        // Plaza View: Show individual MomentCards
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {moments.length === 0 ? (
+                                <p className="text-white/30 italic col-span-full">
+                                    No moments yet. Be the first to capture one!
+                                </p>
+                            ) : (
+                                moments.map((moment) => (
+                                    <MomentCard
+                                        key={moment.id}
+                                        moment={moment}
+                                        // No explicit handlers needed; MomentCard defaults to routing logic
+                                        showDelete={false} // Don't allow delete in public feed
+                                    />
+                                ))
+                            )}
+                        </div>
+                    )}
                 </section>
 
                 {/* Vibes Section (Hide in artist view?) - Keeping it for now as it's general exploration */}

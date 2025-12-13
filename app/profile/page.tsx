@@ -37,12 +37,25 @@ export default function Profile() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this moment?')) return;
+        // Confirmation is handled in MomentCard to allow animation
 
         try {
             const res = await fetch(`/api/moments/${id}`, { method: 'DELETE' });
             if (res.ok) {
-                setMoments(moments.filter(m => m.id !== id));
+                // Smart Cleanup: Remove all moments that match the deleted one (duplicates)
+                setMoments(prev => {
+                    const target = prev.find(m => m.id === id);
+                    if (!target) return prev.filter(m => m.id !== id);
+
+                    return prev.filter(m =>
+                        // Removing the exact ID OR any strict duplicate
+                        !(m.id === id || (
+                            m.sourceUrl === target.sourceUrl &&
+                            m.startSec === target.startSec &&
+                            m.endSec === target.endSec
+                        ))
+                    );
+                });
             }
         } catch (error) {
             console.error('Failed to delete moment', error);

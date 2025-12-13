@@ -25,8 +25,16 @@ export async function DELETE(
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        await prisma.moment.delete({
-            where: { id: params.id },
+        // Consolidate Cleanup: Delete this moment AND any exact duplicates owned by the same user.
+        // matches: sourceUrl, startSec, endSec, userId
+        await prisma.moment.deleteMany({
+            where: {
+                userId: session.user.id, // Security check: Ensure we only delete user's own items
+                sourceUrl: moment.sourceUrl,
+                startSec: moment.startSec,
+                endSec: moment.endSec,
+                // We don't strictly match note, title, etc. If it's the same timestamp/source, it's the "same moment" for this user.
+            },
         });
 
         return NextResponse.json({ success: true });

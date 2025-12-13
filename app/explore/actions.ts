@@ -1,7 +1,9 @@
 'use server';
 
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { MusicService, SongGroup, ArtistStats } from '@/types';
+import { MusicService, SongGroup, ArtistStats, Moment } from '@/types';
 
 export async function getGroupedSongs(): Promise<SongGroup[]> {
     try {
@@ -91,6 +93,42 @@ export async function getArtistSongs(userId: string, artistName: string): Promis
         }));
     } catch (error) {
         console.error('Failed to fetch artist songs:', error);
+        return [];
+    }
+}
+
+export async function getRecentMoments(limit = 50): Promise<Moment[]> {
+    try {
+        const moments = await prisma.moment.findMany({
+            take: limit,
+            orderBy: { createdAt: 'desc' },
+            include: {
+                trackSource: true,
+            }
+        });
+
+        const session = await getServerSession(authOptions);
+
+        if (session?.user?.id) {
+            const likedMomentIds = await prisma.like.findMany({
+                where: {
+                    userId: session.user.id,
+                    momentId: { in: moments.map(m => m.id) }
+                },
+                select: { momentId: true }
+            });
+
+            const likedSet = new Set(likedMomentIds.map(l => l.momentId));
+
+            return moments.map(m => ({
+                ...m,
+                isLiked: likedSet.has(m.id)
+            })) as unknown as Moment[];
+        }
+
+        return moments as unknown as Moment[];
+    } catch (error) {
+        console.error('Failed to fetch recent moments:', error);
         return [];
     }
 }

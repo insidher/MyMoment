@@ -18,6 +18,7 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   moments   Moment[]
+  likes     Like[]
 }
 
 model TrackSource {
@@ -28,6 +29,7 @@ model TrackSource {
   artist      String?  // channelTitle for YouTube, normal artist for Spotify
   artwork     String?
   durationSec Int?     // full track/video duration in seconds
+  canonicalTrackId String? // Unified track identifier (e.g., can_hash)
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -61,11 +63,28 @@ model Moment {
   note             String?
   
   likeCount        Int      @default(0)
+  savedByCount     Int      @default(0) // Added for community aggregation
   
+  // Interactions
+  likes            Like[]
+
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   
   // Indices for performance
   @@index([service, sourceUrl])
   @@index([userId, createdAt])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  momentId  String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moment    Moment   @relation(fields: [momentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, momentId]) // User can like a moment only once
+  @@index([momentId])
 }

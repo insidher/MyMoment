@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Moment } from '@/types';
-import { Chapter } from '@/lib/chapters';
-import { Plus, Square, Volume2 } from 'lucide-react';
+import { Plus, Square, Disc } from 'lucide-react';
 
 interface PlayerTimelineProps {
     currentTime: number;
@@ -12,8 +11,6 @@ interface PlayerTimelineProps {
     captureState: 'idle' | 'start-captured' | 'end-captured';
     onSmartCapture: () => void;
     activeMomentId?: string;
-    chapters?: Chapter[];
-    onChapterClick?: (chapter: Chapter, nextChapterStart?: number) => void;
 }
 
 export default function PlayerTimeline({
@@ -24,9 +21,7 @@ export default function PlayerTimeline({
     onMomentClick,
     captureState,
     onSmartCapture,
-    activeMomentId,
-    chapters = [],
-    onChapterClick
+    activeMomentId
 }: PlayerTimelineProps) {
     const [isHovering, setIsHovering] = useState(false);
     const [showCaptureBtn, setShowCaptureBtn] = useState(false);
@@ -90,22 +85,6 @@ export default function PlayerTimeline({
                             className="h-full bg-green-500 rounded-full transition-all duration-500 ease-linear relative z-0"
                             style={{ width: `${(currentTime / safeDuration) * 100}%` }}
                         />
-
-                        {/* Chapter Markers (Vertical Lines only) */}
-                        {chapters.map((chapter, i) => {
-                            if (chapter.startSec === 0) return null; // Skip redundant 0:00 marker
-                            const left = (chapter.startSec / safeDuration) * 100;
-                            if (left > 100) return null;
-
-                            return (
-                                <div
-                                    key={i}
-                                    className="absolute top-0 bottom-0 w-[1px] bg-white/20 z-0 pointer-events-none"
-                                    style={{ left: `${left}%` }}
-                                    title={`${chapter.title}`}
-                                />
-                            );
-                        })}
                     </div>
 
                     {/* Moments Overlays (Unmasked, Taller) */}
@@ -191,122 +170,6 @@ export default function PlayerTimeline({
                     {formatTime(duration)}
                 </span>
             </div>
-
-            {/* Unified Labels (Chapters & Moments) */}
-            {(() => {
-                // Grouping Logic
-                const groups: { time: number; chapter?: Chapter; moment?: Moment }[] = [];
-                const THRESHOLD = 1; // Seconds to group by
-
-                // Add Chapters
-                chapters.forEach(ch => {
-                    groups.push({ time: ch.startSec, chapter: ch });
-                });
-
-                // Add or Merge Moments
-                moments.forEach(m => {
-                    const existing = groups.find(g => Math.abs(g.time - m.startSec) <= THRESHOLD);
-                    if (existing) {
-                        existing.moment = m; // Attach to existing group (prioritize chapter time)
-                    } else {
-                        groups.push({ time: m.startSec, moment: m });
-                    }
-                });
-
-                // Sort by time
-                groups.sort((a, b) => a.time - b.time);
-
-                if (groups.length === 0) return null;
-
-                return (
-                    <div className="relative h-14 mx-[68px]">
-                        {groups.map((group, i) => {
-                            if (group.time === 0) return null;
-                            const left = (group.time / safeDuration) * 100;
-                            if (left > 100) return null;
-
-                            // Check if this group contains the active moment based on PLAYHEAD INTERSECTION
-                            const isActiveGroup = group.moment && (
-                                activeMomentId === group.moment.id ||
-                                (currentTime >= group.moment.startSec && currentTime < group.moment.endSec)
-                            );
-
-                            // WATERFALL STRATIFICATION
-                            // Active -> Row 0 (Top)
-                            // Inactive -> Rows 1 & 2 (Staggered)
-                            const row = isActiveGroup ? 0 : (i % 2) + 1;
-
-                            const tickHeight = row === 0 ? 'h-2' : row === 1 ? 'h-5' : 'h-8';
-                            const topPos = row === 0 ? 'top-0' : row === 1 ? 'top-5' : 'top-10';
-
-                            // Boost z-index for active group
-                            const zIndex = isActiveGroup ? 50 : 30 - row;
-
-                            return (
-                                <div
-                                    key={i}
-                                    className={`absolute transform group/label hover:z-50 transition-all duration-300 ${topPos} ${isActiveGroup ? 'scale-105 origin-top' : ''}`}
-                                    style={{
-                                        left: `${left}%`,
-                                        zIndex,
-                                        transform: `translateX(-${left}%)`
-                                    }}
-                                >
-                                    <div className="flex flex-col items-center">
-                                        {/* Tick connector */}
-                                        <div className={`w-[1px] mb-0.5 transition-colors ${tickHeight} 
-                                            ${group.moment ? 'bg-orange-500/50' : 'bg-white/20'}
-                                            ${isActiveGroup ? 'bg-orange-500 h-[10px]' : ''}`} // Ensure connector is visible/highlighted
-                                        />
-
-                                        {/* Stacked Labels Container */}
-                                        <div className={`flex flex-col items-center gap-0.5 ${isActiveGroup ? 'drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]' : ''}`}>
-                                            {/* Chapter Label (Green) */}
-                                            {group.chapter && (
-                                                <span
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onSeek(group.chapter!.startSec);
-                                                    }}
-                                                    className={`text-[10px] whitespace-nowrap px-1.5 py-0.5 transition-all cursor-pointer border
-                                                    bg-black
-                                                    ${isActiveGroup
-                                                            ? 'text-green-300 font-bold border-green-500/50 rounded-md'
-                                                            : 'text-green-400/70 border-green-900/30 rounded-sm'}
-                                                    hover:text-green-300 hover:font-bold hover:border-green-400/50 hover:scale-105`}
-                                                >
-                                                    {group.chapter.title}
-                                                </span>
-                                            )}
-
-                                            {/* Moment Label (Orange) */}
-                                            {group.moment && (
-                                                <span
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onMomentClick(group.moment!);
-                                                    }}
-                                                    className={`text-[10px] whitespace-nowrap px-1.5 py-0.5 transition-all cursor-pointer border flex items-center gap-1
-                                                    bg-black
-                                                    ${isActiveGroup
-                                                            ? 'text-orange-300 font-bold border-orange-500/50 rounded-md'
-                                                            : 'text-orange-400/70 border-orange-900/30 rounded-sm'}
-                                                    hover:text-orange-300 hover:font-bold hover:border-orange-400/50 hover:scale-105`}
-                                                >
-                                                    {isActiveGroup && group.moment && (
-                                                        <Volume2 size={8} className="text-orange-300" />
-                                                    )}
-                                                    {group.moment.note || 'Moment'}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                );
-            })()}
         </div>
     );
 }

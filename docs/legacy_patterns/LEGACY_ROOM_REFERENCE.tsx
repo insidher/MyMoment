@@ -15,8 +15,6 @@ import PlayerTimeline from '@/components/PlayerTimeline';
 import { RelatedItem } from '@/lib/related';
 import { useSession } from 'next-auth/react';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
-import { MyMomentIcon } from '@/components/icons/MyMomentIcon';
-import { parseChapters, getCurrentChapter, Chapter } from '@/lib/chapters';
 
 type CaptureState = 'idle' | 'start-captured' | 'end-captured';
 
@@ -90,18 +88,11 @@ export default function Room({ params }: { params: { id: string } }) {
 
 
     // Real Metadata State
-
     const [metadata, setMetadata] = useState({
         title: 'Loading...',
         artist: '...',
         artwork: '',
-        description: '', // Add description field
     });
-
-    // Chapter State
-    const [chapters, setChapters] = useState<Chapter[]>([]);
-    const [currentChapter, setCurrentChapter] = useState<Chapter | null>(null);
-    const [includeChapterNote, setIncludeChapterNote] = useState(false);
 
     // Moments List State
     const [moments, setMoments] = useState<Moment[]>([]);
@@ -172,32 +163,13 @@ export default function Room({ params }: { params: { id: string } }) {
                         setMetadata(data);
                     } else {
                         console.warn('Metadata fetch failed:', data.error);
-                        setMetadata({ title: 'Spotify Track', artist: 'Unknown Artist', artwork: '', description: '' });
+                        setMetadata({ title: 'Spotify Track', artist: 'Unknown Artist', artwork: '' });
                     }
                 })
                 .catch(err => {
                     console.error('Failed to fetch Spotify metadata', err);
-                    setMetadata({ title: 'Spotify Track', artist: 'Unknown Artist', artwork: '', description: '' });
+                    setMetadata({ title: 'Spotify Track', artist: 'Unknown Artist', artwork: '' });
                 });
-        }
-
-        // Fetch YouTube Metadata (for Chapters)
-        if (isYouTube) {
-            fetch(`/api/metadata?url=${encodeURIComponent(url)}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data && !data.error) {
-                        // Merge with existing metadata (keep artwork from player if needed, but API is better)
-                        setMetadata(prev => ({
-                            ...prev,
-                            title: data.title || prev.title,
-                            artist: data.channelTitle || prev.artist,
-                            description: data.description || '',
-                            // artwork: data.thumbnails.maxres || ... (optional, player is usually fast)
-                        }));
-                    }
-                })
-                .catch(err => console.error('Failed to fetch YouTube metadata', err));
         }
     }, [url, isSpotify, startParam, endParam]);
 
@@ -235,24 +207,6 @@ export default function Room({ params }: { params: { id: string } }) {
             setTimeout(() => window.location.reload(), 100);
         }
     }, [isSpotify]);
-
-    // Parse Chapters when description changes
-    useEffect(() => {
-        if (metadata.description) {
-            const parsed = parseChapters(metadata.description);
-            console.log('[Chapters] Parsed:', parsed.length);
-            setChapters(parsed);
-        }
-    }, [metadata.description]);
-
-    // Update Current Chapter based on playback
-    useEffect(() => {
-        const time = isSpotify ? spotifyProgress.current : playbackState.current;
-        const chapter = getCurrentChapter(chapters, time);
-        if (chapter?.title !== currentChapter?.title) {
-            setCurrentChapter(chapter);
-        }
-    }, [playbackState.current, spotifyProgress.current, chapters, isSpotify]);
 
     // Initialize Spotify Player
     useEffect(() => {
@@ -387,7 +341,6 @@ export default function Room({ params }: { params: { id: string } }) {
                             title: snippet.title,
                             artist: snippet.channelTitle, // Reliable channel name from API
                             artwork: snippet.thumbnails.maxres?.url || snippet.thumbnails.high?.url || '',
-                            description: snippet.description || '',
                         });
                         console.log('[YouTube API] Metadata set:', snippet.title, 'by', snippet.channelTitle);
                     }
@@ -399,7 +352,6 @@ export default function Room({ params }: { params: { id: string } }) {
                         title: videoData.title || 'YouTube Video',
                         artist: videoData.author || 'Unknown Channel',
                         artwork: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-                        description: '',
                     });
                 }
             } catch (error) {
@@ -410,7 +362,6 @@ export default function Room({ params }: { params: { id: string } }) {
                     title: videoData.title || 'YouTube Video',
                     artist: videoData.author || 'Unknown Channel',
                     artwork: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-                    description: '',
                 });
             }
         }
@@ -450,7 +401,11 @@ export default function Room({ params }: { params: { id: string } }) {
                 setError('End time must be after start time');
                 return;
             }
-            // Limit removed
+            const duration = currentTimeSec - startSec!;
+            if (duration > 60) {
+                setError('Moment cannot exceed 60 seconds');
+                return;
+            }
             setEndSec(currentTimeSec);
             setCaptureState('end-captured');
             setError('');
@@ -775,23 +730,7 @@ export default function Room({ params }: { params: { id: string } }) {
                         </div>
                     </div>
                     {/* Center Column: Player & Metadata */}
-                    <div className="lg:col-span-6 space-y-6">
-                        {/* Metadata (Compact & Above Player) */}
-                        <div className="flex items-center gap-4 px-1">
-                            {metadata.artwork ? (
-                                <img
-                                    src={metadata.artwork}
-                                    alt="Album Art"
-                                    className="w-12 h-12 rounded-md object-cover shadow-lg"
-                                />
-                            ) : (
-                                <div className="w-12 h-12 rounded-md bg-white/10 animate-pulse" />
-                            )}
-                            <div className="min-w-0">
-                                <h2 className="text-lg font-bold leading-tight truncate">{metadata.title}</h2>
-                                <p className="text-sm text-white/60 truncate">{metadata.artist}</p>
-                            </div>
-                        </div>
+                    <div className="lg:col-span-6 space-y-8">
                         <div className="space-y-4">
                             <div className="glass-panel p-1 overflow-hidden aspect-video relative bg-black">
                                 {isYouTube && youtubeId ? (
@@ -899,12 +838,25 @@ export default function Room({ params }: { params: { id: string } }) {
                                     captureState={captureState}
                                     onSmartCapture={handleSmartCapture}
                                     activeMomentId={activeMoment?.id}
-                                    chapters={chapters}
                                 />
                             )}
                         </div>
 
-
+                        <div className="flex items-center gap-6">
+                            {metadata.artwork ? (
+                                <img
+                                    src={metadata.artwork}
+                                    alt="Album Art"
+                                    className="w-24 h-24 rounded-xl object-cover shadow-2xl"
+                                />
+                            ) : (
+                                <div className="w-24 h-24 rounded-xl bg-white/10 animate-pulse" />
+                            )}
+                            <div>
+                                <h2 className="text-3xl font-bold">{metadata.title}</h2>
+                                <p className="text-xl text-white/60">{metadata.artist}</p>
+                            </div>
+                        </div>
 
                         {/* Related Content (Mobile Only) */}
                         <div className="mt-6 block lg:hidden">
@@ -941,48 +893,46 @@ export default function Room({ params }: { params: { id: string } }) {
                                         No moments saved yet. Be the first!
                                     </div>
                                 ) : (
-                                    groupMoments(moments)
-                                        .sort((a, b) => (activeMoment?.id === a.main.id ? -1 : activeMoment?.id === b.main.id ? 1 : 0))
-                                        .map((group) => (
-                                            <MomentGroup
-                                                key={group.main.id}
-                                                mainMoment={group.main}
-                                                replies={group.replies}
-                                                trackDuration={group.main.trackSource?.durationSec || (isSpotify ? spotifyProgress.duration : playbackState.duration)}
-                                                onDelete={async (id) => {
-                                                    try {
-                                                        const res = await fetch(`/api/moments/${id}`, { method: 'DELETE' });
-                                                        if (res.ok) {
-                                                            // Smart Cleanup: Remove all moments that match the deleted one (duplicates)
-                                                            setMoments(prev => {
-                                                                const target = prev.find(m => m.id === id);
-                                                                if (!target) return prev.filter(m => m.id !== id);
+                                    groupMoments(moments).map((group) => (
+                                        <MomentGroup
+                                            key={group.main.id}
+                                            mainMoment={group.main}
+                                            replies={group.replies}
+                                            trackDuration={group.main.trackSource?.durationSec || (isSpotify ? spotifyProgress.duration : playbackState.duration)}
+                                            onDelete={async (id) => {
+                                                try {
+                                                    const res = await fetch(`/api/moments/${id}`, { method: 'DELETE' });
+                                                    if (res.ok) {
+                                                        // Smart Cleanup: Remove all moments that match the deleted one (duplicates)
+                                                        setMoments(prev => {
+                                                            const target = prev.find(m => m.id === id);
+                                                            if (!target) return prev.filter(m => m.id !== id);
 
-                                                                return prev.filter(m =>
-                                                                    // Removing the exact ID OR any strict duplicate
-                                                                    !(m.id === id || (
-                                                                        m.sourceUrl === target.sourceUrl &&
-                                                                        m.startSec === target.startSec &&
-                                                                        m.endSec === target.endSec
-                                                                    ))
-                                                                );
-                                                            });
-                                                        }
-                                                    } catch (e) {
-                                                        console.error(e);
+                                                            return prev.filter(m =>
+                                                                // Removing the exact ID OR any strict duplicate
+                                                                !(m.id === id || (
+                                                                    m.sourceUrl === target.sourceUrl &&
+                                                                    m.startSec === target.startSec &&
+                                                                    m.endSec === target.endSec
+                                                                ))
+                                                            );
+                                                        });
                                                     }
-                                                }}
-                                                showDelete={session?.user?.id === group.main.userId}
-                                                onPlayFull={() => {
-                                                    router.push(`/room/view?url=${encodeURIComponent(group.main.sourceUrl)}`);
-                                                }}
-                                                onPlayMoment={playMoment}
-                                                onPauseMoment={handlePauseMoment}
-                                                currentTime={isSpotify ? spotifyProgress.current : playbackState.current}
-                                                activeMomentId={activeMoment?.id}
-                                                isPlaying={isPlaying}
-                                            />
-                                        ))
+                                                } catch (e) {
+                                                    console.error(e);
+                                                }
+                                            }}
+                                            showDelete={session?.user?.id === group.main.userId}
+                                            onPlayFull={() => {
+                                                router.push(`/room/view?url=${encodeURIComponent(group.main.sourceUrl)}`);
+                                            }}
+                                            onPlayMoment={playMoment}
+                                            onPauseMoment={handlePauseMoment}
+                                            currentTime={isSpotify ? spotifyProgress.current : playbackState.current}
+                                            activeMomentId={activeMoment?.id}
+                                            isPlaying={isPlaying}
+                                        />
+                                    ))
                                 )}
                             </div>
                         </div>
@@ -1023,29 +973,10 @@ export default function Room({ params }: { params: { id: string } }) {
                         )}
 
                         <div className="glass-panel p-6 h-fit space-y-6">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-xl font-semibold flex items-center gap-2">
-                                    <Clock size={20} className="text-purple-400" />
-                                    Moment Details
-                                </h3>
-                                {(captureState === 'start-captured' || captureState === 'end-captured') && (
-                                    <div className={`flex items-center gap-2 px-3 py-1 rounded-full font-mono text-sm font-bold transition-all ${captureState === 'start-captured' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-purple-500/10 text-purple-300 border border-purple-500/20'}`}>
-                                        {captureState === 'start-captured' ? (
-                                            <>
-                                                <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
-                                                <span>
-                                                    {Math.max(0, (isSpotify ? spotifyProgress.current : playbackState.current) - (startSec || 0))}s
-                                                </span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <MyMomentIcon className="w-4 h-4 fill-current" />
-                                                <span>{(endSec || 0) - (startSec || 0)}s</span>
-                                            </>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
+                            <h3 className="text-xl font-semibold flex items-center gap-2">
+                                <Clock size={20} className="text-purple-400" />
+                                Moment Details
+                            </h3>
 
                             {/* Preview Chip */}
                             {captureState === 'end-captured' && startSec !== null && endSec !== null && (
@@ -1094,44 +1025,7 @@ export default function Room({ params }: { params: { id: string } }) {
                             </div>
 
                             <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <label className="text-xs text-white/50 uppercase tracking-wider">Label / Note</label>
-                                    {currentChapter && (
-                                        <div className="flex items-center gap-2">
-                                            <input
-                                                type="checkbox"
-                                                id="include-chapter"
-                                                checked={includeChapterNote}
-                                                onChange={(e) => {
-                                                    setIncludeChapterNote(e.target.checked);
-                                                    if (e.target.checked) {
-                                                        const suffix = `${currentChapter.title}\n`;
-                                                        if (!note.endsWith(suffix)) {
-                                                            setNote(prev => prev + suffix);
-                                                        }
-                                                    }
-                                                }}
-                                                className="rounded sr-only" // Use custom style or standard
-                                            />
-                                            <label
-                                                htmlFor="include-chapter"
-                                                onClick={() => {
-                                                    const checked = !includeChapterNote;
-                                                    setIncludeChapterNote(checked);
-                                                    if (checked) {
-                                                        const suffix = ` [${currentChapter.title}]`;
-                                                        if (!note.endsWith(suffix)) {
-                                                            setNote(prev => prev + suffix);
-                                                        }
-                                                    }
-                                                }}
-                                                className={`text-xs cursor-pointer select-none transition-colors ${includeChapterNote ? 'text-purple-300' : 'text-white/30 hover:text-white/50'}`}
-                                            >
-                                                {includeChapterNote ? 'Start with chapter title' : 'Use chapter title?'}
-                                            </label>
-                                        </div>
-                                    )}
-                                </div>
+                                <label className="text-xs text-white/50 uppercase tracking-wider">Label / Note</label>
                                 <textarea
                                     placeholder="Why this part hits different..."
                                     value={note}

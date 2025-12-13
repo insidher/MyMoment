@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getSpotifyTrackMetadata, extractSpotifyId } from '@/lib/related';
+import { getSpotifyTrackMetadata, extractSpotifyId, extractYouTubeId } from '@/lib/related';
+import { getYouTubeVideoMetadata } from '@/lib/youtube';
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -18,6 +19,21 @@ export async function GET(request: Request) {
             }
 
             const metadata = await getSpotifyTrackMetadata(trackId);
+            if (metadata) {
+                return NextResponse.json(metadata);
+            } else {
+                return NextResponse.json({ error: 'Failed to fetch metadata' }, { status: 404 });
+            }
+        }
+
+        // Check if it's a YouTube URL
+        if (url.includes('youtube.com') || url.includes('youtu.be')) {
+            const videoId = extractYouTubeId(url);
+            if (!videoId) {
+                return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 });
+            }
+
+            const metadata = await getYouTubeVideoMetadata(videoId);
             if (metadata) {
                 return NextResponse.json(metadata);
             } else {

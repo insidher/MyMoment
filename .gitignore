@@ -35,7 +35,7 @@ yarn-error.log*
 dev.db
 
 # Internal Documentation
-docs/
+# docs/
 
 # env files (can opt-in for committing if needed)
 .env*
