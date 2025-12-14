@@ -4,9 +4,8 @@
 *   **Framework**: [Next.js 16](https://nextjs.org/) (App Router, React 19)
 *   **Language**: TypeScript
 *   **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
-*   **Database**: SQLite (via `better-sqlite3`)
-*   **ORM**: [Prisma v7](https://www.prisma.io/)
-*   **Authentication**: [NextAuth.js v4](https://next-auth.js.org/) (Credentials Provider inferred)
+*   **Database**: Supabase (PostgreSQL)
+*   **Authentication**: [Supabase Auth](https://supabase.com/auth)
 *   **State Management**: React Hooks (`useState`, `useContext`, `useRef`) + URL Search Params.
 
 ## **External APIs**
@@ -15,16 +14,17 @@
 3.  **Spotify Embed / IFrame API**: For playing Spotify tracks. *Note: Requires Premium for full playback; relies on "Hot Engine" workarounds for seeking.*
 
 ## **Database Schema & Data Model**
-*   **`User`**: Core identity (Email, Password, Image).
-*   **`TrackSource`**: Normalized representation of a song/video.
+*   **`profiles`**: User identity (extends Supabase Auth).
+*   **`track_sources`**: Normalized representation of a song/video.
     *   `service` ("youtube" | "spotify")
-    *   `sourceUrl` (Unique key)
-    *   `durationSec` (Cached duration)
-*   **`Moment`**: The core entity.
-    *   `startSec` / `endSec`: Integer timestamps.
+    *   `source_url` (Unique key)
+    *   `duration_sec` (Cached duration)
+*   **`moments`**: The core entity.
+    *   `start_time` / `end_time`: Timestamps.
     *   `note`: User annotation.
-    *   `userId`: Owner.
-    *   **Legacy Fields**: `service`, `sourceUrl` (stored directly on Moment, migration to `TrackSource` relation appears partially planned).
+    *   `user_id`: Owner.
+    *   `resource_id`: Platform ID.
+*   **`likes`**: User likes on moments.
 
 ## **Architectural Patterns**
 *   **Client-Side Player Logic**: Heavy logic in `app/room/[id]/page.tsx` handling audio synchronization, polling (for YouTube), and cross-service playback normalization.

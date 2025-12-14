@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Sparkles, ArrowRight, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
@@ -20,15 +19,17 @@ export default function Login() {
         setError('');
         setLoading(true);
 
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+
         try {
             if (isLogin) {
-                const res = await signIn('credentials', {
-                    redirect: false,
+                const { error } = await supabase.auth.signInWithPassword({
                     email,
                     password,
                 });
 
-                if (res?.error) {
+                if (error) {
                     setError('Invalid email or password');
                 } else {
                     router.push('/profile');
@@ -36,24 +37,24 @@ export default function Login() {
                 }
             } else {
                 // Register
-                const res = await fetch('/api/auth/register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password, name }),
+                const { error: signUpError } = await supabase.auth.signUp({
+                    email,
+                    password,
+                    options: {
+                        data: {
+                            name: name,
+                            full_name: name,
+                        }
+                    }
                 });
 
-                if (res.ok) {
-                    // Auto login after register
-                    await signIn('credentials', {
-                        redirect: false,
-                        email,
-                        password,
-                    });
+                if (signUpError) {
+                    setError(signUpError.message);
+                } else {
+                    // Auto login usually happens, or check for email confirmation
+                    // For now, assume auto-login or redirect
                     router.push('/profile');
                     router.refresh();
-                } else {
-                    const data = await res.json();
-                    setError(data.error || 'Registration failed');
                 }
             }
         } catch (err) {

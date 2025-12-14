@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/prisma';
 import { getYouTubeVideoMetadata } from '@/lib/youtube';
 import { fetchSpotifyMetadata } from '@/lib/metadata';
@@ -10,8 +9,10 @@ export async function POST(
     { params }: { params: { id: string } }
 ) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user?.id) {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 

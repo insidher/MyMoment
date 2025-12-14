@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
+import { createClient } from '@/lib/supabase/client';
+import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Play, Music, Calendar, Youtube } from 'lucide-react';
@@ -9,39 +10,73 @@ import { Moment } from '@/types';
 import MomentCard from '@/components/MomentCard';
 
 export default function Profile() {
-    const { data: session, status } = useSession();
+    const { user, isLoading } = useAuth();
     const router = useRouter();
     const [moments, setMoments] = useState<Moment[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (status === 'unauthenticated') {
+        if (!isLoading && !user) {
             router.push('/login');
-        } else if (status === 'authenticated' && session?.user?.id) {
-            fetchMoments(session.user.id);
+        } else if (user?.id) {
+            fetchMoments(user.id);
         }
-    }, [status, session, router]);
+    }, [user, isLoading, router]);
 
     const fetchMoments = async (userId: string) => {
-        try {
-            const res = await fetch(`/api/moments?userId=${userId}`);
-            const data = await res.json();
-            if (data.moments) {
-                setMoments(data.moments);
-            }
-        } catch (error) {
-            console.error('Failed to fetch moments', error);
-        } finally {
-            setLoading(false);
+        const supabase = createClient();
+
+        const { data, error } = await supabase
+            .from('moments')
+            .select(`
+                *,
+                profiles (
+                    full_name,
+                    avatar_url
+                )
+            `)
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false });
+
+        if (data) {
+            const mappedMoments: Moment[] = data.map((m: any) => ({
+                id: m.id,
+                service: m.platform as any,
+                // Reconstruct Source URL
+                sourceUrl: m.platform === 'youtube' ? `https://www.youtube.com/watch?v=${m.resource_id}` : m.resource_id,
+                startSec: m.start_time,
+                endSec: m.end_time,
+                momentDurationSec: m.end_time - m.start_time,
+                title: m.title,
+                artist: m.artist,
+                artwork: m.artwork,
+                note: m.note,
+                likeCount: m.like_count,
+                savedByCount: m.saved_by_count,
+                createdAt: new Date(m.created_at),
+                user: {
+                    name: m.profiles?.full_name || 'Anonymous',
+                    image: m.profiles?.avatar_url
+                }
+            }));
+            setMoments(mappedMoments);
+        } else if (error) {
+            console.error('Supabase fetch error:', error);
         }
+        setLoading(false);
     };
 
     const handleDelete = async (id: string) => {
         // Confirmation is handled in MomentCard to allow animation
 
         try {
-            const res = await fetch(`/api/moments/${id}`, { method: 'DELETE' });
-            if (res.ok) {
+            const supabase = createClient();
+            const { error } = await supabase
+                .from('moments')
+                .delete()
+                .eq('id', id);
+
+            if (!error) {
                 // Smart Cleanup: Remove all moments that match the deleted one (duplicates)
                 setMoments(prev => {
                     const target = prev.find(m => m.id === id);
@@ -56,13 +91,15 @@ export default function Profile() {
                         ))
                     );
                 });
+            } else {
+                console.error('Failed to delete moment:', error);
             }
         } catch (error) {
             console.error('Failed to delete moment', error);
         }
     };
 
-    if (status === 'loading' || loading) {
+    if (isLoading || loading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white"></div>
@@ -77,11 +114,15 @@ export default function Profile() {
                 {/* Header */}
                 <div className="flex items-center gap-6">
                     <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-4xl font-bold">
-                        {session?.user?.name?.[0] || 'U'}
+                        {user?.user_metadata?.avatar_url ? (
+                            <img src={user.user_metadata.avatar_url} alt={user.email || 'User'} className="w-full h-full rounded-full" />
+                        ) : (
+                            (user?.email?.[0]?.toUpperCase() || 'U')
+                        )}
                     </div>
                     <div>
-                        <h1 className="text-4xl font-bold">{session?.user?.name || 'User'}</h1>
-                        <p className="text-white/60">{session?.user?.email}</p>
+                        <h1 className="text-4xl font-bold">{user?.email?.split('@')[0] || 'User'}</h1>
+                        <p className="text-white/60">{user?.email}</p>
                         <p className="text-white/40 text-sm mt-1">Joined {new Date().toLocaleDateString()}</p>
                     </div>
                 </div>

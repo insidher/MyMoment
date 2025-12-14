@@ -1,7 +1,6 @@
 import { Play, TrendingUp, Music, Heart, User, ArrowLeft, Clock } from 'lucide-react';
 import Link from 'next/link';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 import SongCard from '@/components/SongCard';
 import MomentCard from '@/components/MomentCard';
 import ArtistCard from '@/components/ArtistCard';
@@ -10,7 +9,8 @@ import { getGroupedSongs, getUserArtistStats, getArtistSongs, getRecentMoments }
 import { SongGroup, ArtistStats, Moment } from '@/types';
 
 export default async function Explore({ searchParams }: { searchParams: Promise<{ artist?: string }> }) {
-    const session = await getServerSession(authOptions);
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
     const params = await searchParams;
     const artistFilter = params.artist;
 
@@ -19,14 +19,14 @@ export default async function Explore({ searchParams }: { searchParams: Promise<
     let artistStats: ArtistStats[] = [];
 
     if (artistFilter) {
-        songs = await getArtistSongs(session?.user?.id || '', artistFilter);
+        songs = await getArtistSongs(user?.id || '', artistFilter);
     } else {
         // Main Plaza View: Show recent individual moments
         moments = await getRecentMoments(50);
     }
 
-    if (session?.user?.id && !artistFilter) {
-        artistStats = await getUserArtistStats(session.user.id);
+    if (user && !artistFilter) {
+        artistStats = await getUserArtistStats(user.id);
     }
 
     const vibes = [
@@ -66,7 +66,7 @@ export default async function Explore({ searchParams }: { searchParams: Promise<
                 </div>
 
                 {/* Browse by Artist (Only on main view and if logged in) */}
-                {!artistFilter && session?.user && artistStats.length > 0 && (
+                {!artistFilter && user && artistStats.length > 0 && (
                     <section className="space-y-6">
                         <div className="flex items-center gap-2 text-xl font-semibold text-white/90">
                             <User size={24} className="text-blue-400" />

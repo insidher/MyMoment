@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
-import SessionProvider from "@/components/SessionProvider";
+import { AuthProvider } from "@/context/AuthContext";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -18,13 +18,13 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="en">
-            <body className={`${inter.className} bg-black text-white antialiased`}>
-                <SessionProvider>
+            <body className={`${inter.className} bg-black text-white antialiased`} suppressHydrationWarning>
+                <AuthProvider>
                     <Navbar />
                     <div className="pt-28">
                         {children}
                     </div>
-                </SessionProvider>
+                </AuthProvider>
             </body>
         </html>
     );

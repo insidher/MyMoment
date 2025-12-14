@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(
@@ -8,13 +7,15 @@ export async function POST(
     { params }: { params: Promise<{ id: string }> } // Params is a Promise in Next.js 15+
 ) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user?.id) {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
         const { id: momentId } = await params;
-        const userId = session.user.id;
+        const userId = user.id;
 
         // Check if already liked
         const existingLike = await prisma.like.findUnique({

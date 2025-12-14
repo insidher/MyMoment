@@ -3,13 +3,13 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Sparkles, Compass, User, LogOut, Search } from 'lucide-react';
-import { useSession, signOut } from 'next-auth/react';
+import { useAuth } from '@/context/AuthContext';
 import { useState } from 'react';
 
 export default function Navbar() {
     const pathname = usePathname();
     const router = useRouter();
-    const { data: session } = useSession();
+    const { user, signOut } = useAuth();
     const [searchQuery, setSearchQuery] = useState('');
 
     const isActive = (path: string) => pathname === path;
@@ -61,13 +61,13 @@ export default function Navbar() {
 
                     {/* User Menu */}
                     <div className="flex-shrink-0">
-                        {session ? (
+                        {user ? (
                             <div className="flex items-center gap-3">
                                 <Link href="/profile" className="flex items-center gap-2 hover:bg-white/5 px-2 py-1.5 rounded-full transition-colors">
                                     <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-sm font-bold">
-                                        {session.user?.name?.[0] || session.user?.email?.[0] || 'U'}
+                                        {user.email?.[0]?.toUpperCase() || 'U'}
                                     </div>
-                                    <span className="text-sm font-medium hidden md:block">{session.user?.name || 'User'}</span>
+                                    <span className="text-sm font-medium hidden md:block">{user.email?.split('@')[0] || 'User'}</span>
                                 </Link>
                                 <button
                                     onClick={() => signOut()}

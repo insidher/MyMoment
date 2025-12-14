@@ -1,4 +1,5 @@
 'use client';
+import { createClient } from '@/lib/supabase/client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -13,7 +14,7 @@ import MomentCard from '@/components/MomentCard';
 import MomentGroup from '@/components/MomentGroup';
 import PlayerTimeline from '@/components/PlayerTimeline';
 import { RelatedItem } from '@/lib/related';
-import { useSession } from 'next-auth/react';
+import { useAuth } from '@/context/AuthContext';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
 import { MyMomentIcon } from '@/components/icons/MyMomentIcon';
 import { parseChapters, getCurrentChapter, Chapter } from '@/lib/chapters';
@@ -43,7 +44,6 @@ const groupMoments = (moments: Moment[]): { main: Moment; replies: Moment[] }[] 
     return Object.values(groups);
 };
 
-// Minimal interface for Spotify IFrame API Controller
 interface SpotifyController {
     loadUri: (uri: string) => void;
     play: () => void;
@@ -55,9 +55,23 @@ interface SpotifyController {
     destroy: () => void;
 }
 
+// Helper to get resource ID
+const getResourceId = (url: string): { id: string; platform: 'youtube' | 'spotify' } | null => {
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+        let id = '';
+        if (url.includes('v=')) id = url.split('v=')[1]?.split('&')[0];
+        else if (url.includes('youtu.be/')) id = url.split('youtu.be/')[1]?.split('?')[0];
+        return id ? { id, platform: 'youtube' } : null;
+    }
+    if (url.includes('spotify.com')) {
+        return { id: url, platform: 'spotify' };
+    }
+    return null;
+};
+
 export default function Room({ params }: { params: { id: string } }) {
-    const { data: session, status } = useSession();
-    console.log('[Room] Client Session:', status, session);
+    const { user, isLoading } = useAuth();
+    console.log('[Room] Client User:', user);
 
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -87,6 +101,15 @@ export default function Room({ params }: { params: { id: string } }) {
     const [isSeekingToStart, setIsSeekingToStart] = useState(false);
     const [isReloading, setIsReloading] = useState(false); // Visual reload state
     const [isPlaying, setIsPlaying] = useState(false); // Unified playing state
+
+    // Auto-Heal Guard
+    // Auto-Heal Guard (Strict)
+    const hasUpdatedDuration = useRef(false);
+
+    // Reset guard when URL changes
+    useEffect(() => {
+        hasUpdatedDuration.current = false;
+    }, [url]);
 
 
     // Real Metadata State
@@ -123,45 +146,82 @@ export default function Room({ params }: { params: { id: string } }) {
     const endParam = searchParams.get('end');
 
     // Sound Effects
+    const [activeMoment, setActiveMoment] = useState<Moment | null>(null);
     const { playStart, playStop } = useSoundEffects();
 
     // Fetch Metadata & Moments on Load
     useEffect(() => {
         if (!url) return;
 
+        const supabase = createClient();
+
         // Auto-play if start param exists
         if (startParam) {
             const start = parseInt(startParam);
             const end = endParam ? parseInt(endParam) : null;
-
             setStartSec(start);
             setEndSec(end);
-            setCaptureState('end-captured'); // Show preview mode
-
-            // Enabling Auto-Stop for "Moment Mode"
+            setCaptureState('end-captured');
             if (end) {
-                // We mock an active moment to trigger the supervisor effect
                 const tempMoment: Moment = {
                     id: 'temp-preview',
                     service: isSpotify ? 'spotify' : 'youtube',
                     sourceUrl: url,
                     startSec: start,
                     endSec: end,
+                    start_time: start, // Add compatibility fields
+                    end_time: end,
+                    platform: isSpotify ? 'spotify' : 'youtube',
                     createdAt: new Date(),
-                };
+                } as Moment;
                 setActiveMoment(tempMoment);
             }
-
-            // Note: Player seeking happens in player ready/update effects
         }
 
-        // Fetch Moments
-        fetch(`/api/moments?sourceUrl=${encodeURIComponent(url)}`)
-            .then(res => res.json())
-            .then(data => {
-                if (data.moments) setMoments(data.moments);
-            })
-            .catch(err => console.error('Failed to fetch moments', err));
+        const fetchMoments = async () => {
+            const resource = getResourceId(url);
+            if (!resource) return;
+
+            // Fetch from Supabase
+            const { data, error } = await supabase
+                .from('moments')
+                .select(`
+                    *,
+                    profiles (
+                        full_name,
+                        avatar_url
+                    )
+                `)
+                .eq('resource_id', resource.id)
+                .order('created_at', { ascending: false });
+
+            if (data) {
+                const mappedMoments: Moment[] = data.map((m: any) => ({
+                    id: m.id,
+                    service: m.platform as any,
+                    sourceUrl: url,
+                    startSec: m.start_time,
+                    endSec: m.end_time,
+                    momentDurationSec: m.end_time - m.start_time,
+                    title: m.title,
+                    artist: m.artist,
+                    artwork: m.artwork,
+                    note: m.note,
+                    likeCount: m.like_count,
+                    savedByCount: m.saved_by_count,
+                    createdAt: new Date(m.created_at),
+                    user: {
+                        name: m.profiles?.full_name || 'Anonymous',
+                        image: m.profiles?.avatar_url
+                    }
+                }));
+                setMoments(mappedMoments);
+            } else if (error) {
+                console.error('Supabase fetch error:', error);
+            }
+        };
+
+        fetchMoments();
 
         // Fetch Spotify Metadata
         if (isSpotify) {
@@ -171,12 +231,10 @@ export default function Room({ params }: { params: { id: string } }) {
                     if (data && !data.error) {
                         setMetadata(data);
                     } else {
-                        console.warn('Metadata fetch failed:', data.error);
                         setMetadata({ title: 'Spotify Track', artist: 'Unknown Artist', artwork: '', description: '' });
                     }
                 })
                 .catch(err => {
-                    console.error('Failed to fetch Spotify metadata', err);
                     setMetadata({ title: 'Spotify Track', artist: 'Unknown Artist', artwork: '', description: '' });
                 });
         }
@@ -187,19 +245,18 @@ export default function Room({ params }: { params: { id: string } }) {
                 .then(res => res.json())
                 .then(data => {
                     if (data && !data.error) {
-                        // Merge with existing metadata (keep artwork from player if needed, but API is better)
                         setMetadata(prev => ({
                             ...prev,
                             title: data.title || prev.title,
                             artist: data.channelTitle || prev.artist,
                             description: data.description || '',
-                            // artwork: data.thumbnails.maxres || ... (optional, player is usually fast)
                         }));
                     }
                 })
                 .catch(err => console.error('Failed to fetch YouTube metadata', err));
         }
-    }, [url, isSpotify, startParam, endParam]);
+
+    }, [url, isSpotify, isYouTube, startParam, endParam]);
 
     // YouTube Polling for Timeline
     useEffect(() => {
@@ -462,52 +519,105 @@ export default function Room({ params }: { params: { id: string } }) {
         }
     };
 
+    // New Direct Handlers for Timeline
+    const handleCaptureStart = (time: number) => {
+        setStartSec(time);
+        setCaptureState('start-captured');
+        setError('');
+    };
+
+    const handleCaptureEnd = (time: number) => {
+        setEndSec(time);
+        setCaptureState('end-captured');
+        setError('');
+    };
+
     const handleSave = async () => {
         if (startSec == null || endSec == null || !note) return;
 
-        console.log('[handleSave] Saving moment with metadata:', metadata);
-        console.log('[handleSave] Artist value:', metadata.artist);
-
+        console.log('[handleSave] Saving to Supabase:', metadata);
         setIsSaving(true);
+
         try {
-            const res = await fetch('/api/moments', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    sourceUrl: url,
-                    service: isSpotify ? 'spotify' : 'youtube',
-                    startSec,
-                    endSec,
-                    note,
+            const supabase = createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+
+            if (!user) {
+                setError('You must be logged in');
+                setIsSaving(false);
+                return;
+            }
+
+            const resource = getResourceId(url);
+            if (!resource) {
+                setError('Invalid resource');
+                setIsSaving(false);
+                return;
+            }
+
+            // Insert into Supabase
+            const { data, error } = await supabase
+                .from('moments')
+                .insert({
+                    user_id: user.id,
+                    resource_id: resource.id,
+                    platform: resource.platform,
+                    start_time: startSec,
+                    end_time: endSec,
+                    note: note,
                     title: metadata.title,
                     artist: metadata.artist,
                     artwork: metadata.artwork,
-                    duration: isSpotify ? spotifyProgress.duration : playbackState.duration, // Pass current duration
-                }),
-            });
+                })
+                .select(`
+                    *,
+                    profiles (
+                        full_name,
+                        avatar_url
+                    )
+                `)
+                .single();
 
-            if (res.ok) {
+            if (data) {
                 setSaved(true);
-                const data = await res.json();
-                setMoments([...moments, data.moment]);
+                // Map back to UI type
+                const newMoment: Moment = {
+                    id: data.id,
+                    service: data.platform as any,
+                    sourceUrl: url,
+                    startSec: data.start_time,
+                    endSec: data.end_time,
+                    note: data.note,
+                    title: data.title,
+                    artist: data.artist,
+                    artwork: data.artwork,
+                    createdAt: new Date(data.created_at),
+                    user: {
+                        name: data.profiles?.full_name || user.user_metadata?.full_name || 'Me',
+                        image: data.profiles?.avatar_url || user.user_metadata?.avatar_url
+                    }
+                } as Moment;
+
+                setMoments([newMoment, ...moments]);
                 setTimeout(() => setSaved(false), 3000);
                 setCaptureState('idle');
                 setStartSec(null);
                 setEndSec(null);
                 setNote('');
-            } else {
-                const errorData = await res.json();
-                setError(errorData.error || 'Failed to save moment');
+            } else if (error) {
+                console.error('Supabase save error:', error);
+                setError(error.message || 'Failed to save moment');
             }
-        } catch (error) {
+
+        } catch (error: any) {
             console.error('Failed to save', error);
-            setError('Failed to save moment');
+            setError(error.message || 'Failed to save moment');
         } finally {
             setIsSaving(false);
         }
     };
 
-    const [activeMoment, setActiveMoment] = useState<Moment | null>(null);
+
 
     // Moment Playback Logic (Fades & Auto-Stop)
     useEffect(() => {
@@ -580,25 +690,35 @@ export default function Room({ params }: { params: { id: string } }) {
             const currentDuration = isSpotify ? spotifyProgress.duration : playbackState.duration;
             if (currentDuration <= 0) return;
 
-            // Check if current trackSource needs update
-            // (We can't easily check TrackSource here without fetching, but we can check if any loaded moment is missing it)
+            // Strict Guard: One-Time-Only Per Video
+            if (hasUpdatedDuration.current) return;
+
+            // Check if ANY loaded moment is missing duration. 
+            // If so, we assume the trackSource might need an update.
             const missingDuration = moments.some(m => !m.trackSource?.durationSec || m.trackSource.durationSec === 0);
 
             if (missingDuration) {
                 console.log('[Auto-Heal] Detected missing duration, updating backend:', currentDuration);
+
+                // LOCK immediately
+                hasUpdatedDuration.current = true;
+
                 fetch('/api/tracks/update-duration', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ sourceUrl: url, durationSec: currentDuration })
                 }).then(() => {
-                    console.log('[Auto-Heal] Duration updated. Refreshing moments...');
-                    // Ideally re-fetch moments here to update UI
-                    // quick hack: just update local state
+                    console.log('[Auto-Heal] Duration updated.');
+                    // Update local state to reflect change
                     setMoments(prev => prev.map(m => ({
                         ...m,
                         trackSource: m.trackSource ? { ...m.trackSource, durationSec: currentDuration } : undefined
                     })));
-                }).catch(err => console.error('[Auto-Heal] Failed:', err));
+                }).catch(err => {
+                    console.error('[Auto-Heal] Failed:', err);
+                    // Do NOT reset guard. If it failed, it failed. 
+                    // Retrying in a loop is exactly what we want to avoid.
+                });
             }
         }
     }, [playbackState.duration, spotifyProgress.duration, moments, url, isSpotify]);
@@ -668,6 +788,17 @@ export default function Room({ params }: { params: { id: string } }) {
         }
     };
 
+    // Auto-End Recording on Stop
+    useEffect(() => {
+        if (!isPlaying && startSec !== null && endSec === null) {
+            // Player stopped while recording -> Set End
+            const current = isYouTube && youtubePlayer ? youtubePlayer.getCurrentTime() : spotifyProgress.current;
+            const safeEnd = Math.max(current, startSec + 1); // MINIMUM 1s duration
+            setEndSec(safeEnd);
+            setCaptureState('end-captured');
+        }
+    }, [isPlaying, startSec, endSec, isYouTube, youtubePlayer, spotifyProgress.current]);
+
     const handlePauseMoment = (moment: Moment) => {
         if (activeMoment?.id === moment.id) {
             if (moment.service === 'youtube' && youtubePlayer) {
@@ -719,17 +850,29 @@ export default function Room({ params }: { params: { id: string } }) {
         }
     };
 
-    const handleSkipForward = () => {
+    const handleSeekRelative = (seconds: number) => {
         // Stop any active moment logic
         if (activeMoment) setActiveMoment(null);
 
         let current = 0;
+        // Ensure duration is safe
+        const duration = playbackState.duration || 0;
+
         if (isYouTube && youtubePlayer) {
             current = youtubePlayer.getCurrentTime();
-            youtubePlayer.seekTo(current + 15, true);
         } else if (isSpotify && spotifyPlayer) {
             current = spotifyTimeRef.current;
-            spotifyPlayer.seek(current + 15); // Changed from (current + 15) * 1000
+        }
+
+        let newTime = current + seconds;
+        // Clamp time
+        if (newTime < 0) newTime = 0;
+        if (newTime > duration) newTime = duration;
+
+        if (isYouTube && youtubePlayer) {
+            youtubePlayer.seekTo(newTime, true);
+        } else if (isSpotify && spotifyPlayer) {
+            spotifyPlayer.seek(newTime);
         }
     };
 
@@ -742,6 +885,27 @@ export default function Room({ params }: { params: { id: string } }) {
     const youtubeId = getYouTubeId(url);
 
     console.log('[Room] Debug:', { rawUrl, url, isYouTube, youtubeId, startParam });
+
+    const handlePreviewCapture = () => {
+        if (startSec !== null && endSec !== null) {
+            // Create a temporary moment object for preview
+            const previewMoment: Moment = {
+                id: 'preview-capture',
+                // Track info is implicit
+                startSec: startSec,
+                endSec: endSec,
+                userId: '', // Preview doesn't need real user
+                createdAt: new Date().toISOString(), // Use string format for Moment interface
+                note: note || 'New Moment',
+                service: isYouTube ? 'youtube' : 'spotify',
+                sourceUrl: url,
+                likeCount: 0
+            };
+
+            // Reuse existing playMoment logic to handle seeking/sounds
+            playMoment(previewMoment);
+        }
+    };
 
     return (
         <main className="min-h-screen p-6 flex flex-col items-center">
@@ -864,40 +1028,124 @@ export default function Room({ params }: { params: { id: string } }) {
                                 />
                             </div> */}
 
-                            <div className="flex items-center justify-center gap-4 mt-2 mb-2">
+                            <div className="flex items-center justify-center gap-6 mt-4 mb-2 select-none">
+                                {/* Left Controls: Seek Back */}
+                                {(playbackState.duration > 1740) && (
+                                    <button
+                                        onClick={() => handleSeekRelative(-600)}
+                                        className="text-white/70 hover:text-white font-mono text-xl p-2 transition-colors"
+                                        title="-10 minutes"
+                                    >
+                                        &lt;&lt;&lt;
+                                    </button>
+                                )}
                                 <button
-                                    onClick={() => handleTogglePlay(true)}
-                                    className="p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
-                                    title="Play"
+                                    onClick={() => handleSeekRelative(-15)}
+                                    className="text-white/70 hover:text-white font-mono text-xl p-2 transition-colors"
+                                    title="-15 seconds"
                                 >
-                                    <Play className="w-5 h-5 fill-current" />
+                                    &lt;&lt;
                                 </button>
                                 <button
-                                    onClick={() => handleTogglePlay(false)}
-                                    className="p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
-                                    title="Pause"
+                                    onClick={() => handleSeekRelative(-2)}
+                                    className="text-white/70 hover:text-white font-mono text-xl p-2 transition-colors"
+                                    title="-2 seconds"
                                 >
-                                    <Pause className="w-5 h-5 fill-current" />
+                                    &lt;
+                                </button>
+
+                                {/* Center: Play/Pause */}
+                                <button
+                                    onClick={() => handleTogglePlay(!isPlaying)}
+                                    className="p-4 rounded-full bg-white text-black hover:scale-105 transition-transform shadow-lg"
+                                    title={isPlaying ? "Pause" : "Play"}
+                                >
+                                    {isPlaying ? (
+                                        <Pause className="w-6 h-6 fill-current" />
+                                    ) : (
+                                        <Play className="w-6 h-6 fill-current ml-0.5" />
+                                    )}
+                                </button>
+
+                                {/* Right Controls: Seek Forward */}
+                                <button
+                                    onClick={() => handleSeekRelative(2)}
+                                    className="text-white/70 hover:text-white font-mono text-xl p-2 transition-colors"
+                                    title="+2 seconds"
+                                >
+                                    &gt;
                                 </button>
                                 <button
-                                    onClick={handleSkipForward}
-                                    className="p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
-                                    title="Skip 15s"
+                                    onClick={() => handleSeekRelative(15)}
+                                    className="text-white/70 hover:text-white font-mono text-xl p-2 transition-colors"
+                                    title="+15 seconds"
                                 >
-                                    <FastForward className="w-5 h-5 fill-current" />
+                                    &gt;&gt;
                                 </button>
+                                {(playbackState.duration > 1740) && (
+                                    <button
+                                        onClick={() => handleSeekRelative(600)}
+                                        className="text-white/70 hover:text-white font-mono text-xl p-2 transition-colors"
+                                        title="+10 minutes"
+                                    >
+                                        &gt;&gt;&gt;
+                                    </button>
+                                )}
                             </div>
+
 
                             {/* Unified Player Timeline (Spotify & YouTube) */}
                             {(isSpotify || isYouTube) && (
                                 <PlayerTimeline
                                     currentTime={isSpotify ? spotifyProgress.current : playbackState.current}
                                     duration={isSpotify ? spotifyProgress.duration : playbackState.duration}
+                                    isPlaying={isPlaying}
                                     moments={moments}
                                     onSeek={handleSeek}
                                     onMomentClick={playMoment}
-                                    captureState={captureState}
-                                    onSmartCapture={handleSmartCapture}
+                                    onChapterClick={(chapter) => handleSeek(chapter.startSec)}
+                                    startSec={startSec}
+                                    endSec={endSec}
+                                    note={note}
+                                    onNoteChange={setNote}
+                                    onSaveMoment={handleSave}
+                                    onCancelCapture={() => {
+                                        setStartSec(null);
+                                        setEndSec(null);
+                                        setCaptureState('idle');
+                                        setError('');
+                                    }}
+                                    onPreviewCapture={handlePreviewCapture}
+                                    onCaptureStart={(time) => {
+                                        setStartSec(time);
+                                        setCaptureState('start-captured');
+                                        setError('');
+                                    }}
+                                    onCaptureEnd={(time) => {
+                                        setEndSec(time);
+                                        setCaptureState('end-captured');
+                                        setError('');
+                                    }}
+                                    onCaptureUpdate={(start, end) => {
+                                        // Allow clearing (null)
+                                        if (start === null && end === null) {
+                                            setStartSec(null);
+                                            setEndSec(null);
+                                            setCaptureState('idle');
+                                        } else {
+                                            if (start !== undefined) setStartSec(start);
+                                            if (end !== undefined) setEndSec(end);
+
+                                            // State Inference
+                                            if (start === null) {
+                                                setCaptureState('idle');
+                                            } else if (end === null) {
+                                                setCaptureState('start-captured');
+                                            } else if (start !== null && end !== null) {
+                                                setCaptureState('end-captured');
+                                            }
+                                        }
+                                    }}
                                     activeMomentId={activeMoment?.id}
                                     chapters={chapters}
                                 />
@@ -972,7 +1220,7 @@ export default function Room({ params }: { params: { id: string } }) {
                                                         console.error(e);
                                                     }
                                                 }}
-                                                showDelete={session?.user?.id === group.main.userId}
+                                                showDelete={user?.id === group.main.userId}
                                                 onPlayFull={() => {
                                                     router.push(`/room/view?url=${encodeURIComponent(group.main.sourceUrl)}`);
                                                 }}

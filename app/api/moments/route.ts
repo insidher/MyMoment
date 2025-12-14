@@ -1,15 +1,13 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/prisma';
 import { findOrCreateTrackSource } from '@/lib/trackSource';
-
 export async function POST(request: Request) {
     try {
-        const session = await getServerSession(authOptions);
-        console.log('[API] POST /api/moments - Session:', JSON.stringify(session, null, 2));
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
 
-        if (!session?.user?.id) {
+        if (!user) {
             console.warn('[API] Unauthorized attempt to save moment');
             return NextResponse.json(
                 { error: 'You must be logged in to save moments' },
@@ -100,7 +98,7 @@ export async function POST(request: Request) {
             prisma.moment.create({
                 data: {
                     ...momentData,
-                    userId: session.user.id,
+                    userId: user.id,
                 },
                 include: {
                     trackSource: true,
@@ -169,12 +167,13 @@ export async function GET(request: Request) {
 
         // Check for likes if user is logged in
         let momentsWithLikes = moments;
-        const session = await getServerSession(authOptions);
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
 
-        if (session?.user?.id) {
+        if (user) {
             const likedMomentIds = await prisma.like.findMany({
                 where: {
-                    userId: session.user.id,
+                    userId: user.id,
                     momentId: { in: moments.map(m => m.id) }
                 },
                 select: { momentId: true }
