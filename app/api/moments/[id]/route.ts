@@ -1,46 +1,58 @@
-import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { prisma } from '@/lib/prisma';
+import { NextResponse } from 'next/server';
 
-export async function DELETE(
+export async function PATCH(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> } // Params is a Promise in Next.js 15
 ) {
-    try {
-        const supabase = await createClient();
-        const { data: { user } } = await supabase.auth.getUser();
+    const { id } = await params;
+    const supabase = await createClient(); // Await the promise
+    const { data: { user } } = await supabase.auth.getUser();
 
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    try {
+        const json = await request.json();
+        const { note } = json;
+
+        if (note === undefined) {
+            return NextResponse.json({ error: 'Note is required' }, { status: 400 });
         }
 
-        const moment = await prisma.moment.findUnique({
-            where: { id: params.id },
-        });
+        //Verify ownership
+        const { data: moment, error: fetchError } = await supabase
+            .from('moments')
+            .select('user_id')
+            .eq('id', id)
+            .single();
 
-        if (!moment) {
+        if (fetchError || !moment) {
             return NextResponse.json({ error: 'Moment not found' }, { status: 404 });
         }
 
-        if (moment.userId !== user.id) {
+        if (moment.user_id !== user.id) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        // Consolidate Cleanup: Delete this moment AND any exact duplicates owned by the same user.
-        // matches: sourceUrl, startSec, endSec, userId
-        await prisma.moment.deleteMany({
-            where: {
-                userId: user.id, // Security check: Ensure we only delete user's own items
-                sourceUrl: moment.sourceUrl,
-                startSec: moment.startSec,
-                endSec: moment.endSec,
-                // We don't strictly match note, title, etc. If it's the same timestamp/source, it's the "same moment" for this user.
-            },
-        });
+        // Update
+        const { data, error } = await supabase
+            .from('moments')
+            .update({
+                note,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', id)
+            .select()
+            .single();
 
-        return NextResponse.json({ success: true });
+        if (error) throw error;
+
+        return NextResponse.json({ success: true, moment: data });
+
     } catch (error) {
-        console.error('Failed to delete moment:', error);
-        return NextResponse.json({ error: 'Failed to delete moment' }, { status: 500 });
+        console.error('Update moment error:', error);
+        return NextResponse.json({ error: 'Failed to update moment' }, { status: 500 });
     }
 }

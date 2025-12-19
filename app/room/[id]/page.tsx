@@ -1,12 +1,12 @@
 'use client';
 import { createClient } from '@/lib/supabase/client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Play, Pause, Save, Clock, ArrowLeft, Check, RotateCcw, ListMusic, Loader2, FastForward } from 'lucide-react';
+import { Play, Pause, Save, Clock, ArrowLeft, Check, RotateCcw, ListMusic, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import YouTube, { YouTubeEvent } from 'react-youtube';
-import { fetchSpotifyMetadata } from '@/lib/metadata';
+import { toast } from 'sonner';
 import { Moment } from '@/types';
 import RelatedStrip from '@/components/RelatedStrip';
 import MomentTimeline from '@/components/MomentTimeline';
@@ -15,6 +15,7 @@ import MomentGroup from '@/components/MomentGroup';
 import PlayerTimeline from '@/components/PlayerTimeline';
 import { RelatedItem } from '@/lib/related';
 import { useAuth } from '@/context/AuthContext';
+import { getTrackMoments } from '../../explore/actions';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
 import { MyMomentIcon } from '@/components/icons/MyMomentIcon';
 import { parseChapters, getCurrentChapter, Chapter } from '@/lib/chapters';
@@ -182,42 +183,21 @@ export default function Room({ params }: { params: { id: string } }) {
             const resource = getResourceId(url);
             if (!resource) return;
 
-            // Fetch from Supabase
-            const { data, error } = await supabase
-                .from('moments')
-                .select(`
-                    *,
-                    profiles (
-                        full_name,
-                        avatar_url
-                    )
-                `)
-                .eq('resource_id', resource.id)
-                .order('created_at', { ascending: false });
+            try {
+                // Use Server Action to bypass RLS
+                // Query by the FULL URL (sourceUrl) because that is how it is stored in the DB
+                const data = await getTrackMoments(url);
 
-            if (data) {
+                // Map to ensure any missing fields or local overrides
                 const mappedMoments: Moment[] = data.map((m: any) => ({
-                    id: m.id,
-                    service: m.platform as any,
+                    ...m,
                     sourceUrl: url,
-                    startSec: m.start_time,
-                    endSec: m.end_time,
-                    momentDurationSec: m.end_time - m.start_time,
-                    title: m.title,
-                    artist: m.artist,
-                    artwork: m.artwork,
-                    note: m.note,
-                    likeCount: m.like_count,
-                    savedByCount: m.saved_by_count,
-                    createdAt: new Date(m.created_at),
-                    user: {
-                        name: m.profiles?.full_name || 'Anonymous',
-                        image: m.profiles?.avatar_url
-                    }
+                    momentDurationSec: m.momentDurationSec || (m.endSec - m.startSec)
                 }));
+
                 setMoments(mappedMoments);
-            } else if (error) {
-                console.error('Supabase fetch error:', error);
+            } catch (err) {
+                console.error('Failed to fetch moments:', err);
             }
         };
 
@@ -324,6 +304,7 @@ export default function Room({ params }: { params: { id: string } }) {
             return;
         }
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const initSpotifyPlayer = (IFrameAPI: any) => {
             const element = document.getElementById('spotify-embed');
             if (!element) return;
@@ -337,7 +318,7 @@ export default function Room({ params }: { params: { id: string } }) {
                         EmbedController.seek(parseInt(startParam));
                     }, 1000);
                 }
-                EmbedController.addListener('playback_update', (e: any) => {
+                EmbedController.addListener('playback_update', (e: { data: { position: number; duration: number; isPaused: boolean } }) => {
                     if (e && e.data) {
                         const current = Math.floor(e.data.position / 1000);
                         const duration = Math.floor(e.data.duration / 1000);
@@ -351,15 +332,15 @@ export default function Room({ params }: { params: { id: string } }) {
             IFrameAPI.createController(element, options, callback);
         };
 
-        // @ts-ignore
+        // @ts-expect-error
         if (window.SpotifyIframeApi) {
             // @ts-ignore
             initSpotifyPlayer(window.SpotifyIframeApi);
         } else if (
-            // @ts-ignore
+            // @ts-expect-error
             !window.onSpotifyIframeApiReady
         ) {
-            // @ts-ignore
+            // @ts-expect-error
             window.onSpotifyIframeApiReady = (IFrameAPI: any) => initSpotifyPlayer(IFrameAPI);
             if (!document.getElementById('spotify-iframe-api')) {
                 const script = document.createElement('script');
@@ -535,85 +516,104 @@ export default function Room({ params }: { params: { id: string } }) {
     const handleSave = async () => {
         if (startSec == null || endSec == null || !note) return;
 
-        console.log('[handleSave] Saving to Supabase:', metadata);
+        console.log('[handleSave] Saving via API:', metadata);
         setIsSaving(true);
 
         try {
-            const supabase = createClient();
-            const { data: { user } } = await supabase.auth.getUser();
+            const payload = {
+                sourceUrl: url,
+                startSec,
+                endSec,
+                note,
+                // Pass metadata if available
+                title: metadata?.title || 'Unknown Title',
+                artist: metadata?.artist || 'Unknown Artist',
+                artwork: metadata?.artwork || null,
+                service: isSpotify ? 'spotify' : 'youtube',
+            };
 
-            if (!user) {
-                setError('You must be logged in');
-                setIsSaving(false);
-                return;
+            const res = await fetch('/api/moments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                // If 401, handle specifically?
+                throw new Error(data.error || 'Failed to save moment');
             }
 
-            const resource = getResourceId(url);
-            if (!resource) {
-                setError('Invalid resource');
-                setIsSaving(false);
-                return;
-            }
+            // Success!!
+            setSaved(true);
+            toast.success("Moment captured!");
 
-            // Insert into Supabase
-            const { data, error } = await supabase
-                .from('moments')
-                .insert({
-                    user_id: user.id,
-                    resource_id: resource.id,
-                    platform: resource.platform,
-                    start_time: startSec,
-                    end_time: endSec,
-                    note: note,
-                    title: metadata.title,
-                    artist: metadata.artist,
-                    artwork: metadata.artwork,
-                })
-                .select(`
-                    *,
-                    profiles (
-                        full_name,
-                        avatar_url
-                    )
-                `)
-                .single();
-
-            if (data) {
-                setSaved(true);
-                // Map back to UI type
+            // The API returns the new moment. We can add it directly.
+            // But we need to match the type.
+            if (data.moment) {
+                const m = data.moment;
                 const newMoment: Moment = {
-                    id: data.id,
-                    service: data.platform as any,
+                    id: m.id,
+                    service: m.service || m.platform,
                     sourceUrl: url,
-                    startSec: data.start_time,
-                    endSec: data.end_time,
-                    note: data.note,
-                    title: data.title,
-                    artist: data.artist,
-                    artwork: data.artwork,
-                    createdAt: new Date(data.created_at),
+                    startSec: m.startSec || m.start_time,
+                    endSec: m.endSec || m.end_time,
+                    momentDurationSec: (m.endSec || m.end_time) - (m.startSec || m.start_time),
+                    title: m.title,
+                    artist: m.artist,
+                    artwork: m.artwork,
+                    note: m.note,
+                    likeCount: m.likeCount || 0,
+                    savedByCount: m.savedByCount || 1,
+                    createdAt: new Date(m.createdAt || m.created_at),
                     user: {
-                        name: data.profiles?.full_name || user.user_metadata?.full_name || 'Me',
-                        image: data.profiles?.avatar_url || user.user_metadata?.avatar_url
+                        name: m.user?.name || m.user?.full_name || 'Me',
+                        image: m.user?.image || m.user?.avatar_url
                     }
                 } as Moment;
-
                 setMoments([newMoment, ...moments]);
-                setTimeout(() => setSaved(false), 3000);
-                setCaptureState('idle');
-                setStartSec(null);
-                setEndSec(null);
-                setNote('');
-            } else if (error) {
-                console.error('Supabase save error:', error);
-                setError(error.message || 'Failed to save moment');
             }
 
-        } catch (error: any) {
+            setTimeout(() => setSaved(false), 3000);
+
+            // Reset UI
+            setCaptureState('idle');
+            setStartSec(null);
+            setEndSec(null);
+            setNote('');
+
+        } catch (error: unknown) {
             console.error('Failed to save', error);
-            setError(error.message || 'Failed to save moment');
+            const message = error instanceof Error ? error.message : 'Failed to save moment';
+            setError(message);
+            toast.error(message);
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handleUpdateMoment = async (id: string, newNote: string) => {
+        try {
+            const res = await fetch(`/api/moments/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ note: newNote }),
+            });
+
+            if (!res.ok) throw new Error('Failed to update moment');
+
+            // Update local state
+            setMoments(prev => prev.map(m =>
+                m.id === id ? { ...m, note: newNote, updatedAt: new Date().toISOString() } : m
+            ));
+
+            toast.success("Moment updated!");
+            return true;
+        } catch (error) {
+            console.error('Update failed', error);
+            toast.error("Failed to update moment");
+            return false;
         }
     };
 
@@ -1176,11 +1176,11 @@ export default function Room({ params }: { params: { id: string } }) {
                         </div>
 
                         {/* Moments List */}
-                        {/* Moments List */}
                         <div className="glass-panel p-6 space-y-6">
                             <h3 className="text-xl font-semibold flex items-center gap-2 border-b border-white/10 pb-6">
                                 <ListMusic size={20} className="text-blue-400" />
-                                Saved Moments ({moments.length})
+                                {/* Show count of GROUPS (distinct moments), not total posts including replies */}
+                                Saved Moments ({groupMoments(moments).length})
                             </h3>
 
                             <div className="grid gap-3">
@@ -1400,7 +1400,7 @@ export default function Room({ params }: { params: { id: string } }) {
                                     </>
                                 ) : (
                                     <>
-                                        <Save size={18} />
+                                        {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
                                         {isSaving ? 'Saving...' : 'Save Moment'}
                                     </>
                                 )}

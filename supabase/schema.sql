@@ -151,3 +151,14 @@ WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can delete their own likes" 
 ON public.likes FOR DELETE 
 USING (auth.uid() = user_id);
+
+-- 
+-- 8. Add updated_at to moments
+--
+ALTER TABLE public.moments 
+ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE;
+
+-- Update existing rows to have updated_at = created_at
+UPDATE public.moments 
+SET updated_at = created_at 
+WHERE updated_at IS NULL;

@@ -95,6 +95,7 @@ export interface Database {
                     like_count: number | null
                     saved_by_count: number | null
                     created_at: string
+                    updated_at: string | null
                 }
                 Insert: {
                     id?: string
