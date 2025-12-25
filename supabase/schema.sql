@@ -7,11 +7,15 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL,
+  username TEXT UNIQUE,
   full_name TEXT,
   avatar_url TEXT,
   updated_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Create unique index on username for fast lookups
+CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_username ON public.profiles(username);
 
 -- RLS: Profiles
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -32,10 +36,11 @@ USING (auth.uid() = id);
 CREATE OR REPLACE FUNCTION public.handle_new_user() 
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, full_name, avatar_url)
+  INSERT INTO public.profiles (id, email, username, full_name, avatar_url)
   VALUES (
     new.id, 
-    new.email, 
+    new.email,
+    new.raw_user_meta_data->>'username',
     new.raw_user_meta_data->>'full_name', 
     new.raw_user_meta_data->>'avatar_url'
   );
@@ -73,6 +78,12 @@ USING (true);
 CREATE POLICY "Authenticated users can insert track sources" 
 ON public.track_sources FOR INSERT 
 WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY "Enable update for authenticated users only" 
+ON public.track_sources FOR UPDATE 
+TO authenticated 
+USING (true) 
+WITH CHECK (true);
 
 --
 -- 3. Moments Table

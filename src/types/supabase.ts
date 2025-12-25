@@ -13,24 +13,24 @@ export interface Database {
                 Row: {
                     id: string
                     email: string
-                    full_name: string | null
-                    avatar_url: string | null
+                    name: string | null
+                    image: string | null
                     updated_at: string | null
                     created_at: string
                 }
                 Insert: {
                     id: string
                     email: string
-                    full_name?: string | null
-                    avatar_url?: string | null
+                    name?: string | null
+                    image?: string | null
                     updated_at?: string | null
                     created_at?: string
                 }
                 Update: {
                     id?: string
                     email?: string
-                    full_name?: string | null
-                    avatar_url?: string | null
+                    name?: string | null
+                    image?: string | null
                     updated_at?: string | null
                     created_at?: string
                 }
@@ -54,6 +54,7 @@ export interface Database {
                     duration_sec: number | null
                     canonical_track_id: string | null
                     created_at: string
+                    updated_at: string
                 }
                 Insert: {
                     id?: string
@@ -65,6 +66,7 @@ export interface Database {
                     duration_sec?: number | null
                     canonical_track_id?: string | null
                     created_at?: string
+                    updated_at?: string
                 }
                 Update: {
                     id?: string
@@ -76,6 +78,7 @@ export interface Database {
                     duration_sec?: number | null
                     canonical_track_id?: string | null
                     created_at?: string
+                    updated_at?: string
                 }
                 Relationships: []
             }
@@ -112,6 +115,7 @@ export interface Database {
                     like_count?: number | null
                     saved_by_count?: number | null
                     created_at?: string
+                    updated_at?: string | null
                 }
                 Update: {
                     id?: string
@@ -128,6 +132,7 @@ export interface Database {
                     like_count?: number | null
                     saved_by_count?: number | null
                     created_at?: string
+                    updated_at?: string | null
                 }
                 Relationships: [
                     {
@@ -183,12 +188,6 @@ export interface Database {
             [_ in never]: never
         }
         Functions: {
-            [_ in never]: never
-        }
-        Enums: {
-            [_ in never]: never
-        }
-        CompositeTypes: {
             [_ in never]: never
         }
     }

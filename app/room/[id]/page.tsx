@@ -15,7 +15,7 @@ import MomentGroup from '@/components/MomentGroup';
 import PlayerTimeline from '@/components/PlayerTimeline';
 import { RelatedItem } from '@/lib/related';
 import { useAuth } from '@/context/AuthContext';
-import { getTrackMoments } from '../../explore/actions';
+import { getTrackMoments, healTrackSource } from '../../explore/actions';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
 import { MyMomentIcon } from '@/components/icons/MyMomentIcon';
 import { parseChapters, getCurrentChapter, Chapter } from '@/lib/chapters';
@@ -119,7 +119,8 @@ export default function Room({ params }: { params: { id: string } }) {
         title: 'Loading...',
         artist: '...',
         artwork: '',
-        description: '', // Add description field
+        description: '',
+        duration_sec: 0,
     });
 
     // Chapter State
@@ -210,6 +211,13 @@ export default function Room({ params }: { params: { id: string } }) {
                 .then(data => {
                     if (data && !data.error) {
                         setMetadata(data);
+                        if (data.duration_sec) {
+                            setSpotifyProgress(prev => ({ ...prev, duration: data.duration_sec }));
+                            setPlaybackState(prev => ({ ...prev, duration: data.duration_sec }));
+
+                            // Persist healing back to database so Plaza/Profile are fixed
+                            healTrackSource(url, data.duration_sec);
+                        }
                     } else {
                         setMetadata({ title: 'Spotify Track', artist: 'Unknown Artist', artwork: '', description: '' });
                     }
@@ -323,8 +331,20 @@ export default function Room({ params }: { params: { id: string } }) {
                         const current = Math.floor(e.data.position / 1000);
                         const duration = Math.floor(e.data.duration / 1000);
                         spotifyTimeRef.current = current;
-                        setSpotifyProgress({ current, duration });
-                        setPlaybackState({ current, duration });
+
+                        // Duration Healing: If player provides a longer/better duration, use it
+                        setSpotifyProgress(prev => {
+                            const newDuration = (duration > 0 && duration !== prev.duration) ? duration : prev.duration;
+                            if (newDuration > prev.duration) {
+                                // If the player reports a better duration than we had from metadata/DB, update DB
+                                healTrackSource(url, newDuration);
+                            }
+                            return { current, duration: newDuration };
+                        });
+                        setPlaybackState(prev => {
+                            const newDuration = (duration > 0 && duration !== prev.duration) ? duration : prev.duration;
+                            return { current, duration: newDuration };
+                        });
                         setIsPlaying(!e.data.isPaused);
                     }
                 });
@@ -530,6 +550,9 @@ export default function Room({ params }: { params: { id: string } }) {
                 artist: metadata?.artist || 'Unknown Artist',
                 artwork: metadata?.artwork || null,
                 service: isSpotify ? 'spotify' : 'youtube',
+                // Add track duration for track_sources table
+                // Prioritize player duration if it's > 0, otherwise fallback to metadata
+                duration: (isSpotify ? spotifyProgress.duration : playbackState.duration) || metadata.duration_sec,
             };
 
             const res = await fetch('/api/moments', {
@@ -555,22 +578,23 @@ export default function Room({ params }: { params: { id: string } }) {
                 const m = data.moment;
                 const newMoment: Moment = {
                     id: m.id,
-                    service: m.service || m.platform,
+                    service: m.service ?? m.platform,
                     sourceUrl: url,
-                    startSec: m.startSec || m.start_time,
-                    endSec: m.endSec || m.end_time,
-                    momentDurationSec: (m.endSec || m.end_time) - (m.startSec || m.start_time),
+                    startSec: m.startSec ?? m.start_time,
+                    endSec: m.endSec ?? m.end_time,
+                    momentDurationSec: (m.endSec ?? m.end_time) - (m.startSec ?? m.start_time),
                     title: m.title,
                     artist: m.artist,
                     artwork: m.artwork,
                     note: m.note,
-                    likeCount: m.likeCount || 0,
-                    savedByCount: m.savedByCount || 1,
-                    createdAt: new Date(m.createdAt || m.created_at),
+                    likeCount: m.likeCount ?? 0,
+                    savedByCount: m.savedByCount ?? 1,
+                    createdAt: new Date(m.createdAt ?? m.created_at),
                     user: {
-                        name: m.user?.name || m.user?.full_name || 'Me',
-                        image: m.user?.image || m.user?.avatar_url
-                    }
+                        name: m.user?.name ?? m.user?.full_name ?? 'Me',
+                        image: m.user?.image ?? m.user?.avatar_url
+                    },
+                    trackSource: m.trackSource
                 } as Moment;
                 setMoments([newMoment, ...moments]);
             }
@@ -678,8 +702,12 @@ export default function Room({ params }: { params: { id: string } }) {
         return () => {
             clearInterval(interval);
             // Safety cleanup if component unmounts or moment changes
-            if (activeMoment.service === 'youtube' && youtubePlayer) {
-                youtubePlayer.setVolume(100);
+            try {
+                if (activeMoment?.service === 'youtube' && youtubePlayer && typeof youtubePlayer.setVolume === 'function') {
+                    youtubePlayer.setVolume(100);
+                }
+            } catch (e) {
+                // Ignore player errors on cleanup
             }
         };
     }, [activeMoment, youtubePlayer, spotifyPlayer]);
@@ -884,7 +912,7 @@ export default function Room({ params }: { params: { id: string } }) {
     };
     const youtubeId = getYouTubeId(url);
 
-    console.log('[Room] Debug:', { rawUrl, url, isYouTube, youtubeId, startParam });
+
 
     const handlePreviewCapture = () => {
         if (startSec !== null && endSec !== null) {
@@ -1196,7 +1224,7 @@ export default function Room({ params }: { params: { id: string } }) {
                                                 key={group.main.id}
                                                 mainMoment={group.main}
                                                 replies={group.replies}
-                                                trackDuration={group.main.trackSource?.durationSec || (isSpotify ? spotifyProgress.duration : playbackState.duration)}
+                                                trackDuration={(isSpotify ? spotifyProgress.duration : playbackState.duration) || metadata.duration_sec || group.main.trackSource?.durationSec}
                                                 onDelete={async (id) => {
                                                     try {
                                                         const res = await fetch(`/api/moments/${id}`, { method: 'DELETE' });

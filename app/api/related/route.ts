@@ -56,7 +56,7 @@ export async function POST(request: Request) {
                     // Count moments where sourceUrl contains the ID
                     count = await prisma.moment.count({
                         where: {
-                            sourceUrl: {
+                            resourceId: {
                                 contains: id
                             }
                         }
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
                     // Fallback to exact URL match
                     count = await prisma.moment.count({
                         where: {
-                            sourceUrl: item.sourceUrl
+                            resourceId: item.sourceUrl
                         }
                     });
                 }

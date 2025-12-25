@@ -6,85 +6,100 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String?
-  image     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  moments   Moment[]
-  likes     Like[]
+model Profile {
+  id         String   @id @default(cuid())
+  email      String   @unique
+  // password removed (handled by Supabase Auth)
+  full_name  String?  @map("name")
+  avatar_url String?  @map("image")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  moments    Moment[]
+  likes      Like[]
+
+  @@map("profiles")
 }
 
 model TrackSource {
   id          String   @id @default(cuid())
   service     String   // "youtube" | "spotify" | "apple-music" | ...
-  sourceUrl   String   @unique
+  sourceUrl   String   @unique @map("source_url")
   title       String?
   artist      String?  // channelTitle for YouTube, normal artist for Spotify
   artwork     String?
-  durationSec Int?     // full track/video duration in seconds
-  canonicalTrackId String? // Unified track identifier (e.g., can_hash)
+  durationSec Int?     @map("duration_sec") // full track/video duration in seconds
+  canonicalTrackId String? @map("canonical_track_id") // Unified track identifier (e.g., can_hash)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   moments     Moment[]
+
+  @@map("track_sources")
 }
 
 model Moment {
   id               String   @id @default(cuid())
-  userId           String
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           String   @map("user_id")
+  user             Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   // Relation to TrackSource
-  trackSourceId    String?  // Optional for migration, but should be required eventually
+  trackSourceId    String?  @map("track_source_id")
   trackSource      TrackSource? @relation(fields: [trackSourceId], references: [id])
 
   // Legacy Source tracking (keeping for backward compatibility/migration)
-  service          String   // "youtube" | "spotify" | "apple-music" | "unknown" | "legacy"
-  sourceUrl        String   // Original URL
-  canonicalTrackId String?  // Future: unified track identifier across services
+  service          String   @map("platform") // "youtube" | "spotify" | "apple-music" | "unknown" | "legacy"
+  resourceId       String   @map("resource_id") // Original URL or ID
+  canonicalTrackId String?  @map("canonical_track_id") // Future: unified track identifier across services
   
+  // Threading / Replies
+  parentId         String?  @map("parent_id")
+  parent           Moment?  @relation("MomentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies          Moment[] @relation("MomentReplies")
+
   // Timing (stored as integer seconds)
-  startSec         Int
-  endSec           Int
-  momentDurationSec Int?    // derived: endSec - startSec (Optional for migration)
+  startSec         Int      @map("start_time")
+  endSec           Int      @map("end_time")
+  momentDurationSec Int?    @map("moment_duration_sec") // derived: endSec - startSec (Optional for migration)
   
   // Metadata (Moment-specific or override)
   title            String?
   artist           String?
   artwork          String?
-  note             String?
+  note             String?  @db.Text
   
-  likeCount        Int      @default(0)
-  savedByCount     Int      @default(0) // Added for community aggregation
+  likeCount        Int      @default(0) @map("like_count")
+  savedByCount     Int      @default(0) @map("saved_by_count") // Added for community aggregation
   
   // Interactions
   likes            Like[]
 
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
   
   // Indices for performance
-  @@index([service, sourceUrl])
+  @@index([service, resourceId])
   @@index([userId, createdAt])
+
+  @@map("moments")
 }
 
 model Like {
   id        String   @id @default(cuid())
-  userId    String
-  momentId  String
-  createdAt DateTime @default(now())
+  userId    String   @map("user_id")
+  momentId  String   @map("moment_id")
+  createdAt DateTime @default(now()) @map("created_at")
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
   moment    Moment   @relation(fields: [momentId], references: [id], onDelete: Cascade)
 
   @@unique([userId, momentId]) // User can like a moment only once
   @@index([momentId])
+
+  @@map("likes")
 }

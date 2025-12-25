@@ -119,7 +119,7 @@ async function getTrackDetails(trackId: string, token: string): Promise<{ artist
 /**
  * Get Full Track Metadata
  */
-export async function getSpotifyTrackMetadata(trackId: string): Promise<{ title: string; artist: string; artwork: string } | null> {
+export async function getSpotifyTrackMetadata(trackId: string): Promise<{ title: string; artist: string; artwork: string; duration_sec?: number } | null> {
     try {
         const token = await getSpotifyAccessToken();
         const res = await fetch(`https://api.spotify.com/v1/tracks/${trackId}`, {
@@ -132,7 +132,8 @@ export async function getSpotifyTrackMetadata(trackId: string): Promise<{ title:
         return {
             title: data.name,
             artist: data.artists.map((a: any) => a.name).join(', '),
-            artwork: data.album.images[0]?.url || ''
+            artwork: data.album.images[0]?.url || '',
+            duration_sec: Math.floor(data.duration_ms / 1000)
         };
     } catch (e) {
         console.error('[Spotify] Failed to get track metadata', e);

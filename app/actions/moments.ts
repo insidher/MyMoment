@@ -1,6 +1,5 @@
 'use server';
 
-import { prisma } from '@/lib/prisma';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 
@@ -13,42 +12,55 @@ export async function toggleLike(momentId: string, path: string) {
     }
 
     // Check if like exists
-    const existingLike = await prisma.like.findUnique({
-        where: {
-            userId_momentId: {
-                userId: user.id,
-                momentId: momentId
-            }
-        }
-    });
+    const { data: existingLike } = await supabase
+        .from('likes')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('moment_id', momentId)
+        .single();
 
     if (existingLike) {
-        // Unlike
-        await prisma.like.delete({
-            where: {
-                id: existingLike.id
-            }
-        });
+        // Unlike - delete the like
+        await supabase
+            .from('likes')
+            .delete()
+            .eq('id', existingLike.id);
 
-        // Decrement count
-        await prisma.moment.update({
-            where: { id: momentId },
-            data: { likeCount: { decrement: 1 } }
-        });
+        // Decrement like count
+        const { data: moment } = await supabase
+            .from('moments')
+            .select('like_count')
+            .eq('id', momentId)
+            .single();
+
+        if (moment) {
+            await supabase
+                .from('moments')
+                .update({ like_count: Math.max(0, (moment.like_count || 0) - 1) })
+                .eq('id', momentId);
+        }
     } else {
-        // Like
-        await prisma.like.create({
-            data: {
-                userId: user.id,
-                momentId: momentId
-            }
-        });
+        // Like - create new like
+        await supabase
+            .from('likes')
+            .insert({
+                user_id: user.id,
+                moment_id: momentId
+            });
 
-        // Increment count
-        await prisma.moment.update({
-            where: { id: momentId },
-            data: { likeCount: { increment: 1 } }
-        });
+        // Increment like count
+        const { data: moment } = await supabase
+            .from('moments')
+            .select('like_count')
+            .eq('id', momentId)
+            .single();
+
+        if (moment) {
+            await supabase
+                .from('moments')
+                .update({ like_count: (moment.like_count || 0) + 1 })
+                .eq('id', momentId);
+        }
     }
 
     revalidatePath(path);
@@ -65,35 +77,36 @@ export async function createComment(momentId: string, content: string, path: str
     if (!content.trim()) return;
 
     // Fetch parent moment details to copy context
-    const parentMoment = await prisma.moment.findUnique({
-        where: { id: momentId }
-    });
+    const { data: parentMoment, error } = await supabase
+        .from('moments')
+        .select('track_source_id, resource_id, platform, title, artist, artwork, start_time, end_time')
+        .eq('id', momentId)
+        .single();
 
-    if (!parentMoment) throw new Error('Parent moment not found');
+    if (error || !parentMoment) {
+        throw new Error('Parent moment not found');
+    }
 
-    // Create Reply Moment
-    await prisma.moment.create({
-        data: {
-            userId: user.id,
-            parentId: momentId,
+    // Create Reply Moment (comment)
+    await supabase
+        .from('moments')
+        .insert({
+            user_id: user.id,
+            parent_id: momentId,
             note: content,
 
             // Context Copying
-            trackSourceId: parentMoment.trackSourceId,
-            resourceId: parentMoment.resourceId,
-            service: parentMoment.service,
-            title: parentMoment.title, // Optional: Denote reply?
+            track_source_id: parentMoment.track_source_id,
+            resource_id: parentMoment.resource_id,
+            platform: parentMoment.platform,
+            title: parentMoment.title,
             artist: parentMoment.artist,
             artwork: parentMoment.artwork,
 
             // Timing Match (so it appears at same spot)
-            startSec: parentMoment.startSec,
-            endSec: parentMoment.endSec,
-
-            // Ensure profile exists (it should if logged in)
-            // No strict check here, implicit via userId FK
-        }
-    });
+            start_time: parentMoment.start_time,
+            end_time: parentMoment.end_time,
+        });
 
     revalidatePath(path);
 }

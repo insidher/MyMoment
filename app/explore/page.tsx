@@ -1,33 +1,56 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import { Play, TrendingUp, Music, Heart, User, ArrowLeft, Clock } from 'lucide-react';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
+import { useRouter, useSearchParams } from 'next/navigation';
 import SongCard from '@/components/SongCard';
 import MomentCard from '@/components/MomentCard';
 import ArtistCard from '@/components/ArtistCard';
 import { getGroupedSongs, getUserArtistStats, getArtistSongs, getRecentMoments } from './actions';
-
+import { useAuth } from '@/context/AuthContext';
+import { useFilter } from '@/context/FilterContext';
 import { SongGroup, ArtistStats, Moment } from '@/types';
 
-export default async function Explore({ searchParams }: { searchParams: Promise<{ artist?: string }> }) {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    const params = await searchParams;
-    const artistFilter = params.artist;
+export default function ExplorePage() {
+    const { user } = useAuth();
+    const { showSpotify, isLoading: filterLoading } = useFilter();
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const artistFilter = searchParams.get('artist');
 
-    let songs: SongGroup[] = [];
-    let moments: Moment[] = [];
-    let artistStats: ArtistStats[] = [];
+    const [songs, setSongs] = useState<SongGroup[]>([]);
+    const [moments, setMoments] = useState<Moment[]>([]);
+    const [artistStats, setArtistStats] = useState<ArtistStats[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    if (artistFilter) {
-        songs = await getArtistSongs(user?.id || '', artistFilter);
-    } else {
-        // Main Plaza View: Show recent individual moments
-        moments = await getRecentMoments(50);
-    }
+    useEffect(() => {
+        if (!filterLoading) {
+            fetchData();
+        }
+    }, [artistFilter, user, showSpotify, filterLoading]);
 
-    if (user && !artistFilter) {
-        artistStats = await getUserArtistStats(user.id);
-    }
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            if (artistFilter) {
+                const songsData = await getArtistSongs(user?.id || '', artistFilter, !showSpotify);
+                setSongs(songsData);
+            } else {
+                const momentsData = await getRecentMoments(50, !showSpotify);
+                setMoments(momentsData);
+            }
+
+            if (user && !artistFilter) {
+                const stats = await getUserArtistStats(user.id);
+                setArtistStats(stats);
+            }
+        } catch (error) {
+            console.error('Failed to fetch explore data:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const vibes = [
         { id: 'chill', label: 'Chill', color: 'from-blue-500 to-cyan-500' },
@@ -35,6 +58,25 @@ export default async function Explore({ searchParams }: { searchParams: Promise<
         { id: 'focus', label: 'Focus', color: 'from-purple-500 to-pink-500' },
         { id: 'party', label: 'Party', color: 'from-green-500 to-emerald-500' },
     ];
+
+    // Show skeleton loading state while filter is initializing
+    if (filterLoading || loading) {
+        return (
+            <main className="min-h-screen p-8 pb-24">
+                <div className="max-w-7xl mx-auto space-y-12">
+                    <div className="space-y-2">
+                        <div className="h-10 w-64 bg-white/5 rounded-lg animate-pulse" />
+                        <div className="h-6 w-96 bg-white/5 rounded-lg animate-pulse" />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {[...Array(6)].map((_, i) => (
+                            <div key={i} className="h-64 bg-white/5 rounded-xl animate-pulse" />
+                        ))}
+                    </div>
+                </div>
+            </main>
+        );
+    }
 
     return (
         <main className="min-h-screen p-8 pb-24">
@@ -100,57 +142,39 @@ export default async function Explore({ searchParams }: { searchParams: Promise<
                         // Artist View: Show grouped SongCards
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {songs.length === 0 ? (
-                                <p className="text-white/30 italic col-span-full">
-                                    No songs found for {artistFilter}.
-                                </p>
+                                <div className="col-span-full text-center py-12 text-white/40">
+                                    <p>No songs found for this artist.</p>
+                                </div>
                             ) : (
                                 songs.map((song) => (
-                                    <SongCard key={song.sourceUrl} song={song} />
+                                    <SongCard key={`${song.service}-${song.sourceUrl}`} song={song} />
                                 ))
                             )}
                         </div>
                     ) : (
                         // Plaza View: Show individual MomentCards
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {moments.length === 0 ? (
-                                <p className="text-white/30 italic col-span-full">
-                                    No moments yet. Be the first to capture one!
-                                </p>
+                                <div className="col-span-full text-center py-12 text-white/40">
+                                    <p>No moments found.</p>
+                                    <Link href="/" className="text-purple-400 hover:text-purple-300 mt-2 inline-block">
+                                        Be the first to capture one!
+                                    </Link>
+                                </div>
                             ) : (
                                 moments.map((moment) => (
                                     <MomentCard
                                         key={moment.id}
                                         moment={moment}
-                                        // No explicit handlers needed; MomentCard defaults to routing logic
-                                        showDelete={false} // Don't allow delete in public feed
+                                        trackDuration={moment.trackSource?.durationSec}
+                                        onPlayFull={(m) => router.push(`/room/view?url=${encodeURIComponent(m.sourceUrl)}`)}
+                                        onPlayMoment={(m) => router.push(`/room/view?url=${encodeURIComponent(m.sourceUrl)}&start=${m.startSec}&end=${m.endSec}`)}
                                     />
                                 ))
                             )}
                         </div>
                     )}
                 </section>
-
-                {/* Vibes Section (Hide in artist view?) - Keeping it for now as it's general exploration */}
-                {!artistFilter && (
-                    <section className="space-y-6">
-                        <div className="flex items-center gap-2 text-xl font-semibold text-white/90">
-                            <Heart size={24} className="text-pink-400" />
-                            <h2>Browse by Vibe</h2>
-                        </div>
-
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {vibes.map((vibe) => (
-                                <button
-                                    key={vibe.id}
-                                    className={`h-32 rounded-2xl bg-gradient-to-br ${vibe.color} p-6 flex items-end justify-start text-xl font-bold shadow-lg hover:scale-[1.02] transition-transform relative overflow-hidden group`}
-                                >
-                                    <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
-                                    <span className="relative z-10">{vibe.label}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </section>
-                )}
 
             </div>
         </main>

@@ -3,67 +3,46 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { useFilter } from '@/context/FilterContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Play, Music, Calendar, Youtube } from 'lucide-react';
+import { Play, Music, Calendar, Youtube, Settings } from 'lucide-react';
 import { Moment } from '@/types';
 import MomentCard from '@/components/MomentCard';
+import { getUserMoments, getLikedMoments } from '../explore/actions';
+import SettingsSidebar from '@/components/SettingsSidebar';
 
 export default function Profile() {
     const { user, isLoading } = useAuth();
+    const { showSpotify, isLoading: filterLoading } = useFilter();
     const router = useRouter();
     const [moments, setMoments] = useState<Moment[]>([]);
+    const [likedMoments, setLikedMoments] = useState<Moment[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
     useEffect(() => {
         if (!isLoading && !user) {
             router.push('/login');
-        } else if (user?.id) {
+        } else if (user?.id && !filterLoading) {
             fetchMoments(user.id);
         }
-    }, [user, isLoading, router]);
+    }, [user, isLoading, router, showSpotify, filterLoading]);
 
     const fetchMoments = async (userId: string) => {
-        const supabase = createClient();
-
-        const { data, error } = await supabase
-            .from('moments')
-            .select(`
-                *,
-                profiles (
-                    full_name,
-                    avatar_url
-                )
-            `)
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false });
-
-        if (data) {
-            const mappedMoments: Moment[] = data.map((m: any) => ({
-                id: m.id,
-                service: m.platform as any,
-                // Reconstruct Source URL
-                sourceUrl: m.platform === 'youtube' ? `https://www.youtube.com/watch?v=${m.resource_id}` : m.resource_id,
-                startSec: m.start_time,
-                endSec: m.end_time,
-                momentDurationSec: m.end_time - m.start_time,
-                title: m.title,
-                artist: m.artist,
-                artwork: m.artwork,
-                note: m.note,
-                likeCount: m.like_count,
-                savedByCount: m.saved_by_count,
-                createdAt: new Date(m.created_at),
-                user: {
-                    name: m.profiles?.full_name || 'Anonymous',
-                    image: m.profiles?.avatar_url
-                }
-            }));
-            setMoments(mappedMoments);
-        } else if (error) {
-            console.error('Supabase fetch error:', error);
+        setLoading(true);
+        try {
+            const [userData, likedData] = await Promise.all([
+                getUserMoments(userId, !showSpotify),
+                getLikedMoments(userId, !showSpotify)
+            ]);
+            setMoments(userData);
+            setLikedMoments(likedData);
+        } catch (error) {
+            console.error('Failed to fetch user moments:', error);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     const handleDelete = async (id: string) => {
@@ -78,7 +57,7 @@ export default function Profile() {
 
             if (!error) {
                 // Smart Cleanup: Remove all moments that match the deleted one (duplicates)
-                setMoments(prev => {
+                const cleanup = (prev: Moment[]) => {
                     const target = prev.find(m => m.id === id);
                     if (!target) return prev.filter(m => m.id !== id);
 
@@ -90,7 +69,10 @@ export default function Profile() {
                             m.endSec === target.endSec
                         ))
                     );
-                });
+                };
+
+                setMoments(prev => cleanup(prev));
+                setLikedMoments(prev => cleanup(prev));
             } else {
                 console.error('Failed to delete moment:', error);
             }
@@ -109,22 +91,38 @@ export default function Profile() {
 
     return (
         <main className="min-h-screen p-8 pb-24">
+            <SettingsSidebar
+                isOpen={isSettingsOpen}
+                onClose={() => setIsSettingsOpen(false)}
+                userEmail={user?.email}
+            />
+
             <div className="max-w-7xl mx-auto space-y-12">
 
                 {/* Header */}
-                <div className="flex items-center gap-6">
-                    <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-4xl font-bold">
-                        {user?.user_metadata?.avatar_url ? (
-                            <img src={user.user_metadata.avatar_url} alt={user.email || 'User'} className="w-full h-full rounded-full" />
-                        ) : (
-                            (user?.email?.[0]?.toUpperCase() || 'U')
-                        )}
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-6">
+                        <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-4xl font-bold">
+                            {user?.user_metadata?.avatar_url ? (
+                                <img src={user.user_metadata.avatar_url} alt={user.email || 'User'} className="w-full h-full rounded-full" />
+                            ) : (
+                                (user?.email?.[0]?.toUpperCase() || 'U')
+                            )}
+                        </div>
+                        <div>
+                            <h1 className="text-4xl font-bold">{user?.email?.split('@')[0] || 'User'}</h1>
+                            <p className="text-white/60">{user?.email}</p>
+                            <p className="text-white/40 text-sm mt-1">Joined {new Date().toLocaleDateString()}</p>
+                        </div>
                     </div>
-                    <div>
-                        <h1 className="text-4xl font-bold">{user?.email?.split('@')[0] || 'User'}</h1>
-                        <p className="text-white/60">{user?.email}</p>
-                        <p className="text-white/40 text-sm mt-1">Joined {new Date().toLocaleDateString()}</p>
-                    </div>
+
+                    <button
+                        onClick={() => setIsSettingsOpen(true)}
+                        className="p-3 bg-white/5 hover:bg-white/10 rounded-full transition-colors text-white/60 hover:text-white"
+                        title="Settings"
+                    >
+                        <Settings size={24} />
+                    </button>
                 </div>
 
                 {/* My Moments */}
@@ -144,7 +142,7 @@ export default function Profile() {
                                 <MomentCard
                                     key={moment.id}
                                     moment={moment}
-                                    onDelete={handleDelete}
+                                    onDelete={moment.userId === user?.id ? handleDelete : undefined}
                                     // Pass track duration to enable visual timeline
                                     trackDuration={moment.trackSource?.durationSec}
                                     onPlayFull={(m) => router.push(`/room/view?url=${encodeURIComponent(m.sourceUrl)}`)}
@@ -155,6 +153,27 @@ export default function Profile() {
                         )}
                     </div>
                 </section>
+
+                {/* Liked Moments */}
+                {likedMoments.length > 0 && (
+                    <section className="space-y-6 animate-in slide-in-from-bottom-4 fade-in duration-500 delay-100">
+                        <h2 className="text-2xl font-bold border-b border-white/10 pb-4 text-pink-400">Liked Moments</h2>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {likedMoments.map((moment) => (
+                                <MomentCard
+                                    key={moment.id}
+                                    moment={moment}
+                                    onDelete={handleDelete} // Logic handles strict deletion. For Likes, we probably want "Unlike"?
+                                    // For now, allow deletion if owner? MomentCard handles owner check ideally.
+                                    trackDuration={moment.trackSource?.durationSec}
+                                    onPlayFull={(m) => router.push(`/room/view?url=${encodeURIComponent(m.sourceUrl)}`)}
+                                    onPlayMoment={(m) => router.push(`/room/view?url=${encodeURIComponent(m.sourceUrl)}&start=${m.startSec}&end=${m.endSec}`)}
+                                />
+                            ))}
+                        </div>
+                    </section>
+                )}
 
             </div>
         </main>
