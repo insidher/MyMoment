@@ -66,7 +66,12 @@ export async function toggleLike(momentId: string, path: string) {
     revalidatePath(path);
 }
 
-export async function createComment(momentId: string, content: string, path: string) {
+export async function createComment(
+    momentId: string,
+    content: string,
+    path: string,
+    isHead: boolean = false // NEW PARAMETER (Default false for backward compat)
+) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -79,7 +84,7 @@ export async function createComment(momentId: string, content: string, path: str
     // Fetch parent moment details to copy context
     const { data: parentMoment, error } = await supabase
         .from('moments')
-        .select('track_source_id, resource_id, platform, title, artist, artwork, start_time, end_time')
+        .select('parent_id, track_source_id, resource_id, platform, title, artist, artwork, start_time, end_time')
         .eq('id', momentId)
         .single();
 
@@ -87,12 +92,37 @@ export async function createComment(momentId: string, content: string, path: str
         throw new Error('Parent moment not found');
     }
 
-    // Create Reply Moment (comment)
-    await supabase
+    let finalParentId = momentId; // Default: Attach directly to the moment we clicked (creating a child)
+
+    // SMART CAP LOGIC
+    // ONLY run this if we are NOT replying to the Head (Main Moment)
+    if (!isHead && parentMoment.parent_id) {
+        // It has a parent. Now we check if it is DEEP nested (Level 3).
+
+        // Fetch the Grandparent to check depth
+        const { data: grandParent } = await supabase
+            .from('moments')
+            .select('parent_id')
+            .eq('id', parentMoment.parent_id)
+            .single();
+
+        if (grandParent && grandParent.parent_id) {
+            // Parent (Level 3) -> Grandparent (Level 2) -> GreatGrandparent (Level 1)
+            // We are at max depth. We cannot create a Level 4 item.
+            // Action: Flatten. Attach to the immediate parent (Level 2) to keep it at Level 3.
+            finalParentId = parentMoment.parent_id;
+        }
+
+        // IF grandParent has NO parent_id (Level 2), then parentMoment is Level 2.
+        // We CAN create a Level 3 item. So we leave finalParentId = momentId.
+        // This ensures the Main Moment (Level 2) stays the Parent of the new Reply (Level 3).
+    }
+
+    const { data: newComment } = await supabase
         .from('moments')
         .insert({
             user_id: user.id,
-            parent_id: momentId,
+            parent_id: finalParentId,
             note: content,
 
             // Context Copying
@@ -106,7 +136,12 @@ export async function createComment(momentId: string, content: string, path: str
             // Timing Match (so it appears at same spot)
             start_time: parentMoment.start_time,
             end_time: parentMoment.end_time,
-        });
+            moment_duration_sec: parentMoment.end_time - parentMoment.start_time,
+            saved_by_count: 1,
+        })
+        .select('*, profiles(name, image)')
+        .single();
 
     revalidatePath(path);
+    return newComment;
 }

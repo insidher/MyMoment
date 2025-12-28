@@ -13,6 +13,7 @@ export interface TrackSource {
 
 export interface Moment {
   id: string;
+  parentId?: string | null; // Added for hierarchy
   userId?: string;
 
   // Source
@@ -37,6 +38,8 @@ export interface Moment {
   likeCount?: number;
   isLiked?: boolean; // Add this
   savedByCount?: number;
+  replies?: Moment[];
+  replyCount?: number;
 
   createdAt: string | Date;
   updatedAt?: string | Date;

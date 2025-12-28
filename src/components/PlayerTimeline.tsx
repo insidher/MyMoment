@@ -86,15 +86,42 @@ export default function PlayerTimeline({
         }
     };
 
+    const [optimisticReplies, setOptimisticReplies] = useState<Record<string, Moment[]>>({});
+
     const handleSendComment = async (m: Moment) => {
         if (!replyText.trim()) return;
+
+        // Optimistic / Instant Update
+        // We don't have the full ID yet, but we can fake it or wait for the return.
+        // Waiting for return is better to get the real ID, but still "Instant" enough for UX usually (ms).
         try {
-            await createComment(m.id, replyText, pathname);
+            const newComment = await createComment(m.id, replyText, pathname);
+
+            if (newComment) {
+                const newReplyMoment: Moment = {
+                    id: newComment.id,
+                    userId: newComment.user_id,
+                    note: newComment.note,
+                    createdAt: newComment.created_at,
+                    likeCount: 0,
+                    user: {
+                        name: newComment.profiles?.name || 'Me',
+                        image: newComment.profiles?.image
+                    },
+                    // minimal required fields
+                    service: 'legacy' as any,
+                    sourceUrl: '',
+                    startSec: 0, endSec: 0
+                } as Moment;
+
+                setOptimisticReplies(prev => ({
+                    ...prev,
+                    [m.id]: [...(prev[m.id] || []), newReplyMoment]
+                }));
+            }
+
             setReplyText('');
             setIsReplying(false);
-            // Optionally show success or keep explicit feedback
-            // Since it's server action revalidation, it might take a moment to appear if we displayed replies here.
-            // But we don't display replies here.
         } catch (e) {
             console.error(e);
         }
@@ -656,6 +683,26 @@ export default function PlayerTimeline({
                                 autoFocus
                                 value={note}
                                 onChange={(e) => onNoteChange?.(e.target.value)}
+                                onKeyDown={async (e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        if (note.trim()) {
+                                            if (editingMomentId) {
+                                                if (onUpdateMoment) {
+                                                    const success = await onUpdateMoment(editingMomentId, note);
+                                                    if (success) {
+                                                        setIsEditorOpen(false);
+                                                        setEditingMomentId(null);
+                                                        onCancelCapture?.();
+                                                    }
+                                                }
+                                            } else {
+                                                onSaveMoment?.();
+                                                setIsEditorOpen(false);
+                                            }
+                                        }
+                                    }
+                                }}
                                 placeholder="What's happening in this moment?"
                                 className="w-full h-24 bg-white/5 border border-white/10 rounded-lg p-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-orange-500/50 resize-none scrollbar-thin scrollbar-thumb-white/20 font-serif leading-relaxed"
                             />
@@ -709,21 +756,21 @@ export default function PlayerTimeline({
             {/* Unified Labels (Chapters & Moments) */}
             {(() => {
                 // Grouping Logic
-                const groups: { time: number; chapter?: Chapter; moment?: Moment; labelWidth?: number }[] = [];
+                const groups: { time: number; chapter?: Chapter; moments: Moment[]; labelWidth?: number }[] = [];
                 const THRESHOLD = 1; // Seconds to group by
 
                 // Add Chapters
                 chapters.forEach(ch => {
-                    groups.push({ time: ch.startSec, chapter: ch });
+                    groups.push({ time: ch.startSec, chapter: ch, moments: [] });
                 });
 
                 // Add or Merge Moments
                 moments.forEach(m => {
                     const existing = groups.find(g => Math.abs(g.time - m.startSec) <= THRESHOLD);
                     if (existing) {
-                        existing.moment = m; // Attach to existing group (prioritize chapter time)
+                        existing.moments.push(m); // Add to cluster
                     } else {
-                        groups.push({ time: m.startSec, moment: m });
+                        groups.push({ time: m.startSec, moments: [m] });
                     }
                 });
 
@@ -763,9 +810,10 @@ export default function PlayerTimeline({
                             if (left > 100) return null;
 
                             // Check if this group contains the active moment based on PLAYHEAD INTERSECTION
-                            const isActiveGroup = group.moment && (
-                                activeMomentId === group.moment.id ||
-                                (currentTime >= group.moment.startSec && currentTime < group.moment.endSec)
+                            const primaryMoment = group.moments[0];
+                            const isActiveGroup = primaryMoment && (
+                                activeMomentId === primaryMoment.id ||
+                                (currentTime >= primaryMoment.startSec && currentTime < primaryMoment.endSec)
                             );
 
                             // ROW LOGIC:
@@ -781,11 +829,21 @@ export default function PlayerTimeline({
                             const topPos = row === 0 ? 'top-1' : row === 1 ? 'top-3.5' : 'top-9';
 
                             // Z-index
-                            const isExpanded = expandedMomentId === group.moment?.id;
+                            const isExpanded = expandedMomentId === primaryMoment?.id;
                             const zIndex = isExpanded ? 100 : (isActiveGroup ? 50 : 30 - row);
 
-                            // Calculate width available until next marker to prevent overlap
-                            const nextGroupTime = packedGroups[i + 1]?.time || safeDuration;
+                            // Calculate width available until next marker ON THE SAME ROW to prevent overlap
+                            const currentAssignedRow = group.assignedRow;
+                            let nextGroupTime = safeDuration;
+
+                            // Look ahead for the next item in the same visual row
+                            for (let j = i + 1; j < packedGroups.length; j++) {
+                                if (packedGroups[j].assignedRow === currentAssignedRow) {
+                                    nextGroupTime = packedGroups[j].time;
+                                    break;
+                                }
+                            }
+
                             const widthToNext = ((nextGroupTime - group.time) / safeDuration) * 100;
                             const maxWidth = Math.max(1, widthToNext - 0.5); // Leave 0.5% gap
 
@@ -801,13 +859,6 @@ export default function PlayerTimeline({
                                     }}
                                 >
                                     <div className="flex flex-row items-stretch">
-                                        {/* BRACKET LINE (Left Side) */}
-                                        <div
-                                            className={`w-[1px] mr-1.5 transition-colors
-                                                ${isActiveGroup ? 'bg-orange-500' : 'bg-white/20 group-hover:bg-white/50'}
-                                            `}
-                                        />
-
                                         {/* Stacked Labels Container */}
                                         <div className={`flex flex-col items-start gap-0.5 py-0.5 min-w-0 ${isActiveGroup ? 'drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]' : ''}`}>
                                             {/* Chapter Label (Green) */}
@@ -829,57 +880,68 @@ export default function PlayerTimeline({
                                             )}
 
                                             {/* Moment Label (Orange) */}
-                                            {group.moment && (
+                                            {group.moments.length > 0 && (
                                                 <div className="flex flex-col items-start z-50 max-w-full">
                                                     <div
-                                                        className={`flex items-center gap-1 transition-all cursor-pointer border px-1.5 py-0.5 max-w-full
+                                                        className={`flex items-center gap-1 transition-all cursor-pointer border px-1.5 py-0.5 w-full relative overflow-hidden
                                                             bg-black
-                                                            ${(isActiveGroup || expandedMomentId === group.moment.id)
+                                                            ${(isActiveGroup || expandedMomentId === group.moments[0].id)
                                                                 ? 'text-orange-300 font-bold border-orange-500/50 rounded-md shadow-lg shadow-orange-900/20'
                                                                 : 'text-orange-400/70 border-orange-900/30 rounded-sm'
                                                             }
                                                             hover:text-orange-300 hover:font-bold hover:border-orange-400/50 hover:scale-[1.02]`}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            onMomentClick(group.moment!);
+                                                            onMomentClick(group.moments[0]);
                                                         }}
                                                     >
-                                                        {isActiveGroup && group.moment && (
+                                                        {isActiveGroup && (
                                                             <Volume2 size={8} className="text-orange-300 shrink-0" />
                                                         )}
 
-                                                        {/* Truncated Text Container */}
-                                                        <span className={`text-[10px] whitespace-nowrap w-full flex items-center gap-1 ${currentUser?.id === group.moment.userId ? 'justify-center font-bold uppercase tracking-tight' : ''}`}>
-                                                            {currentUser?.id === group.moment.userId ? (
-                                                                (() => {
-                                                                    const pct = ((group.moment.endSec - group.moment.startSec) / safeDuration) * 100;
-                                                                    return (
-                                                                        <>
-                                                                            <Wrench size={9} strokeWidth={2.5} className="shrink-0 z-10" />
-                                                                            {pct > 5 && (
-                                                                                <span className="truncate min-w-0">
-                                                                                    {pct < 15 ? 'Edit' : 'Edit Moment'}
-                                                                                </span>
-                                                                            )}
-                                                                        </>
-                                                                    );
-                                                                })()
-                                                            ) : (
-                                                                <span className="truncate w-full block">
-                                                                    {group.moment.note || 'Moment'}
+                                                        {/* Text Container with Fade Mask */}
+                                                        <div className={`flex-1 min-w-0 relative flex items-center ${currentUser?.id === group.moments[0].userId ? 'justify-center' : ''}`}>
+                                                            <span className={`text-[10px] whitespace-nowrap block truncate ${currentUser?.id === group.moments[0].userId ? 'font-bold uppercase tracking-tight' : ''}`}
+                                                                style={{
+                                                                    maxWidth: '100%'
+                                                                }}
+                                                            >
+                                                                {currentUser?.id === group.moments[0].userId ? (
+                                                                    (() => {
+                                                                        const pct = ((group.moments[0].endSec - group.moments[0].startSec) / safeDuration) * 100;
+                                                                        return (
+                                                                            <span className="flex items-center gap-1">
+                                                                                <Wrench size={9} strokeWidth={2.5} className="shrink-0 z-10" />
+                                                                                {pct > 5 && (
+                                                                                    <span>
+                                                                                        {pct < 15 ? 'Edit' : 'Edit Moment'}
+                                                                                    </span>
+                                                                                )}
+                                                                            </span>
+                                                                        );
+                                                                    })()
+                                                                ) : (
+                                                                    group.moments[0].note || 'Moment'
+                                                                )}
+                                                            </span>
+
+                                                            {/* Cluster Badge */}
+                                                            {group.moments.length > 1 && (
+                                                                <span className="ml-1.5 flex items-center justify-center h-3 min-w-[12px] px-0.5 rounded-sm bg-orange-500/20 text-orange-300 text-[8px] font-mono font-bold border border-orange-500/20 shrink-0">
+                                                                    {group.moments.length}
                                                                 </span>
                                                             )}
-                                                        </span>
+                                                        </div>
 
-                                                        {/* Expand Carrot - Always visible now */}
+                                                        {/* Expand Carrot - Always visible, fixed right */}
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                setExpandedMomentId(prev => prev === group.moment!.id ? null : group.moment!.id);
+                                                                setExpandedMomentId(prev => prev === group.moments[0].id ? null : group.moments[0].id);
                                                             }}
-                                                            className="ml-1 p-0.5 hover:bg-white/10 rounded-full transition-colors"
+                                                            className="ml-0.5 p-0.5 hover:bg-white/10 rounded-full transition-colors shrink-0 z-10"
                                                         >
-                                                            {expandedMomentId === group.moment.id ? (
+                                                            {expandedMomentId === group.moments[0].id ? (
                                                                 <ChevronUp size={8} />
                                                             ) : (
                                                                 <ChevronDown size={8} />
@@ -888,15 +950,63 @@ export default function PlayerTimeline({
                                                     </div>
 
                                                     {/* Expanded Opaque Text Area */}
-                                                    {expandedMomentId === group.moment.id && (
+                                                    {expandedMomentId === group.moments[0].id && (
                                                         <div
                                                             className="mt-1 w-[300px] p-4 bg-zinc-950 border border-orange-500/50 shadow-2xl shadow-black rounded-xl animate-in fade-in slide-in-from-top-1 z-[999] relative"
                                                             onClick={(e) => e.stopPropagation()}
                                                         >
-                                                            <div className="max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-orange-500/20 pr-1">
-                                                                <p className="text-sm text-white leading-relaxed font-serif whitespace-pre-wrap font-medium">
-                                                                    {group.moment.note}
-                                                                </p>
+                                                            <div className="max-h-[320px] overflow-y-auto scrollbar-thin scrollbar-thumb-orange-500/20 pr-1 flex flex-col gap-3">
+                                                                {group.moments.map((m, idx) => (
+                                                                    <div key={m.id} className={`relative group/stack-item ${idx !== group.moments.length - 1 ? 'border-b border-white/5 pb-3' : ''}`}>
+                                                                        {/* Header */}
+                                                                        <div className="flex items-center justify-between mb-1.5">
+                                                                            <div className="flex items-center gap-2">
+                                                                                {/* User Avatar */}
+                                                                                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-[9px] font-bold text-white border border-white/10">
+                                                                                    {m.user?.image ? (
+                                                                                        <img src={m.user.image} className="w-full h-full rounded-full object-cover" />
+                                                                                    ) : (
+                                                                                        (m.user?.name?.[0] || 'U')
+                                                                                    )}
+                                                                                </div>
+                                                                                <span className="text-[10px] text-white/60 font-medium">{m.user?.name || 'Unknown'}</span>
+                                                                            </div>
+
+                                                                            {/* Timestamp */}
+                                                                            <span className="text-[9px] text-white/20 font-mono">
+                                                                                {new Date(m.createdAt).toLocaleDateString()}
+                                                                            </span>
+                                                                        </div>
+
+                                                                        {/* Note Content */}
+                                                                        <p className="text-xs text-white/90 leading-relaxed font-serif whitespace-pre-wrap pl-7">
+                                                                            {m.note}
+                                                                        </p>
+
+                                                                        {/* Mini Actions (Like/Reply for this specific item) */}
+                                                                        <div className="pl-7 mt-2 flex items-center gap-4 opacity-40 group-hover/stack-item:opacity-100 transition-opacity">
+                                                                            <button
+                                                                                onClick={(e) => { e.stopPropagation(); handleLike(m); }}
+                                                                                className="flex items-center gap-1 text-[10px] hover:text-pink-400 transition-colors"
+                                                                            >
+                                                                                <Heart size={10} className={getMomentStats(m).isLiked ? "fill-pink-500 text-pink-500" : ""} />
+                                                                                <span>{getMomentStats(m).count}</span>
+                                                                            </button>
+
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    // Trigger reply logic (contextualized to this moment)
+                                                                                    onMomentClick(m);
+                                                                                }}
+                                                                                className="flex items-center gap-1 text-[10px] hover:text-blue-400 transition-colors"
+                                                                            >
+                                                                                <MessageSquare size={10} />
+                                                                                <span>Reply</span>
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
                                                             </div>
 
                                                             {/* Actions Row */}
@@ -906,33 +1016,32 @@ export default function PlayerTimeline({
                                                                     <button
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
-                                                                            handleLike(group.moment!);
+                                                                            handleLike(group.moments[0]);
                                                                         }}
                                                                         className="flex items-center gap-1.5 text-xs text-white/60 hover:text-pink-400 transition-colors group/like"
                                                                     >
                                                                         <Heart
                                                                             size={14}
-                                                                            className={`transition-colors ${getMomentStats(group.moment!).isLiked ? 'fill-pink-500 text-pink-500' : 'group-hover:text-pink-400'}`}
+                                                                            className={`transition-colors ${getMomentStats(group.moments[0]).isLiked ? 'fill-pink-500 text-pink-500' : 'group-hover:text-pink-400'}`}
                                                                         />
-                                                                        <span>{getMomentStats(group.moment!).count}</span>
+                                                                        <span>{getMomentStats(group.moments[0]).count}</span>
                                                                     </button>
 
                                                                     {/* Edit Button (Owner Only) */}
-                                                                    {currentUser && group.moment && (currentUser.id === group.moment.userId) && (
+                                                                    {currentUser && (currentUser.id === group.moments[0].userId) && (
                                                                         <button
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
-                                                                                if (!group.moment) return;
-                                                                                setEditingMomentId(group.moment.id);
-                                                                                onNoteChange?.(group.moment.note || '');
-                                                                                onCaptureUpdate?.(group.moment.startSec, group.moment.endSec); // Set timeline state
+                                                                                setEditingMomentId(group.moments[0].id);
+                                                                                onNoteChange?.(group.moments[0].note || '');
+                                                                                onCaptureUpdate?.(group.moments[0].startSec, group.moments[0].endSec); // Set timeline state
                                                                                 setIsEditorOpen(true);
                                                                             }}
                                                                             className="flex items-center gap-1.5 text-xs text-white/60 hover:text-white transition-colors group/edit"
                                                                         >
                                                                             <Wrench size={14} />
                                                                             {(() => {
-                                                                                const mDuration = group.moment.endSec - group.moment.startSec;
+                                                                                const mDuration = group.moments[0].endSec - group.moments[0].startSec;
                                                                                 if (mDuration <= 20) return null;
                                                                                 if (mDuration < 70) return <span>Edit</span>;
                                                                                 return <span>Edit Moment</span>;
@@ -952,23 +1061,21 @@ export default function PlayerTimeline({
                                                                         `}
                                                                     >
                                                                         <MessageSquare size={14} />
-                                                                        <span>Reply</span>
+                                                                        <span>Comment</span>
                                                                     </button>
                                                                 </div>
 
                                                                 {/* Date */}
                                                                 {/* Date & Edited */}
                                                                 <div className="flex flex-col items-end">
-                                                                    {group.moment && (
-                                                                        <>
-                                                                            <span className="text-[10px] text-white/30 font-mono">
-                                                                                {new Date(group.moment.createdAt).toLocaleDateString()}
-                                                                            </span>
-                                                                            {group.moment.updatedAt && group.moment.updatedAt !== group.moment.createdAt && (
-                                                                                <span className="text-[9px] text-white/20 italic">Edited</span>
-                                                                            )}
-                                                                        </>
-                                                                    )}
+                                                                    <>
+                                                                        <span className="text-[10px] text-white/30 font-mono">
+                                                                            {new Date(group.moments[0].createdAt).toLocaleDateString()}
+                                                                        </span>
+                                                                        {group.moments[0].updatedAt && group.moments[0].updatedAt !== group.moments[0].createdAt && (
+                                                                            <span className="text-[9px] text-white/20 italic">Edited</span>
+                                                                        )}
+                                                                    </>
                                                                 </div>
                                                             </div>
 
@@ -978,7 +1085,7 @@ export default function PlayerTimeline({
                                                                     <textarea
                                                                         value={replyText}
                                                                         onChange={(e) => setReplyText(e.target.value)}
-                                                                        placeholder="Add a reply..."
+                                                                        placeholder="Add a comment..."
                                                                         className="flex-1 bg-black/50 border border-white/10 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-blue-500/50 resize-none h-16"
                                                                         autoFocus
                                                                         onClick={(e) => e.stopPropagation()}
@@ -986,7 +1093,7 @@ export default function PlayerTimeline({
                                                                     <button
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
-                                                                            handleSendComment(group.moment!);
+                                                                            handleSendComment(group.moments[0]);
                                                                         }}
                                                                         disabled={!replyText.trim()}
                                                                         className="h-8 w-8 flex items-center justify-center bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors self-end"

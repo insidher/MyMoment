@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { Moment } from '@/types';
-import { RefreshCw, X, Heart, MessageSquare, Play, Users } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { RefreshCw, X, Heart, MessageSquare, Play, Users, Send, ChevronDown, ChevronUp } from 'lucide-react';
+import { useRouter, usePathname } from 'next/navigation';
+import { toggleLike, createComment } from '../../app/actions/moments';
 
 interface MomentCardProps {
     moment: Moment;
@@ -17,6 +18,10 @@ interface MomentCardProps {
     currentTime?: number;
     isActive?: boolean; // Currently playing
     isPlaying?: boolean;
+    onToggleReplies?: () => void;
+    isRepliesExpanded?: boolean;
+    replyCount?: number;
+    onReplyClick?: () => void;
 }
 
 export default function MomentCard({
@@ -30,7 +35,11 @@ export default function MomentCard({
     trackDuration,
     currentTime = 0,
     isActive = false,
-    isPlaying = false
+    isPlaying = false,
+    onToggleReplies,
+    isRepliesExpanded = false,
+    replyCount: propsReplyCount,
+    onReplyClick
 }: MomentCardProps) {
     const [moment, setMoment] = useState(initialMoment);
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -38,14 +47,20 @@ export default function MomentCard({
     const [likeCount, setLikeCount] = useState(moment.likeCount || 0);
     const [liked, setLiked] = useState(initialMoment.isLiked || false); // Load from prop
     const [isLiking, setIsLiking] = useState(false);
-    const [showForkInput, setShowForkInput] = useState(false);
-    const [forkNote, setForkNote] = useState('');
-    const [isForking, setIsForking] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false); // For animation
     const [isExpanded, setIsExpanded] = useState(false);
+
+    // Comment State
+    // Prioritize Prop (from Group) > Moment.replyCount (from DB) > Moment.replies.length (local structure)
+    const [replyCount, setReplyCount] = useState(propsReplyCount ?? (moment.replyCount || moment.replies?.length || 0));
+    const [showCommentInput, setShowCommentInput] = useState(false);
+    const [commentText, setCommentText] = useState('');
+    const [isPostingComment, setIsPostingComment] = useState(false);
+
     const MAX_NOTE_LENGTH = 40;
 
     const router = useRouter();
+    const pathname = usePathname();
 
     // Derive display data from TrackSource or Moment
     const track = moment.trackSource || {
@@ -127,42 +142,27 @@ export default function MomentCard({
         }
     };
 
-    const handleFork = async (e: React.FormEvent) => {
+
+
+    const handlePostComment = async (e: React.FormEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        if (!forkNote.trim()) return;
-        setIsForking(true);
+        if (!commentText.trim()) return;
+        setIsPostingComment(true);
 
         try {
-            const res = await fetch('/api/moments', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    sourceUrl: moment.sourceUrl,
-                    service: moment.service,
-                    startSec: moment.startSec,
-                    endSec: moment.endSec,
-                    note: forkNote,
-                })
-            });
-
-            if (res.ok) {
-                const data = await res.json();
-                alert('Saved to your profile!');
-                setShowForkInput(false);
-                setForkNote('');
-                // If we want to update the community count immediately:
-                setMoment(prev => ({
-                    ...prev,
-                    savedByCount: (prev.savedByCount || 1) + 1
-                }));
-            } else {
-                alert('Failed to save moment.');
+            const newComment = await createComment(moment.id, commentText, pathname);
+            if (newComment) {
+                // Optimistic Update
+                setReplyCount(prev => prev + 1);
+                setCommentText('');
+                setShowCommentInput(false);
+                // Optionally show success toast
             }
         } catch (error) {
-            console.error('Fork failed', error);
+            console.error('Failed to post comment', error);
         } finally {
-            setIsForking(false);
+            setIsPostingComment(false);
         }
     };
 
@@ -195,32 +195,33 @@ export default function MomentCard({
     }
 
     return (
-        <div className={`relative group transition-all duration-300 ${isDeleting ? 'scale-90 opacity-0' : 'scale-100 opacity-100'}`}>
-            {showForkInput && (
-                <div className="absolute inset-0 z-50 bg-black/90 rounded-xl flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-200">
-                    <form onSubmit={handleFork} className="w-full flex gap-2">
+        <div className={`relative group transition-all duration-300 min-w-0 ${isDeleting ? 'scale-90 opacity-0' : 'scale-100 opacity-100'}`}>
+            {showCommentInput && (
+                <div
+                    className="absolute inset-x-0 bottom-0 z-50 bg-black/90 p-3 backdrop-blur-md animate-in slide-in-from-bottom-2 duration-200 border-t border-white/10"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <form onSubmit={handlePostComment} className="w-full flex gap-2 items-center">
                         <input
                             autoFocus
                             type="text"
-                            placeholder="Add a note..."
-                            className="flex-1 bg-white/10 border border-white/10 rounded-full px-4 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-1 focus:ring-orange-500/50"
-                            value={forkNote}
-                            onChange={(e) => setForkNote(e.target.value)}
-                            onClick={(e) => e.stopPropagation()}
+                            placeholder="Write a reply..."
+                            className="flex-1 bg-white/10 border border-white/10 rounded-full px-4 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                            value={commentText}
+                            onChange={(e) => setCommentText(e.target.value)}
                         />
                         <button
                             type="submit"
-                            disabled={isForking}
-                            className="bg-orange-500 hover:bg-orange-600 text-white rounded-full px-4 text-xs font-bold transition-colors disabled:opacity-50"
-                            onClick={(e) => e.stopPropagation()}
+                            disabled={isPostingComment || !commentText.trim()}
+                            className="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {isForking ? 'Saving...' : 'Save'}
+                            <Send size={14} />
                         </button>
                         <button
                             type="button"
                             onClick={(e) => {
                                 e.stopPropagation();
-                                setShowForkInput(false);
+                                setShowCommentInput(false);
                             }}
                             className="p-2 text-white/60 hover:text-white"
                         >
@@ -231,7 +232,7 @@ export default function MomentCard({
             )}
 
             <div
-                className={`glass-panel overflow-hidden hover:bg-white/5 transition-colors relative`}
+                className={`glass-panel overflow-hidden hover:bg-white/5 transition-colors relative min-w-0`}
                 onClick={() => {
                     if (onPlayFull) {
                         onPlayFull(moment);
@@ -259,6 +260,25 @@ export default function MomentCard({
 
                     {/* Actions - Right */}
                     <div className="flex gap-1.5 pointer-events-auto">
+                        {/* Toggle Replies (Stacked Feed) */}
+                        {(replyCount > 0) && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (onToggleReplies) onToggleReplies();
+                                }}
+                                className={`p-1.5 rounded-full bg-black/40 transition-all backdrop-blur-md flex items-center gap-1.5
+                                    ${onToggleReplies ? 'hover:bg-blue-500/20 cursor-pointer' : 'cursor-default opacity-80'}
+                                    ${isRepliesExpanded ? 'text-blue-300 bg-blue-500/10' : 'text-blue-200'}
+                                `}
+                                title={onToggleReplies ? (isRepliesExpanded ? "Hide Replies" : "Show Replies") : `${replyCount} Replies`}
+                            >
+                                <MessageSquare size={14} className="fill-current" />
+                                <span className="text-[10px] font-bold">{replyCount}</span>
+                                {onToggleReplies && (isRepliesExpanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
+                            </button>
+                        )}
+
                         {needsRefresh && (
                             <button
                                 onClick={handleRefresh}
@@ -270,22 +290,25 @@ export default function MomentCard({
                             </button>
                         )}
 
-                        {/* Comment/Fork Button */}
+                        {/* Comment Button */}
                         {showCommentButton && (
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    setShowForkInput(true);
+                                    setShowCommentInput(!showCommentInput);
+                                    if (!showCommentInput) {
+                                        // Focus logic handled by autoFocus in input
+                                    }
                                 }}
                                 className={`p-1.5 rounded-full bg-black/40 transition-all backdrop-blur-md flex items-center gap-1.5
                                  hover:text-blue-300 hover:bg-blue-500/20
-                                 ${(moment.savedByCount || 0) > 0 ? 'text-blue-200' : 'text-white/40'}
+                                 ${showCommentInput ? 'text-blue-300 bg-blue-500/10' : ((replyCount > 0) ? 'text-blue-200' : 'text-white/40')}
                             `}
-                                title="Comment / Save to your profile"
+                                title="Comment"
                             >
-                                <MessageSquare size={14} className={(moment.savedByCount || 0) > 0 ? 'fill-current' : ''} />
-                                {(moment.savedByCount || 0) > 0 ? (
-                                    <span className="text-[10px] font-bold">{moment.savedByCount}</span>
+                                <MessageSquare size={14} className={(replyCount > 0) ? 'fill-current' : ''} />
+                                {replyCount > 0 ? (
+                                    <span className="text-[10px] font-bold">{replyCount}</span>
                                 ) : (
                                     <span className="text-[10px] font-medium opacity-50">0</span>
                                 )}
@@ -336,7 +359,7 @@ export default function MomentCard({
                         )}
 
                         {/* Tiny Artwork */}
-                        <div className="w-10 h-10 rounded-md bg-black/50 overflow-hidden flex-shrink-0 relative opacity-80 group-hover/track:opacity-100 transition-opacity">
+                        <div className="w-14 h-14 rounded-md bg-black/50 overflow-hidden flex-shrink-0 relative opacity-80 group-hover/track:opacity-100 transition-opacity">
                             {trackCardData.artwork ? (
                                 <img src={trackCardData.artwork} alt={trackCardData.title || 'Track artwork'} className="w-full h-full object-cover" />
                             ) : (

@@ -89,6 +89,7 @@ export interface Database {
                     resource_id: string | null
                     platform: string
                     track_source_id: string | null
+                    parent_id: string | null
                     start_time: number
                     end_time: number
                     note: string | null
@@ -106,6 +107,7 @@ export interface Database {
                     resource_id?: string | null
                     platform: string
                     track_source_id?: string | null
+                    parent_id?: string | null
                     start_time: number
                     end_time: number
                     note?: string | null
@@ -123,6 +125,7 @@ export interface Database {
                     resource_id?: string | null
                     platform?: string
                     track_source_id?: string | null
+                    parent_id?: string | null
                     start_time?: number
                     end_time?: number
                     note?: string | null
@@ -145,6 +148,12 @@ export interface Database {
                         foreignKeyName: "moments_track_source_id_fkey"
                         columns: ["track_source_id"]
                         referencedRelation: "track_sources"
+                        referencedColumns: ["id"]
+                    },
+                    {
+                        foreignKeyName: "moments_parent_id_fkey"
+                        columns: ["parent_id"]
+                        referencedRelation: "moments"
                         referencedColumns: ["id"]
                     }
                 ]

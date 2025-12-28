@@ -51,6 +51,14 @@ export async function POST(request: Request) {
             // Use existing track_source
             trackSourceId = existingTrackSource.id;
             console.log('[API] Using existing track_source:', trackSourceId);
+
+            // Auto-Heal: If new duration provided > 0, update existing record (blindly update to ensure latest duration)
+            if (duration > 0) {
+                await supabase
+                    .from('track_sources')
+                    .update({ duration_sec: duration })
+                    .eq('id', trackSourceId);
+            }
         } else {
             // Create new track_source (even if duration is 0 or missing)
             const { data: newTrackSource, error: trackSourceError } = await supabase
@@ -75,12 +83,57 @@ export async function POST(request: Request) {
             }
         }
 
+        // Step 1.5: Fuzzy Threading & Heirarchy Flattening
+        let parentId: string | null = null;
+        let proposedParentId = body.parentId || null;
+
+        if (!proposedParentId && trackSourceId) {
+            // No parent specified, proceed with Fuzzy Search
+            /* DISABLED: Fuzzy Threading - Capture should always create a new Root Moment
+            const FUZZY_THRESHOLD = 3;
+
+            // Search for ANY overlapping moment (Partner or Child)
+            const { data: fuzzyMatch } = await supabase
+                .from('moments')
+                .select('id')
+                .eq('track_source_id', trackSourceId)
+                .gte('end_time', body.startSec - FUZZY_THRESHOLD)
+                .lte('start_time', body.endSec + FUZZY_THRESHOLD)
+                .order('created_at', { ascending: true }) // Find oldest overlap
+                .limit(1)
+                .single();
+
+            if (fuzzyMatch) {
+                proposedParentId = fuzzyMatch.id;
+                console.log('[API] Fuzzy match found:', proposedParentId);
+            }
+            */
+        }
+
+        // Recursive Parent Check (Flattening)
+        if (proposedParentId) {
+            // Fetch the proposed parent to see if it is already a child
+            const { data: targetMoment } = await supabase
+                .from('moments')
+                .select('id, parent_id')
+                .eq('id', proposedParentId)
+                .single();
+
+            if (targetMoment) {
+                // If target has a parent, link to THAT parent (Root).
+                // If target IS a parent (parent_id null), link to target.
+                parentId = targetMoment.parent_id || targetMoment.id;
+                console.log(`[API] Resolved Parent: ${proposedParentId} -> ${parentId} (Flattened)`);
+            }
+        }
+
         // Step 2: Prepare moment data for Supabase (snake_case columns)
         const momentData = {
             user_id: user.id,
             resource_id: body.sourceUrl,
             platform: service,
             track_source_id: trackSourceId, // Link to track_source
+            parent_id: parentId, // Set the determined parent (Manual or Fuzzy)
             start_time: body.startSec,
             end_time: body.endSec,
             note: body.note || null,
@@ -88,6 +141,7 @@ export async function POST(request: Request) {
             artist: body.artist || 'Unknown Artist',
             artwork: body.artwork || null,
             saved_by_count: 1,
+            moment_duration_sec: body.endSec - body.startSec,
         };
 
         console.log('[API] Creating moment with data:', JSON.stringify(momentData, null, 2));
@@ -191,8 +245,10 @@ export async function GET(request: Request) {
                     artist,
                     artwork,
                     duration_sec
-                )
+                ),
+                replies: moments!parent_id(count)
             `)
+            .is('parent_id', null) // Stacked Feed: Only Top-Level
             .order('created_at', { ascending: false });
 
         // Apply filters
@@ -228,6 +284,7 @@ export async function GET(request: Request) {
             artist: m.track_sources?.artist || m.artist || 'Unknown Artist',
             artwork: m.track_sources?.artwork || m.artwork || null,
             likeCount: m.like_count || 0,
+            replyCount: m.replies?.[0]?.count || 0,
             savedByCount: m.saved_by_count || 1,
             createdAt: m.created_at,
             updatedAt: m.updated_at,

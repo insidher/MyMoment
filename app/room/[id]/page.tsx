@@ -1,9 +1,10 @@
 'use client';
 import { createClient } from '@/lib/supabase/client';
+import { createComment } from '../../actions/moments';
 
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Play, Pause, Save, Clock, ArrowLeft, Check, RotateCcw, ListMusic, Loader2 } from 'lucide-react';
+import { Play, Pause, Save, Clock, ArrowLeft, Check, RotateCcw, ListMusic, Loader2, X } from 'lucide-react';
 import Link from 'next/link';
 import YouTube, { YouTubeEvent } from 'react-youtube';
 import { toast } from 'sonner';
@@ -42,7 +43,40 @@ const groupMoments = (moments: Moment[]): { main: Moment; replies: Moment[] }[] 
     // Sort groups by main moment's creation time (newest first)? Or start time?
     // Usually newest first is good for feeds, but for a room list, maybe time order? 
     // Let's stick to the current order of moments which is Newest First.
-    return Object.values(groups);
+    // Convert map to array and determine Main vs Replies for each group
+    return Object.values(groups).map(group => {
+        // We have a list of moments sharing the same timestamp/source.
+        // We need to identify the "Main" moment.
+        // Priority 1: The one with parentId === null (Root).
+        // Priority 2: The Oldest one (created first).
+
+        let all = [group.main, ...group.replies];
+
+        // Sort by creation time ascending (Oldest First)
+        all.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+        // Find root
+        const rootIndex = all.findIndex(m => !m.parentId);
+
+        let mainMoment: Moment;
+        let replies: Moment[];
+
+        if (rootIndex !== -1) {
+            mainMoment = all[rootIndex];
+            // Remove main from list, keep others
+            replies = all.filter((_, idx) => idx !== rootIndex);
+        } else {
+            // No strict root found (maybe all are replies to a deleted root? or fuzzy matches)
+            // Fallback to Oldest as Main
+            mainMoment = all[0];
+            replies = all.slice(1);
+        }
+
+        // Re-sort replies by Newest First for display (since we want newest comments at top)
+        replies.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+        return { main: mainMoment, replies };
+    });
 };
 
 interface SpotifyController {
@@ -72,7 +106,7 @@ const getResourceId = (url: string): { id: string; platform: 'youtube' | 'spotif
 
 export default function Room({ params }: { params: { id: string } }) {
     const { user, isLoading } = useAuth();
-    console.log('[Room] Client User:', user);
+
 
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -84,6 +118,10 @@ export default function Room({ params }: { params: { id: string } }) {
     const [note, setNote] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+
+    // Reply Mode State
+    const [replyingTo, setReplyingTo] = useState<{ id: string; username: string } | null>(null);
+    const noteInputRef = useRef<HTMLTextAreaElement>(null);
 
     // Smart Capture State
     const [captureState, setCaptureState] = useState<CaptureState>('idle');
@@ -219,11 +257,11 @@ export default function Room({ params }: { params: { id: string } }) {
                             healTrackSource(url, data.duration_sec);
                         }
                     } else {
-                        setMetadata({ title: 'Spotify Track', artist: 'Unknown Artist', artwork: '', description: '' });
+                        setMetadata({ title: 'Spotify Track', artist: 'Unknown Artist', artwork: '', description: '', duration_sec: 0 });
                     }
                 })
                 .catch(err => {
-                    setMetadata({ title: 'Spotify Track', artist: 'Unknown Artist', artwork: '', description: '' });
+                    setMetadata({ title: 'Spotify Track', artist: 'Unknown Artist', artwork: '', description: '', duration_sec: 0 });
                 });
         }
 
@@ -285,7 +323,7 @@ export default function Room({ params }: { params: { id: string } }) {
     useEffect(() => {
         if (metadata.description) {
             const parsed = parseChapters(metadata.description);
-            console.log('[Chapters] Parsed:', parsed.length);
+
             setChapters(parsed);
         }
     }, [metadata.description]);
@@ -446,6 +484,7 @@ export default function Room({ params }: { params: { id: string } }) {
                             artist: snippet.channelTitle, // Reliable channel name from API
                             artwork: snippet.thumbnails.maxres?.url || snippet.thumbnails.high?.url || '',
                             description: snippet.description || '',
+                            duration_sec: 0,
                         });
                         console.log('[YouTube API] Metadata set:', snippet.title, 'by', snippet.channelTitle);
                     }
@@ -458,6 +497,7 @@ export default function Room({ params }: { params: { id: string } }) {
                         artist: videoData.author || 'Unknown Channel',
                         artwork: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
                         description: '',
+                        duration_sec: 0,
                     });
                 }
             } catch (error) {
@@ -469,6 +509,7 @@ export default function Room({ params }: { params: { id: string } }) {
                     artist: videoData.author || 'Unknown Channel',
                     artwork: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
                     description: '',
+                    duration_sec: 0,
                 });
             }
         }
@@ -534,78 +575,105 @@ export default function Room({ params }: { params: { id: string } }) {
     };
 
     const handleSave = async () => {
-        if (startSec == null || endSec == null || !note) return;
+        // If creating new moment: Check start/end. If replying: Ignore start/end.
+        if (!replyingTo && (startSec == null || endSec == null || !note)) return;
+        if (replyingTo && !note) return;
 
         console.log('[handleSave] Saving via API:', metadata);
         setIsSaving(true);
 
         try {
-            const payload = {
-                sourceUrl: url,
-                startSec,
-                endSec,
-                note,
-                // Pass metadata if available
-                title: metadata?.title || 'Unknown Title',
-                artist: metadata?.artist || 'Unknown Artist',
-                artwork: metadata?.artwork || null,
-                service: isSpotify ? 'spotify' : 'youtube',
-                // Add track duration for track_sources table
-                // Prioritize player duration if it's > 0, otherwise fallback to metadata
-                duration: (isSpotify ? spotifyProgress.duration : playbackState.duration) || metadata.duration_sec,
-            };
+            if (replyingTo) {
+                // REPLY FLOW
+                const isHead = replyingTo.id === params.id;
+                const newComment = await createComment(replyingTo.id, note, window.location.pathname, isHead);
 
-            const res = await fetch('/api/moments', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
+                if (newComment) {
+                    toast.success('Reply posted!');
+                    setSaved(true);
 
-            const data = await res.json();
+                    // We need to fetch moments again or optimistically update. 
+                    // For now, let's just clear state. The Real-time nature or a re-fetch would be ideal.
+                    // But to see it instantly, we might want to reload or utilize the revalidatePath from server action.
 
-            if (!res.ok) {
-                // If 401, handle specifically?
-                throw new Error(data.error || 'Failed to save moment');
-            }
-
-            // Success!!
-            setSaved(true);
-            toast.success("Moment captured!");
-
-            // The API returns the new moment. We can add it directly.
-            // But we need to match the type.
-            if (data.moment) {
-                const m = data.moment;
-                const newMoment: Moment = {
-                    id: m.id,
-                    service: m.service ?? m.platform,
+                    setTimeout(() => setSaved(false), 2000);
+                    setReplyingTo(null);
+                    setNote('');
+                }
+            } else {
+                // CREATE MOMENT FLOW
+                const payload = {
                     sourceUrl: url,
-                    startSec: m.startSec ?? m.start_time,
-                    endSec: m.endSec ?? m.end_time,
-                    momentDurationSec: (m.endSec ?? m.end_time) - (m.startSec ?? m.start_time),
-                    title: m.title,
-                    artist: m.artist,
-                    artwork: m.artwork,
-                    note: m.note,
-                    likeCount: m.likeCount ?? 0,
-                    savedByCount: m.savedByCount ?? 1,
-                    createdAt: new Date(m.createdAt ?? m.created_at),
-                    user: {
-                        name: m.user?.name ?? m.user?.full_name ?? 'Me',
-                        image: m.user?.image ?? m.user?.avatar_url
-                    },
-                    trackSource: m.trackSource
-                } as Moment;
-                setMoments([newMoment, ...moments]);
+                    startSec,
+                    endSec,
+                    note,
+                    // Pass metadata if available
+                    title: metadata?.title || 'Unknown Title',
+                    artist: metadata?.artist || 'Unknown Artist',
+                    artwork: metadata?.artwork || null,
+                    service: isSpotify ? 'spotify' : 'youtube',
+                    // Add track duration for track_sources table
+                    // Prioritize player duration if it's > 0, otherwise fallback to metadata
+                    duration: (isSpotify ? spotifyProgress.duration : playbackState.duration) || metadata.duration_sec,
+                };
+
+                const res = await fetch('/api/moments', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.error || 'Failed to save moment');
+                }
+
+                // Success!!
+                setSaved(true);
+                toast.success("Moment captured!");
+
+                // The API returns the new moment. We can add it directly.
+                if (data.moment) {
+                    // ... (Existing optimistic update logic, simplified for brevity in this replace block, 
+                    // BUT WE MUST PRESERVE IT. I will paste the original logic back in the next chunks if needed, 
+                    // or better, I will assume the original logic is after this block if I only replace specific lines.
+                    // Wait, I am replacing the whole try block entry.
+                    // I should adjust my strategy to be less invasive or include the original code.)
+                    // Let's REWRITE THE WHOLE TRY BLOCK to be safe and clean.
+
+                    const m = data.moment;
+                    const newMoment: Moment = {
+                        id: m.id,
+                        service: m.service ?? m.platform,
+                        sourceUrl: url,
+                        startSec: m.startSec ?? m.start_time,
+                        endSec: m.endSec ?? m.end_time,
+                        momentDurationSec: (m.endSec ?? m.end_time) - (m.startSec ?? m.start_time),
+                        title: m.title,
+                        artist: m.artist,
+                        artwork: m.artwork,
+                        note: m.note,
+                        likeCount: m.likeCount ?? 0,
+                        savedByCount: m.savedByCount ?? 1,
+                        createdAt: new Date(m.createdAt ?? m.created_at),
+                        user: {
+                            name: m.user?.name ?? m.user?.full_name ?? 'Me',
+                            image: m.user?.image ?? m.user?.avatar_url
+                        },
+                        trackSource: m.trackSource
+                    } as Moment;
+                    setMoments([newMoment, ...moments]);
+                }
+
+                setTimeout(() => setSaved(false), 3000);
+
+                // Reset UI
+                setCaptureState('idle');
+                setStartSec(null);
+                setEndSec(null);
+                setNote('');
             }
-
-            setTimeout(() => setSaved(false), 3000);
-
-            // Reset UI
-            setCaptureState('idle');
-            setStartSec(null);
-            setEndSec(null);
-            setNote('');
 
         } catch (error: unknown) {
             console.error('Failed to save', error);
@@ -1257,6 +1325,13 @@ export default function Room({ params }: { params: { id: string } }) {
                                                 currentTime={isSpotify ? spotifyProgress.current : playbackState.current}
                                                 activeMomentId={activeMoment?.id}
                                                 isPlaying={isPlaying}
+                                                currentUserId={user?.id || ''}
+                                                onReply={(momentId, username) => {
+                                                    setReplyingTo({ id: momentId, username });
+                                                    // Scroll to input? Or just focus if visible
+                                                    // Ideally scroll to bottom right column
+                                                    noteInputRef.current?.focus();
+                                                }}
                                             />
                                         ))
                                 )}
@@ -1323,8 +1398,8 @@ export default function Room({ params }: { params: { id: string } }) {
                                 )}
                             </div>
 
-                            {/* Preview Chip */}
-                            {captureState === 'end-captured' && startSec !== null && endSec !== null && (
+                            {/* Preview Chip - Only show if NOT replying */}
+                            {captureState === 'end-captured' && startSec !== null && endSec !== null && !replyingTo && (
                                 <div className="glass-panel p-4 bg-purple-600/20 border-2 border-purple-500">
                                     <p className="text-xs text-white/50 uppercase tracking-wider mb-2">Preview</p>
                                     <div className="flex items-center gap-3">
@@ -1344,81 +1419,112 @@ export default function Room({ params }: { params: { id: string } }) {
                                 </div>
                             )}
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <label className="text-xs text-white/50 uppercase tracking-wider">Start</label>
-                                    <input
-                                        type="text"
-                                        placeholder="0:45"
-                                        value={startSec !== null ? formatTime(startSec) : ''}
-                                        readOnly
-                                        className="input-field w-full text-center font-mono text-lg"
-                                        suppressHydrationWarning
-                                    />
+                            {/* Start/End Inputs - Hide if Replying */}
+                            {!replyingTo && (
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-white/50 uppercase tracking-wider">Start</label>
+                                        <input
+                                            type="text"
+                                            placeholder="0:45"
+                                            value={startSec !== null ? formatTime(startSec) : ''}
+                                            readOnly
+                                            className="input-field w-full text-center font-mono text-lg"
+                                            suppressHydrationWarning
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-white/50 uppercase tracking-wider">End</label>
+                                        <input
+                                            type="text"
+                                            placeholder="1:15"
+                                            value={endSec !== null ? formatTime(endSec) : ''}
+                                            readOnly
+                                            className="input-field w-full text-center font-mono text-lg"
+                                            suppressHydrationWarning
+                                        />
+                                    </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs text-white/50 uppercase tracking-wider">End</label>
-                                    <input
-                                        type="text"
-                                        placeholder="1:15"
-                                        value={endSec !== null ? formatTime(endSec) : ''}
-                                        readOnly
-                                        className="input-field w-full text-center font-mono text-lg"
-                                        suppressHydrationWarning
-                                    />
-                                </div>
-                            </div>
+                            )}
 
                             <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <label className="text-xs text-white/50 uppercase tracking-wider">Label / Note</label>
-                                    {currentChapter && (
-                                        <div className="flex items-center gap-2">
-                                            <input
-                                                type="checkbox"
-                                                id="include-chapter"
-                                                checked={includeChapterNote}
-                                                onChange={(e) => {
-                                                    setIncludeChapterNote(e.target.checked);
-                                                    if (e.target.checked) {
-                                                        const suffix = `${currentChapter.title}\n`;
-                                                        if (!note.endsWith(suffix)) {
-                                                            setNote(prev => prev + suffix);
-                                                        }
-                                                    }
-                                                }}
-                                                className="rounded sr-only" // Use custom style or standard
-                                            />
-                                            <label
-                                                htmlFor="include-chapter"
-                                                onClick={() => {
-                                                    const checked = !includeChapterNote;
-                                                    setIncludeChapterNote(checked);
-                                                    if (checked) {
-                                                        const suffix = ` [${currentChapter.title}]`;
-                                                        if (!note.endsWith(suffix)) {
-                                                            setNote(prev => prev + suffix);
-                                                        }
-                                                    }
-                                                }}
-                                                className={`text-xs cursor-pointer select-none transition-colors ${includeChapterNote ? 'text-purple-300' : 'text-white/30 hover:text-white/50'}`}
-                                            >
-                                                {includeChapterNote ? 'Start with chapter title' : 'Use chapter title?'}
-                                            </label>
+                                {/* Reply Banner */}
+                                {replyingTo && (
+                                    <div className="flex items-center justify-between bg-blue-500/10 border border-blue-500/20 px-3 py-2 rounded-lg mb-2">
+                                        <div className="flex items-center gap-2 text-sm text-blue-200">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                                            <span>Replying to <span className="font-bold">{replyingTo.username}</span></span>
                                         </div>
-                                    )}
-                                </div>
+                                        <button
+                                            onClick={() => {
+                                                setReplyingTo(null);
+                                                setNote('');
+                                            }}
+                                            className="p-1 hover:bg-white/10 rounded-full transition-colors text-white/50 hover:text-white"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                )}
+
+                                {!replyingTo && (
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-xs text-white/50 uppercase tracking-wider">Label / Note</label>
+                                        {currentChapter && (
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    id="include-chapter"
+                                                    checked={includeChapterNote}
+                                                    onChange={(e) => {
+                                                        setIncludeChapterNote(e.target.checked);
+                                                        if (e.target.checked) {
+                                                            const suffix = `${currentChapter.title}\n`;
+                                                            if (!note.endsWith(suffix)) {
+                                                                setNote(prev => prev + suffix);
+                                                            }
+                                                        }
+                                                    }}
+                                                    className="rounded sr-only" // Use custom style or standard
+                                                />
+                                                <label
+                                                    htmlFor="include-chapter"
+                                                    onClick={() => {
+                                                        const checked = !includeChapterNote;
+                                                        setIncludeChapterNote(checked);
+                                                        if (checked) {
+                                                            const suffix = ` [${currentChapter.title}]`;
+                                                            if (!note.endsWith(suffix)) {
+                                                                setNote(prev => prev + suffix);
+                                                            }
+                                                        }
+                                                    }}
+                                                    className={`text-xs cursor-pointer select-none transition-colors ${includeChapterNote ? 'text-purple-300' : 'text-white/30 hover:text-white/50'}`}
+                                                >
+                                                    {includeChapterNote ? 'Start with chapter title' : 'Use chapter title?'}
+                                                </label>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                                 <textarea
-                                    placeholder="Why this part hits different..."
+                                    ref={noteInputRef}
+                                    placeholder={replyingTo ? "Write a reply..." : "Why this part hits different..."}
                                     value={note}
                                     onChange={(e) => setNote(e.target.value)}
-                                    className="input-field w-full min-h-[100px] resize-none"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleSave();
+                                        }
+                                    }}
+                                    className={`input-field w-full min-h-[100px] resize-none ${replyingTo ? 'border-blue-500/50 focus:border-blue-400' : ''}`}
                                 />
                             </div>
 
                             <button
                                 onClick={handleSave}
-                                disabled={isSaving || saved || startSec === null || endSec === null || !note}
+                                disabled={isSaving || saved || (!replyingTo && (startSec === null || endSec === null)) || !note}
                                 className={`w-full btn-primary flex items-center justify-center gap-2 ${saved ? 'bg-green-600 hover:bg-green-600 from-green-600 to-green-500' : ''} disabled:opacity-50 disabled:cursor-not-allowed`}
                             >
                                 {saved ? (
@@ -1429,7 +1535,7 @@ export default function Room({ params }: { params: { id: string } }) {
                                 ) : (
                                     <>
                                         {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                                        {isSaving ? 'Saving...' : 'Save Moment'}
+                                        {isSaving ? 'Saving...' : (replyingTo ? 'Post Reply' : 'Save Moment')}
                                     </>
                                 )}
                             </button>

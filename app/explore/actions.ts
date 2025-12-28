@@ -243,7 +243,8 @@ export async function getRecentMoments(limit = 50, excludeSpotify = false): Prom
                     artist,
                     artwork,
                     duration_sec
-                )
+                ),
+                replies: moments!parent_id(count)
             `);
 
         // Apply Spotify filter at query level if requested
@@ -252,6 +253,7 @@ export async function getRecentMoments(limit = 50, excludeSpotify = false): Prom
         }
 
         const { data: moments, error } = await query
+            .is('parent_id', null) // Stacked Feed: Only Top-Level
             .order('created_at', { ascending: false })
             .limit(limit);
 
@@ -280,6 +282,7 @@ export async function getRecentMoments(limit = 50, excludeSpotify = false): Prom
             artwork: m.track_sources?.artwork || m.artwork || null,
             note: m.note,
             likeCount: m.like_count || 0,
+            replyCount: m.replies?.[0]?.count || 0,
             savedByCount: m.saved_by_count || 0,
             createdAt: m.created_at,
             updatedAt: m.updated_at,
@@ -314,37 +317,37 @@ export async function getUserMoments(userId: string, excludeSpotify = false): Pr
         let query = supabase
             .from('moments')
             .select(`
-                id,
-                platform,
-                resource_id,
-                start_time,
-                end_time,
-                moment_duration_sec,
-                title,
-                artist,
-                artwork,
-                note,
-                like_count,
-                created_at,
-                updated_at,
-                user_id,
-                track_source_id,
-                profiles!user_id (
-                    name,
-                    image
-                ),
-                likes (
+        id,
+            platform,
+            resource_id,
+            start_time,
+            end_time,
+            moment_duration_sec,
+            title,
+            artist,
+            artwork,
+            note,
+            like_count,
+            created_at,
+            updated_at,
+            user_id,
+            track_source_id,
+            profiles!user_id(
+                name,
+                image
+            ),
+                likes(
                     user_id
                 ),
-                track_sources!track_source_id (
+                track_sources!track_source_id(
                     title,
                     artist,
                     artwork,
                     duration_sec
-                )
-            `)
-            .eq('user_id', userId)
-            .is('parent_id', null);
+                ),
+                replies: moments!parent_id(count)
+                    `)
+            .eq('user_id', userId);
 
         // Apply Spotify filter at query level if requested
         if (excludeSpotify) {
@@ -352,6 +355,7 @@ export async function getUserMoments(userId: string, excludeSpotify = false): Pr
         }
 
         const { data: moments, error } = await query
+            .is('parent_id', null) // Stacked Feed: Only Top-Level
             .order('created_at', { ascending: false });
 
         if (error || !moments) {
@@ -404,35 +408,35 @@ export async function getLikedMoments(userId: string, excludeSpotify = false): P
         let query = supabase
             .from('likes')
             .select(`
-                moment_id,
-                moments!inner (
-                    id,
-                    platform,
-                    resource_id,
-                    start_time,
-                    end_time,
-                    moment_duration_sec,
+        moment_id,
+            moments!inner(
+                id,
+                platform,
+                resource_id,
+                start_time,
+                end_time,
+                moment_duration_sec,
+                title,
+                artist,
+                artwork,
+                note,
+                like_count,
+                created_at,
+                updated_at,
+                user_id,
+                track_source_id,
+                profiles!user_id(
+                    name,
+                    image
+                ),
+                track_sources!track_source_id(
                     title,
                     artist,
                     artwork,
-                    note,
-                    like_count,
-                    created_at,
-                    updated_at,
-                    user_id,
-                    track_source_id,
-                    profiles!user_id (
-                        name,
-                        image
-                    ),
-                    track_sources!track_source_id (
-                        title,
-                        artist,
-                        artwork,
-                        duration_sec
-                    )
+                    duration_sec
                 )
-            `)
+            )
+                `)
             .eq('user_id', userId);
 
         // Apply Spotify filter at query level if requested
@@ -496,35 +500,58 @@ export async function getTrackMoments(resourceId: string): Promise<Moment[]> {
         const { data: moments, error } = await supabase
             .from('moments')
             .select(`
-                id,
-                platform,
-                resource_id,
-                start_time,
-                end_time,
-                moment_duration_sec,
-                title,
-                artist,
-                artwork,
-                note,
-                like_count,
-                created_at,
-                updated_at,
-                user_id,
-                track_source_id,
-                profiles!user_id (
-                    name,
-                    image
-                ),
-                likes (
+            id,
+            parent_id,
+            platform,
+            resource_id,
+            start_time,
+            end_time,
+            moment_duration_sec,
+            title,
+            artist,
+            artwork,
+            note,
+            like_count,
+            created_at,
+            updated_at,
+            user_id,
+            track_source_id,
+            profiles!user_id(
+                name,
+                image
+            ),
+                likes(
                     user_id
                 ),
-                track_sources!track_source_id (
+                track_sources!track_source_id(
                     title,
                     artist,
                     artwork,
                     duration_sec
-                )
-            `)
+                ),
+                    replies: moments!parent_id(
+                        id,
+                        user_id,
+                        note,
+                        created_at,
+                        like_count,
+                        profiles!user_id(
+                            name,
+                            image
+                        ),
+                        replies: moments!parent_id(
+                            id,
+                            user_id,
+                            note,
+                            created_at,
+                            like_count,
+                            profiles!user_id(
+                                name,
+                                image
+                            )
+                        )
+                    )
+                        `)
             .eq('resource_id', resourceId)
             .order('created_at', { ascending: false });
 
@@ -535,6 +562,7 @@ export async function getTrackMoments(resourceId: string): Promise<Moment[]> {
 
         return moments.map((m: any) => ({
             id: m.id,
+            parentId: m.parent_id,
             service: m.platform as any,
             sourceUrl: m.resource_id,
             startSec: m.start_time,
@@ -563,6 +591,28 @@ export async function getTrackMoments(resourceId: string): Promise<Moment[]> {
                 artwork: m.track_sources.artwork,
                 durationSec: m.track_sources.duration_sec,
             } : undefined,
+            replies: m.replies ? m.replies.map((r: any) => ({
+                id: r.id,
+                userId: r.user_id,
+                note: r.note,
+                createdAt: r.created_at,
+                likeCount: r.like_count || 0,
+                user: {
+                    name: r.profiles?.name || 'User',
+                    image: r.profiles?.image || null
+                },
+                replies: r.replies ? r.replies.map((rr: any) => ({
+                    id: rr.id,
+                    userId: rr.user_id,
+                    note: rr.note,
+                    createdAt: rr.created_at,
+                    likeCount: rr.like_count || 0,
+                    user: {
+                        name: rr.profiles?.name || 'User',
+                        image: rr.profiles?.image || null
+                    }
+                })).sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) : []
+            })).sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) : [],
         } as Moment));
     } catch (error) {
         console.error('Failed to fetch track moments:', error);
