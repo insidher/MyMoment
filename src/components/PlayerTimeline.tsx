@@ -57,6 +57,9 @@ export default function PlayerTimeline({
     const [editingMomentId, setEditingMomentId] = useState<string | null>(null);
     const [hoverTime, setHoverTime] = useState<number | null>(null);
 
+    // Filter out replies so they don't appear as separate pills on the timeline
+    const rootMoments = moments.filter(m => !m.parentId);
+
     // Social State
     const [replyText, setReplyText] = useState('');
     const [isReplying, setIsReplying] = useState(false);
@@ -560,7 +563,7 @@ export default function PlayerTimeline({
 
 
                     {/* Moments Overlays (Existing) */}
-                    {moments.map((moment) => {
+                    {rootMoments.map((moment) => {
                         const startPercent = (moment.startSec / safeDuration) * 100;
                         const endPercent = (moment.endSec / safeDuration) * 100;
                         const widthPercent = Math.max(0.5, endPercent - startPercent);
@@ -765,7 +768,7 @@ export default function PlayerTimeline({
                 });
 
                 // Add or Merge Moments
-                moments.forEach(m => {
+                rootMoments.forEach(m => {
                     const existing = groups.find(g => Math.abs(g.time - m.startSec) <= THRESHOLD);
                     if (existing) {
                         existing.moments.push(m); // Add to cluster
@@ -907,19 +910,10 @@ export default function PlayerTimeline({
                                                                 }}
                                                             >
                                                                 {currentUser?.id === group.moments[0].userId ? (
-                                                                    (() => {
-                                                                        const pct = ((group.moments[0].endSec - group.moments[0].startSec) / safeDuration) * 100;
-                                                                        return (
-                                                                            <span className="flex items-center gap-1">
-                                                                                <Wrench size={9} strokeWidth={2.5} className="shrink-0 z-10" />
-                                                                                {pct > 5 && (
-                                                                                    <span>
-                                                                                        {pct < 15 ? 'Edit' : 'Edit Moment'}
-                                                                                    </span>
-                                                                                )}
-                                                                            </span>
-                                                                        );
-                                                                    })()
+                                                                    <span className="flex items-center gap-1">
+                                                                        <Wrench size={9} strokeWidth={2.5} className="shrink-0 z-10" />
+                                                                        <span className="truncate">{group.moments[0].note || 'Moment'}</span>
+                                                                    </span>
                                                                 ) : (
                                                                     group.moments[0].note || 'Moment'
                                                                 )}

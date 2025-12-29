@@ -1,193 +1,49 @@
 # MyMoment Architecture Dictionary
 
-**Last Updated**: 2025-12-18  
+**Last Updated**: 2025-12-27
 **Purpose**: Reference document for codebase architecture, migration status, and component naming conventions.
 
 ---
 
 ## Part 1: Migration Audit (Prisma → Supabase)
 
-### ⚠️ CRITICAL FINDING: Migration Incomplete
+### ✅ STATUS: Production Migration Complete
 
-**Status**: The application has **dual database access** - Supabase for auth/client queries and Prisma for API writes.
+**Status**: The core application (`app/`) now exclusively uses **Supabase** for all read/write operations. Prisma remains only in legacy scripts and unused utility files.
 
-### 🔴 Active Prisma Usage
+### 🗑️ Legacy / Inactive Code (To Be Deleted)
 
-The following files actively import and use `@prisma/client`:
+The following files are **candidates for deletion** as they use the legacy Prisma client and are no longer referenced in production:
 
-#### Production Code (Active)
-- **`src/lib/prisma.ts`** - Prisma client singleton
-- **`app/api/moments/route.ts`** - Primary moments API (POST/GET)
-- **`app/actions/moments.ts`** - Server actions for likes/comments
+- **`src/lib/prisma.ts`** - Legacy Prisma client
+- **`src/lib/trackSource.ts`** - Legacy track source creation logic (replaced by logic in `moments/route.ts`)
+- **`scripts/`** - All scripts in this folder rely on Prisma
 
-#### Legacy/Scripts (Inactive)
-- `scripts/debug_tables.ts`
-- `scripts/migrate-legacy-moments.js`
-- `scripts/verify_db.js`
-- `scripts/verify_db.ts`
-- `scripts/check_artists.js`
-- `scripts/check-duplicates.ts`
-- `scripts/backfill_artists.js`
+### ✅ Active Architecture (Supabase Only)
 
-### ✅ Schema Definition
+**Supabase Client**: `src/lib/supabase/client.ts` (Browser) & `src/lib/supabase/server.ts` (Server)
 
-**Location**: `src/types/supabase.ts`
+#### Checked & Migrated Files:
+- **`app/api/moments/route.ts`**: Fully migrated. Handles moment creation, track source management, and heirarchy flattening directly via Supabase.
+- **`app/actions/moments.ts`**: Fully migrated. Handles likes and threaded comments.
 
-```typescript
-// Generated TypeScript definition for Supabase
-export interface Database {
-  public: {
-    Tables: {
-      moments: {
-        Row: {
-          id: string
-          user_id: string
-          resource_id: string | null
-          platform: string
-          track_source_id: string | null
-          start_time: number
-          end_time: number
-          note: string | null
-          title: string | null
-          artist: string | null
-          artwork: string | null
-          like_count: number | null
-          saved_by_count: number | null
-          created_at: string
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          resource_id?: string | null
-          platform: string
-          track_source_id?: string | null
-          start_time: number
-          end_time: number
-          note?: string | null
-          title?: string | null
-          artist?: string | null
-          artwork?: string | null
-          like_count?: number | null
-          saved_by_count?: number | null
-          created_at?: string
-          updated_at?: string | null
-        }
-        Update: {
-          // Similar structure for partial updates
-        }
-      }
-    }
-  }
-}
-```
+### 🗄️ Database Schema (Key Tables)
 
-**Application Type**: `src/types/index.ts`
+**`moments` Table**:
+- `id`: UUID
+- `parent_id`: UUID (Self-reference for Threading)
+- `track_source_id`: UUID (Link to metadata)
+- `resource_id`: String (URL)
+- `platform`: 'spotify' | 'youtube' | 'apple-music'
+- `start_time` / `end_time`: Integer (Seconds)
+- `moment_duration_sec`: Integer (Cached duration)
+- `note`: Text (Comment/Caption)
 
-```typescript
-export interface Moment {
-  id: string
-  userId?: string
-  service: MusicService
-  sourceUrl: string
-  trackSourceId?: string
-  trackSource?: TrackSource
-  startSec: number
-  endSec: number
-  momentDurationSec?: number
-  title?: string
-  artist?: string
-  artwork?: string
-  note?: string
-  likeCount?: number
-  savedByCount?: number
-  createdAt: Date
-  updatedAt?: Date
-  user?: {
-    name?: string
-    image?: string
-  }
-}
-```
-
-### ✅ Supabase Connection
-
-**Location**: `src/lib/supabase/client.ts`
-
-```typescript
-import { createBrowserClient } from '@supabase/ssr'
-import { Database } from '@/types/supabase'
-
-export function createClient() {
-    return createBrowserClient<Database>(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-}
-```
-
-**Server Client**: `src/lib/supabase/server.ts` (uses cookies for SSR)
-
-### 🔴 Save Logic (Using Prisma)
-
-**Location**: `app/room/[id]/page.tsx` → calls → `app/api/moments/route.ts`
-
-**Client-side function** (lines 516-594):
-```typescript
-const handleSave = async () => {
-    const payload = {
-        sourceUrl: url,
-        startSec,
-        endSec,
-        note,
-        title: metadata?.title || 'Unknown Title',
-        artist: metadata?.artist || 'Unknown Artist',
-        artwork: metadata?.artwork || null,
-        service: isSpotify ? 'spotify' : 'youtube',
-    };
-
-    const res = await fetch('/api/moments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-    });
-    // ... handle response
-}
-```
-
-**API endpoint** (`app/api/moments/route.ts` lines 5-120):
-```typescript
-export async function POST(request: Request) {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser(); // ✅ Supabase auth
-
-    // ⚠️ PRISMA WRITE
-    const newMoment = await prisma.moment.create({
-        data: {
-            ...momentData,
-            userId: user.id,
-        },
-        include: {
-            trackSource: true,
-            user: { select: { full_name: true, avatar_url: true } }
-        }
-    });
-    
-    return NextResponse.json({ success: true, moment: newMoment });
-}
-```
-
-### 📋 Migration Checklist
-
-- [x] Schema defined in `types/supabase.ts`
-- [x] Supabase client configured
-- [x] Auth migrated to Supabase
-- [ ] **Moment creation** - Still uses Prisma
-- [ ] **Moment updates** - Uses Prisma (`app/api/moments/[id]/route.ts`)
-- [ ] **Likes/Comments** - Uses Prisma (`app/actions/moments.ts`)
-- [ ] **Track sources** - Uses Prisma (`lib/trackSource.ts`)
-- [ ] Remove `src/lib/prisma.ts`
-- [ ] Update CI/CD to remove Prisma dependencies
+**`track_sources` Table**:
+- `id`: UUID
+- `source_url`: String (Unique)
+- `duration_sec`: Integer (Track length)
+- `title`, `artist`, `artwork`: Metadata
 
 ---
 
@@ -197,171 +53,102 @@ export async function POST(request: Request) {
 
 #### **Home** (`app/page.tsx`)
 - **Route**: `/`
-- **Purpose**: Landing page with URL input for Spotify/YouTube
-- **Key Features**: URL validation, platform detection, Spotify helper widget
+- **Purpose**: Landing page with URL input for Spotify/YouTube.
+- **Key Features**: URL validation, platform detection, Spotify login helper.
 
 #### **Room** (`app/room/[id]/page.tsx`)
 - **Route**: `/room/[id]?url=...`
-- **Purpose**: Main listening room with moment capture
-- **Key Features**: 
+- **Purpose**: Main listening room with moment capture.
+- **Key Features**:
   - Dual player (Spotify SDK / YouTube iframe)
-  - Timeline capture workflow
-  - Moment editor
-  - Related content strip
+  - **Timeline Clustering**: Visual grouping of overlapping moments.
+  - **Threading**: Creating and viewing replies to moments.
+  - Related content strip.
 - **Recommended Name**: "The Room" or "Listening Room"
 
 #### **Explore (Plaza)** (`app/explore/page.tsx`)
 - **Route**: `/explore`
-- **Purpose**: Public feed of moments and artist discovery
-- **Key Features**: Moment cards, artist cards, filtering
-- **Recommended Name**: "The Plaza"
+- **Purpose**: Public feed of moments ("The Plaza").
+- **Key Features**: Moment cards, artist cards, filtering.
 
 #### **Profile** (`app/profile/page.tsx`)
 - **Route**: `/profile`
-- **Purpose**: User's saved moments
-- **Key Features**: Personal moment library, stats
-
-#### **Login** (`app/login/page.tsx`)
-- **Route**: `/login`
-- **Purpose**: Supabase auth redirect handler
+- **Purpose**: User's library.
+- **Key Features**: Saved moments, likes.
 
 ---
 
-### 🎯 Core Features
-
-#### **The Player** (Embedded in `app/room/[id]/page.tsx`)
-- **Component**: Inline Spotify/YouTube player logic
-- **Purpose**: Playback control and state management
-- **Key State**: `currentTime`, `duration`, `isPlaying`, `playbackState`
+### 🎯 Core Components
 
 #### **The Timeline** (`src/components/PlayerTimeline.tsx`)
-- **Purpose**: Visual timeline with moments, chapters, and capture UI
+- **Purpose**: Visual timeline for playback, capture, and interaction.
 - **Key Features**:
-  - Progress bar with scrubbing
-  - Moment markers (pills)
-  - Sticky bracket capture
-  - Expanded note viewer
-  - Edit mode for owners
-- **Recommended Name**: "Timeline" or "The Capture Bar"
-- **Related**: 943 lines - largest component
-
-#### **Moment Capture System** (Integrated in Timeline + Room)
-- **Files**: `PlayerTimeline.tsx` (UI), `app/room/[id]/page.tsx` (state)
-- **Purpose**: Interactive moment creation workflow
-- **Components**:
-  - Start/End markers
-  - Sticky bracket (follows mouse)
-  - Note editor popover
-  - "Set End" label
+  - **Clustering**: Overlapping moments are grouped into "Timeline Clusters" to prevent UI overcrowding.
+  - **Capture UI**: Sticky bracket, "Set Start/End" markers.
+  - **Playback Control**: Scrubbing, active segment highlighting.
+- **Status**: The most complex component (approx. 1000 lines).
 
 #### **Moment Card** (`src/components/MomentCard.tsx`)
-- **Purpose**: Display individual moments in feeds
-- **Features**: Mini-timeline, play button, like/delete, artwork
-- **Used In**: Explore, Profile
+- **Purpose**: Display individual moments in feeds (Plaza, Profile, Lists).
+- **Features**:
+  - **Mini-Timeline**: Visual progress bar specific to the moment's segment.
+  - **Playback**: Inline playback control.
+  - **Social**: Like button, Reply button, Share.
 
-#### **Moment Group** (`src/components/MomentGroup.tsx`)
-- **Purpose**: Display moment with replies (comments)
-- **Features**: Main moment + nested reply cards
+#### **Thread Container** (`src/components/MomentGroup.tsx` & `ThreadComment.tsx`)
+- **Purpose**: Visualization of conversation threads.
+- **Features**:
+  - **MomentGroup**: Displays the "Head" moment and its immediate children.
+  - **ThreadComment**: Individual reply component.
+  - **Logic**: Supports max depth of 3 levels (Head -> Reply -> Nested Reply). Deeper replies are flattened.
 
 #### **Related Strip** (`src/components/RelatedStrip.tsx`)
-- **Purpose**: Horizontal carousel of related YouTube videos
-- **Used In**: Room page
+- **Purpose**: Horizontal carousel of related YouTube videos in the Room.
 
 ---
 
-### 🎨 UI Elements
+### 🎨 Design & UI Elements
 
 #### **Navbar** (`src/components/Navbar.tsx`)
-- **Purpose**: Global navigation header
-- **Features**: Logo, navigation links, user menu
-
-#### **Settings Sidebar** (`src/components/SettingsSidebar.tsx`)
-- **Purpose**: User preferences panel
+- **Purpose**: Global header (Logo, Search, User Menu).
 
 #### **Artist Card** (`src/components/ArtistCard.tsx`)
-- **Purpose**: Artist spotlight in Plaza
-- **Features**: Gradient placeholder image, link to filtered view
+- **Purpose**: Artist spotlight in Plaza.
 
-#### **Track Card** (`src/components/TrackCard.tsx`)
-- **Purpose**: Generic track display
-
-#### **Song Card** (`src/components/SongCard.tsx`)
-- **Purpose**: Song display variant
-
-#### **MyMoment Icon** (`src/components/icons/MyMomentIcon.tsx`)
-- **Purpose**: Brand logo SVG
+#### **Icons** (`src/components/icons/*`)
+- **Includes**: `MyMomentIcon`, `SocialIcons`, etc.
 
 ---
 
-### 🔧 Services & Utilities
+## Part 3: Terminology & Concepts
 
-#### **Database**
-- **`src/lib/supabase/client.ts`** - Browser Supabase client
-- **`src/lib/supabase/server.ts`** - Server Supabase client (SSR)
-- **`src/lib/prisma.ts`** - ⚠️ Legacy Prisma client
+### Threading Model
+- **Head Moment**: The detailed, top-level captured moment.
+- **Reply**: A moment created as a response to another moment (has `parent_id`).
+- **Flattening**: The logic that forces replies deeper than level 3 to attach to the level 2 parent, keeping the hierarchy shallow.
 
-#### **API Routes** (`app/api/`)
-- **`moments/route.ts`** - Create/list moments (POST/GET)
-- **`moments/[id]/route.ts`** - Update/delete moment (PATCH/DELETE)
-- **`metadata/route.ts`** - Fetch track metadata
-- **`related/route.ts`** - YouTube related videos
-- **`tracks/route.ts`** - Track source operations
+### Timeline Clustering
+- **Cluster**: A visual grouping of moments that overlap in time on the player timeline.
+- **Representative**: The specific moment chosen to represent a cluster (usually the first created or highest ranked).
+- **"Too Many Pills"**: The UI problem that clustering solves.
 
-#### **Server Actions** (`app/actions/`)
-- **`moments.ts`** - Like/unlike, create comments (uses Prisma)
-
-#### **Utilities** (`src/lib/`)
-- **`canonical.ts`** - Track ID normalization
-- **`chapters.ts`** - YouTube chapter parsing
-- **`metadata.ts`** - Track metadata extraction
-- **`related.ts`** - YouTube API integration
-- **`storage.ts`** - Local storage helpers
-- **`trackSource.ts`** - Track source CRUD (uses Prisma)
-- **`validation.ts`** - Input validation
-- **`youtube.ts`** - YouTube iframe API helpers
+### Data Synchronization
+- **Mini-Timeline**: The visual representation of a moment's duration relative to the full track.
+- **Heal**: The process of fixing missing or incorrect `duration_sec` data in the `track_sources` table.
 
 ---
 
-## Quick Reference: Naming Conventions
+## Next Steps
 
-When discussing with AI assistant, use these shorthand names:
+1. **Legacy Cleanup**:
+   - Delete `src/lib/prisma.ts` and `src/lib/trackSource.ts`.
+   - Remove `prisma` from `package.json`.
+   - Delete `scripts/` folder or migrate useful scripts to TypeScript/Supabase.
 
-| Full Name | Shorthand |
-|-----------|-----------|
-| `app/room/[id]/page.tsx` | "The Room" or "Room Page" |
-| `src/components/PlayerTimeline.tsx` | "Timeline" or "The Timeline" |
-| `app/explore/page.tsx` | "Plaza" or "Explore" |
-| `src/components/MomentCard.tsx` | "Moment Card" |
-| Sticky bracket capture UI | "Sticky Bracket" or "Capture Mode" |
-| `app/api/moments/route.ts` | "Moments API" |
-| `src/lib/supabase/client.ts` | "Supabase Client" |
+2. **Refactoring**:
+   - `PlayerTimeline.tsx` is becoming monolithic; consider extracting `ClusterView` or `CaptureOverlay`.
+   - `app/room/[id]/page.tsx` contains heavy state management; consider `useRoomState` hook.
 
----
-
-## Next Steps (Post-Audit)
-
-### High Priority
-1. **Complete Prisma → Supabase Migration**
-   - Migrate `app/api/moments/route.ts` to use Supabase client
-   - Migrate `app/actions/moments.ts` (likes/comments)
-   - Migrate `lib/trackSource.ts`
-   - Remove `src/lib/prisma.ts` after verification
-
-2. **Clean Up Legacy Code**
-   - Archive or delete `scripts/` folder
-   - Remove Prisma from `package.json` dependencies
-
-### Medium Priority
-3. **Component Refactoring**
-   - Split `app/room/[id]/page.tsx` (1415 lines) into smaller modules
-   - Extract player logic into `useSpotifyPlayer` and `useYouTubePlayer` hooks
-   - Consider splitting `PlayerTimeline.tsx` (943 lines) into sub-components
-
-4. **Type Safety**
-   - Align `Moment` interface with Supabase schema
-   - Generate Supabase types automatically
-   - Remove Prisma types
-
----
-
-**End of Dictionary**
+3. **Testing**:
+   - Verify threaded comments depth limit.
+   - Verify cluster expansion/interaction.

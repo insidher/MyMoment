@@ -136,6 +136,7 @@ export async function POST(request: Request) {
             parent_id: parentId, // Set the determined parent (Manual or Fuzzy)
             start_time: body.startSec,
             end_time: body.endSec,
+            track_duration_sec: body.duration || 0, // Store track duration directly
             note: body.note || null,
             title: body.title || 'Unknown Title',
             artist: body.artist || 'Unknown Artist',
@@ -182,6 +183,7 @@ export async function POST(request: Request) {
             sourceUrl: newMoment.resource_id,
             startSec: newMoment.start_time,
             endSec: newMoment.end_time,
+            trackDurationSec: newMoment.track_duration_sec,
             note: newMoment.note,
             title: newMoment.track_sources?.title || newMoment.title || 'Unknown Title',
             artist: newMoment.track_sources?.artist || newMoment.artist || 'Unknown Artist',

@@ -79,104 +79,102 @@ export default function ExplorePage() {
     }
 
     return (
-        <main className="min-h-screen p-8 pb-24">
-            <div className="max-w-7xl mx-auto space-y-12">
+        <div className="flex flex-col gap-6 md:gap-8 min-h-[calc(100vh-80px)] p-6 md:p-8 pb-32 relative">
 
-                {/* Header */}
-                <div className="space-y-2">
+            {/* Header Section */}
+            <div className="space-y-2">
+                {artistFilter ? (
+                    <div className="space-y-4">
+                        <Link href="/explore" className="inline-flex items-center gap-2 text-white/60 hover:text-white transition-colors">
+                            <ArrowLeft size={20} />
+                            Back to Plaza
+                        </Link>
+                        <h1 className="text-4xl font-bold text-white">
+                            {artistFilter}
+                        </h1>
+                        <p className="text-white/60 text-lg">
+                            {songs.length} songs · {songs.reduce((acc, s) => acc + s.momentsCount, 0)} moments
+                        </p>
+                    </div>
+                ) : (
+                    <>
+                        <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60">
+                            The Plaza
+                        </h1>
+                        <p className="text-white/60 text-lg">Discover moments captured by the community.</p>
+                    </>
+                )}
+            </div>
+
+            {/* Browse by Artist (Only on main view and if logged in) */}
+            {!artistFilter && user && artistStats.length > 0 && (
+                <section className="space-y-6">
+                    <div className="flex items-center gap-2 text-xl font-semibold text-white/90">
+                        <User size={24} className="text-blue-400" />
+                        <h2>Your Top Artists</h2>
+                    </div>
+                    <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+                        {artistStats.map((stats) => (
+                            <ArtistCard key={stats.artist} stats={stats} />
+                        ))}
+                    </div>
+                </section>
+            )}
+
+            {/* Content Grid */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-2 text-xl font-semibold text-white/90">
                     {artistFilter ? (
-                        <div className="space-y-4">
-                            <Link href="/explore" className="inline-flex items-center gap-2 text-white/60 hover:text-white transition-colors">
-                                <ArrowLeft size={20} />
-                                Back to Plaza
-                            </Link>
-                            <h1 className="text-4xl font-bold text-white">
-                                {artistFilter}
-                            </h1>
-                            <p className="text-white/60 text-lg">
-                                {songs.length} songs · {songs.reduce((acc, s) => acc + s.momentsCount, 0)} moments
-                            </p>
-                        </div>
+                        <>
+                            <TrendingUp size={24} className="text-purple-400" />
+                            <h2>Songs by {artistFilter}</h2>
+                        </>
                     ) : (
                         <>
-                            <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60">
-                                The Plaza
-                            </h1>
-                            <p className="text-white/60 text-lg">Discover moments captured by the community.</p>
+                            <Clock size={24} className="text-orange-400" />
+                            <h2>Latest Moments</h2>
                         </>
                     )}
                 </div>
 
-                {/* Browse by Artist (Only on main view and if logged in) */}
-                {!artistFilter && user && artistStats.length > 0 && (
-                    <section className="space-y-6">
-                        <div className="flex items-center gap-2 text-xl font-semibold text-white/90">
-                            <User size={24} className="text-blue-400" />
-                            <h2>Your Top Artists</h2>
-                        </div>
-                        <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-                            {artistStats.map((stats) => (
-                                <ArtistCard key={stats.artist} stats={stats} />
-                            ))}
-                        </div>
-                    </section>
-                )}
-
-                {/* Content Grid */}
-                <section className="space-y-6">
-                    <div className="flex items-center gap-2 text-xl font-semibold text-white/90">
-                        {artistFilter ? (
-                            <>
-                                <TrendingUp size={24} className="text-purple-400" />
-                                <h2>Songs by {artistFilter}</h2>
-                            </>
+                {artistFilter ? (
+                    // Artist View: Show grouped SongCards
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {songs.length === 0 ? (
+                            <div className="col-span-full text-center py-12 text-white/40">
+                                <p>No songs found for this artist.</p>
+                            </div>
                         ) : (
-                            <>
-                                <Clock size={24} className="text-orange-400" />
-                                <h2>Latest Moments</h2>
-                            </>
+                            songs.map((song) => (
+                                <SongCard key={`${song.service}-${song.sourceUrl}`} song={song} />
+                            ))
                         )}
                     </div>
+                ) : (
+                    // Plaza View: Show individual MomentCards
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {moments.length === 0 ? (
+                            <div className="col-span-full text-center py-12 text-white/40">
+                                <p>No moments found.</p>
+                                <Link href="/" className="text-purple-400 hover:text-purple-300 mt-2 inline-block">
+                                    Be the first to capture one!
+                                </Link>
+                            </div>
+                        ) : (
+                            moments.map((moment) => (
+                                <MomentCard
+                                    key={moment.id}
+                                    moment={moment}
+                                    trackDuration={moment.trackSource?.durationSec}
+                                    onPlayFull={(m) => router.push(`/room/view?url=${encodeURIComponent(m.sourceUrl)}`)}
+                                    onPlayMoment={(m) => router.push(`/room/view?url=${encodeURIComponent(m.sourceUrl)}&start=${m.startSec}&end=${m.endSec}`)}
+                                />
+                            ))
+                        )}
+                    </div>
+                )}
+            </section>
 
-                    {artistFilter ? (
-                        // Artist View: Show grouped SongCards
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {songs.length === 0 ? (
-                                <div className="col-span-full text-center py-12 text-white/40">
-                                    <p>No songs found for this artist.</p>
-                                </div>
-                            ) : (
-                                songs.map((song) => (
-                                    <SongCard key={`${song.service}-${song.sourceUrl}`} song={song} />
-                                ))
-                            )}
-                        </div>
-                    ) : (
-                        // Plaza View: Show individual MomentCards
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {moments.length === 0 ? (
-                                <div className="col-span-full text-center py-12 text-white/40">
-                                    <p>No moments found.</p>
-                                    <Link href="/" className="text-purple-400 hover:text-purple-300 mt-2 inline-block">
-                                        Be the first to capture one!
-                                    </Link>
-                                </div>
-                            ) : (
-                                moments.map((moment) => (
-                                    <MomentCard
-                                        key={moment.id}
-                                        moment={moment}
-                                        trackDuration={moment.trackSource?.durationSec}
-                                        onPlayFull={(m) => router.push(`/room/view?url=${encodeURIComponent(m.sourceUrl)}`)}
-                                        onPlayMoment={(m) => router.push(`/room/view?url=${encodeURIComponent(m.sourceUrl)}&start=${m.startSec}&end=${m.endSec}`)}
-                                    />
-                                ))
-                            )}
-                        </div>
-                    )}
-                </section>
-
-            </div>
-        </main>
+        </div>
     );
 }

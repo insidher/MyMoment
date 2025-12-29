@@ -473,20 +473,34 @@ export default function Room({ params }: { params: { id: string } }) {
 
                 if (apiKey) {
                     const response = await fetch(
-                        `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${apiKey}`
+                        `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${videoId}&key=${apiKey}`
                     );
                     const data = await response.json();
 
                     if (data.items && data.items.length > 0) {
                         const snippet = data.items[0].snippet;
+                        const contentDetails = data.items[0].contentDetails;
+
+                        // Parse ISO 8601 duration (PT1M13S)
+                        const parseDuration = (duration: string) => {
+                            const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
+                            if (!match) return 0;
+                            const hours = (parseInt(match[1]) || 0);
+                            const minutes = (parseInt(match[2]) || 0);
+                            const seconds = (parseInt(match[3]) || 0);
+                            return hours * 3600 + minutes * 60 + seconds;
+                        };
+
+                        const durationSec = parseDuration(contentDetails.duration);
+
                         setMetadata({
                             title: snippet.title,
                             artist: snippet.channelTitle, // Reliable channel name from API
                             artwork: snippet.thumbnails.maxres?.url || snippet.thumbnails.high?.url || '',
                             description: snippet.description || '',
-                            duration_sec: 0,
+                            duration_sec: durationSec,
                         });
-                        console.log('[YouTube API] Metadata set:', snippet.title, 'by', snippet.channelTitle);
+                        console.log('[YouTube API] Metadata set:', snippet.title, 'by', snippet.channelTitle, 'Duration:', durationSec);
                     }
                 } else {
                     console.warn('[YouTube] API key is undefined, using iframe fallback');

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Moment } from '@/types';
-import { RefreshCw, X, Heart, MessageSquare, Play, Users, Send, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Heart, MessageSquare, Play, Users, Send, ChevronDown, ChevronUp } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { toggleLike, createComment } from '../../app/actions/moments';
 
@@ -42,7 +42,7 @@ export default function MomentCard({
     onReplyClick
 }: MomentCardProps) {
     const [moment, setMoment] = useState(initialMoment);
-    const [isRefreshing, setIsRefreshing] = useState(false);
+
     const [imageError, setImageError] = useState(false);
     const [likeCount, setLikeCount] = useState(moment.likeCount || 0);
     const [liked, setLiked] = useState(initialMoment.isLiked || false); // Load from prop
@@ -72,28 +72,7 @@ export default function MomentCard({
         durationSec: 0,
     } as any;
 
-    // Check if we need refresh
-    const needsRefresh = !track.artist || !track.artwork || !track.durationSec || imageError;
 
-    const handleRefresh = async (e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsRefreshing(true);
-        try {
-            const res = await fetch(`/api/moments/${moment.id}/refresh`, { method: 'POST' });
-            if (res.ok) {
-                const data = await res.json();
-                if (data.success && data.moment) {
-                    setMoment(data.moment);
-                    setImageError(false);
-                }
-            }
-        } catch (error) {
-            console.error('Failed to refresh moment:', error);
-        } finally {
-            setIsRefreshing(false);
-        }
-    };
 
     const handleDeleteWrapper = async (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -167,9 +146,12 @@ export default function MomentCard({
     };
 
     const formatTime = (seconds: number) => {
-        const m = Math.floor(seconds / 60);
-        const s = seconds % 60;
-        return `${m}:${s.toString().padStart(2, '0')}`;
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
+        return h > 0
+            ? `${h}h ${m}m ${s}s`
+            : `${m}:${s.toString().padStart(2, '0')}`;
     };
 
     const duration = moment.endSec - moment.startSec;
@@ -182,7 +164,8 @@ export default function MomentCard({
     };
 
     // Mini Timeline Calculations
-    const effectiveDuration = trackDuration || track.durationSec || 0;
+    // Priority: 1) moment's own track duration, 2) trackDuration prop, 3) trackSource.durationSec
+    const effectiveDuration = moment.trackDurationSec || trackDuration || track.durationSec || 0;
     const showMiniTimeline = effectiveDuration > 0;
     const startPercent = showMiniTimeline ? (moment.startSec / effectiveDuration) * 100 : 0;
     const widthPercent = showMiniTimeline ? ((moment.endSec - moment.startSec) / effectiveDuration) * 100 : 0;
@@ -279,16 +262,7 @@ export default function MomentCard({
                             </button>
                         )}
 
-                        {needsRefresh && (
-                            <button
-                                onClick={handleRefresh}
-                                disabled={isRefreshing}
-                                className={`p-1.5 rounded-full bg-black/40 text-white/50 hover:text-white hover:bg-white/10 transition-all ${isRefreshing ? 'animate-spin' : ''}`}
-                                title="Refresh metadata"
-                            >
-                                <RefreshCw size={14} />
-                            </button>
-                        )}
+
 
                         {/* Comment Button */}
                         {showCommentButton && (

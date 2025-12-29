@@ -28,6 +28,7 @@ export interface Moment {
   startSec: number;
   endSec: number;
   momentDurationSec?: number;
+  trackDurationSec?: number; // Duration of the full track (denormalized)
 
   // Metadata
   title?: string;
