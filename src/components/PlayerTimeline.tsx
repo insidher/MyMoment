@@ -27,6 +27,7 @@ interface PlayerTimelineProps {
     onPreviewCapture?: () => void;
     currentUser?: any; // Ideally typed but avoiding circular ref or huge import for now
     onUpdateMoment?: (id: string, note: string) => Promise<boolean>;
+    disabled?: boolean;
 }
 
 export default function PlayerTimeline({
@@ -50,7 +51,8 @@ export default function PlayerTimeline({
     onCancelCapture,
     onPreviewCapture,
     currentUser,
-    onUpdateMoment
+    onUpdateMoment,
+    disabled = false
 }: PlayerTimelineProps) {
     const [isHovering, setIsHovering] = useState(false);
     const [expandedMomentId, setExpandedMomentId] = useState<string | null>(null);
@@ -1108,6 +1110,14 @@ export default function PlayerTimeline({
                     </div>
                 );
             })()}
+            {disabled && (
+                <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-[1px] rounded-lg flex items-center justify-center cursor-not-allowed">
+                    <div className="flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg animate-pulse">
+                        <span>⚠️</span>
+                        <span>Ad Playing - Timeline Locked</span>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

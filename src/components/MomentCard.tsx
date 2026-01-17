@@ -7,7 +7,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { toggleLike, createComment } from '../../app/actions/moments';
 
 interface MomentCardProps {
-    moment: Moment;
+    moment: Moment & { likes?: { user: { name: string; image?: string | null } }[] };
     onDelete?: (id: string) => void;
     showDelete?: boolean;
     showCommentButton?: boolean;
@@ -22,6 +22,7 @@ interface MomentCardProps {
     isRepliesExpanded?: boolean;
     replyCount?: number;
     onReplyClick?: () => void;
+    onNewReply?: (parentId: string, reply: any) => void;
 }
 
 export default function MomentCard({
@@ -39,7 +40,8 @@ export default function MomentCard({
     onToggleReplies,
     isRepliesExpanded = false,
     replyCount: propsReplyCount,
-    onReplyClick
+    onReplyClick,
+    onNewReply
 }: MomentCardProps) {
     const [moment, setMoment] = useState(initialMoment);
 
@@ -49,6 +51,7 @@ export default function MomentCard({
     const [isLiking, setIsLiking] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false); // For animation
     const [isExpanded, setIsExpanded] = useState(false);
+    const [showLikesList, setShowLikesList] = useState(false); // Added this line
 
     // Comment State
     // Prioritize Prop (from Group) > Moment.replyCount (from DB) > Moment.replies.length (local structure)
@@ -126,17 +129,24 @@ export default function MomentCard({
     const handlePostComment = async (e: React.FormEvent) => {
         e.preventDefault();
         e.stopPropagation();
+
         if (!commentText.trim()) return;
+
         setIsPostingComment(true);
 
         try {
             const newComment = await createComment(moment.id, commentText, pathname);
+
             if (newComment) {
                 // Optimistic Update
                 setReplyCount(prev => prev + 1);
                 setCommentText('');
                 setShowCommentInput(false);
-                // Optionally show success toast
+
+                // Notify parent to update state
+                if (onNewReply) {
+                    onNewReply(moment.id, newComment);
+                }
             }
         } catch (error) {
             console.error('Failed to post comment', error);
@@ -237,7 +247,7 @@ export default function MomentCard({
                             )}
                         </div>
                         <span className="text-xs font-medium text-white/80">
-                            {moment.user?.name || 'Music Lover'}
+                            {moment.user?.name || 'Music Lover'} <span className="text-purple-400 font-mono ml-1" title="Debug ID">{moment.id.slice(0, 8)}</span>
                         </span>
                     </div>
 
@@ -264,46 +274,85 @@ export default function MomentCard({
 
 
 
-                        {/* Comment Button */}
+                        {/* Comment Button - Text Based */}
                         {showCommentButton && (
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     setShowCommentInput(!showCommentInput);
-                                    if (!showCommentInput) {
-                                        // Focus logic handled by autoFocus in input
-                                    }
                                 }}
-                                className={`p-1.5 rounded-full bg-black/40 transition-all backdrop-blur-md flex items-center gap-1.5
-                                 hover:text-blue-300 hover:bg-blue-500/20
-                                 ${showCommentInput ? 'text-blue-300 bg-blue-500/10' : ((replyCount > 0) ? 'text-blue-200' : 'text-white/40')}
-                            `}
-                                title="Comment"
+                                className="px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 text-blue-200 transition-colors"
+                                title="Add a comment"
                             >
-                                <MessageSquare size={14} className={(replyCount > 0) ? 'fill-current' : ''} />
-                                {replyCount > 0 ? (
-                                    <span className="text-[10px] font-bold">{replyCount}</span>
-                                ) : (
-                                    <span className="text-[10px] font-medium opacity-50">0</span>
-                                )}
+                                <span className="text-xs font-medium">Add comment</span>
                             </button>
                         )}
 
-                        {/* Like Button */}
-                        <button
-                            onClick={handleLike}
-                            disabled={isLiking}
-                            className={`p-1.5 rounded-full bg-black/40 transition-all backdrop-blur-md flex items-center gap-1.5
-                                ${liked ? 'text-pink-500 hover:bg-pink-500/10' : 'text-white/40 hover:text-pink-400 hover:bg-pink-500/20'}
-                            `}
-                        >
-                            <Heart size={14} className={liked ? 'fill-current' : ''} />
-                            {likeCount > 0 ? (
-                                <span className="text-[10px] font-bold">{likeCount}</span>
-                            ) : (
-                                <span className="text-[10px] font-medium opacity-50">0</span>
+                        {/* Like Button with Dropdown */}
+                        <div className="relative">
+                            <div className="flex items-center gap-0.5">
+                                <button
+                                    onClick={handleLike}
+                                    disabled={isLiking}
+                                    className={`p-1.5 rounded-full bg-black/40 transition-all backdrop-blur-md flex items-center gap-1.5
+                                        ${liked ? 'text-pink-500 hover:bg-pink-500/10' : 'text-white/40 hover:text-pink-400 hover:bg-pink-500/20'}
+                                    `}
+                                >
+                                    <Heart size={14} className={liked ? 'fill-current' : ''} />
+                                    {likeCount > 0 ? (
+                                        <span className="text-[10px] font-bold">{likeCount}</span>
+                                    ) : (
+                                        <span className="text-[10px] font-medium opacity-50">0</span>
+                                    )}
+                                </button>
+
+                                {/* Chevron Trigger - Only show if there are likes */}
+                                {likeCount > 0 && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowLikesList(!showLikesList);
+                                        }}
+                                        className="p-1 hover:bg-white/10 rounded ml-1 text-white/60 hover:text-white transition-colors"
+                                        title="See who liked this"
+                                    >
+                                        <ChevronDown size={10} className={`transition-transform ${showLikesList ? 'rotate-180' : ''}`} />
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Likes Dropdown */}
+                            {showLikesList && likeCount > 0 && (
+                                <div
+                                    className="absolute top-full right-0 mt-2 w-48 bg-black/95 backdrop-blur-md border border-white/10 rounded-lg shadow-xl z-50"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <div className="p-2 border-b border-white/10">
+                                        <span className="text-xs font-semibold text-white/80">Liked by</span>
+                                    </div>
+                                    <div className="max-h-48 overflow-y-auto">
+                                        {moment.likes && moment.likes.length > 0 ? (
+                                            moment.likes.map((like, idx) => (
+                                                <div key={idx} className="flex items-center gap-2 px-3 py-2 hover:bg-white/5 transition-colors">
+                                                    <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-[10px] font-bold shrink-0">
+                                                        {like.user.image ? (
+                                                            <img src={like.user.image} alt={like.user.name} className="w-full h-full rounded-full object-cover" />
+                                                        ) : (
+                                                            like.user.name[0]?.toUpperCase() || 'U'
+                                                        )}
+                                                    </div>
+                                                    <span className="text-xs text-white/90">{like.user.name}</span>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="px-3 py-4 text-center">
+                                                <span className="text-xs text-white/40 italic">List unavailable</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             )}
-                        </button>
+                        </div>
 
                         {showDelete && onDelete && (
                             <button
@@ -345,8 +394,8 @@ export default function MomentCard({
 
                         {/* Compact Metadata */}
                         <div className="flex-1 min-w-0 flex flex-col justify-center text-xs opacity-60 group-hover/track:opacity-100 transition-opacity">
-                            <h3 className="font-bold truncate text-white">{trackCardData.title || 'Unknown Title'}</h3>
-                            <p className="text-white/60 truncate">{trackCardData.artist || 'Unknown Artist'}</p>
+                            <h3 className="font-bold text-white break-words leading-tight">{trackCardData.title || 'Unknown Title'}</h3>
+                            <p className="text-white/60 break-words leading-tight">{trackCardData.artist || 'Unknown Artist'}</p>
                         </div>
                     </div>
 

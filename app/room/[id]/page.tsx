@@ -20,6 +20,7 @@ import { getTrackMoments, healTrackSource } from '../../explore/actions';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
 import { MyMomentIcon } from '@/components/icons/MyMomentIcon';
 import { parseChapters, getCurrentChapter, Chapter } from '@/lib/chapters';
+import { usePlaybackGuard } from '@/hooks/usePlaybackGuard';
 
 type CaptureState = 'idle' | 'start-captured' | 'end-captured';
 
@@ -35,7 +36,6 @@ const groupMoments = (moments: Moment[]): { main: Moment; replies: Moment[] }[] 
         if (!groups[key]) {
             groups[key] = { main: m, replies: [] };
         } else {
-            // Add as reply
             groups[key].replies.push(m);
         }
     });
@@ -112,6 +112,8 @@ export default function Room({ params }: { params: { id: string } }) {
     const router = useRouter();
     const rawUrl = searchParams.get('url');
     const url = rawUrl ? decodeURIComponent(rawUrl) : '';
+
+    // 🎨 [Render Cycle] moved down
 
     const [startSec, setStartSec] = useState<number | null>(null);
     const [endSec, setEndSec] = useState<number | null>(null);
@@ -218,28 +220,77 @@ export default function Room({ params }: { params: { id: string } }) {
             }
         }
 
-        const fetchMoments = async () => {
-            const resource = getResourceId(url);
-            if (!resource) return;
 
-            try {
-                // Use Server Action to bypass RLS
-                // Query by the FULL URL (sourceUrl) because that is how it is stored in the DB
-                const data = await getTrackMoments(url);
+    }, [startParam, endParam, isSpotify, url]);
 
-                // Map to ensure any missing fields or local overrides
-                const mappedMoments: Moment[] = data.map((m: any) => ({
-                    ...m,
-                    sourceUrl: url,
-                    momentDurationSec: m.momentDurationSec || (m.endSec - m.startSec)
-                }));
+    const fetchMoments = async () => {
+        const resource = getResourceId(url);
+        if (!resource) return;
 
-                setMoments(mappedMoments);
-            } catch (err) {
-                console.error('Failed to fetch moments:', err);
-            }
+        try {
+            // Use Server Action to bypass RLS
+            // Query by the FULL URL (sourceUrl) because that is how it is stored in the DB
+            const data = await getTrackMoments(url);
+
+            // Map to ensure any missing fields or local overrides
+            const mappedMoments: Moment[] = data.map((m: any) => ({
+                ...m,
+                sourceUrl: url,
+                momentDurationSec: m.momentDurationSec || (m.endSec - m.startSec)
+            }));
+
+            setMoments(mappedMoments);
+        } catch (err) {
+            console.error('Failed to fetch moments:', err);
+        }
+    };
+
+    const handleNewReply = (parentId: string, rawReply: any) => {
+
+        // 🛡️ SANITIZATION: Protect against bad API data
+        const newReply = {
+            ...rawReply,
+            // If date is missing, default to NOW
+            createdAt: rawReply.createdAt || rawReply.created_at || new Date().toISOString(),
+            // If user is missing, try to construct a fallback
+            user: rawReply.user || rawReply.profiles || { name: 'Unknown', image: null },
+            // Ensure profiles exists (some schemas use this)
+            profiles: rawReply.profiles || rawReply.user || { name: 'Unknown', image: null },
+            // Ensure ID is a string
+            id: rawReply.id || `temp-fallback-${Date.now()}`
         };
 
+        setMoments((prevMoments) => {
+
+            // Find the parent moment to get its timestamp info
+            const parentMoment = prevMoments.find(m => m.id === parentId);
+
+            if (!parentMoment) {
+                return prevMoments;
+            }
+
+            // Check if reply already exists (prevent duplicates)
+            if (prevMoments.some(m => m.id === newReply.id)) {
+                return prevMoments;
+            }
+
+            // Add the reply as a new moment with the SAME timestamp as parent
+            // This allows groupMoments() to group them together
+            const replyAsMoment = {
+                ...newReply,
+                startSec: parentMoment.startSec,
+                endSec: parentMoment.endSec,
+                sourceUrl: parentMoment.sourceUrl,
+                parentId: parentId // Mark it as a reply
+            };
+            // APPEND to end so parent is processed first by groupMoments()
+            return [...prevMoments, replyAsMoment];
+        });
+    };
+
+    // Initial Fetch
+    useEffect(() => {
+        if (!url) return;
         fetchMoments();
 
         // Fetch Spotify Metadata
@@ -284,16 +335,17 @@ export default function Room({ params }: { params: { id: string } }) {
 
     }, [url, isSpotify, isYouTube, startParam, endParam]);
 
-    // YouTube Polling for Timeline
+    // YouTube Polling for Timeline - REPLACED BY AD GUARD
+    /*
     useEffect(() => {
         if (!isYouTube || !youtubePlayer) return;
-
+    
         const interval = setInterval(() => {
             try {
                 // getCurrentTime returns seconds
                 const current = Math.floor(youtubePlayer.getCurrentTime() || 0);
                 const duration = Math.floor(youtubePlayer.getDuration() || 0);
-
+    
                 // Only update if changed significantly to reduce re-renders
                 if (current !== playbackState.current || duration !== playbackState.duration) {
                     setPlaybackState({ current, duration });
@@ -302,9 +354,23 @@ export default function Room({ params }: { params: { id: string } }) {
                 // Player might not be ready
             }
         }, 500);
-
+    
         return () => clearInterval(interval);
     }, [isYouTube, youtubePlayer, playbackState.current, playbackState.duration]);
+    */
+
+    // Ad Guard Hook
+    const {
+        currentTime: guardCurrentTime,
+        duration: guardDuration,
+        isAd,
+        controlsDisabled
+    } = usePlaybackGuard({
+        player: youtubePlayer,
+        expectedDuration: metadata?.duration_sec || 0,
+        startParam: searchParams.get('start'),
+        isEnabled: !!(isYouTube && metadata?.duration_sec)
+    });
 
     // Auto-Refresh One-Time Stop-Gap
     useEffect(() => {
@@ -528,13 +594,15 @@ export default function Room({ params }: { params: { id: string } }) {
             }
         }
 
-        // Auto-seek if start param exists
+        // Auto-seek handled by usePlaybackGuard now
+        /*
         if (startParam) {
             const start = parseInt(startParam);
             console.log('[Room] Auto-seeking to:', start);
             event.target.seekTo(start, true);
             event.target.playVideo();
         }
+        */
     };
 
     const formatTime = (seconds: number): string => {
@@ -582,16 +650,19 @@ export default function Room({ params }: { params: { id: string } }) {
         setError('');
     };
 
-    const handleCaptureEnd = (time: number) => {
-        setEndSec(time);
-        setCaptureState('end-captured');
-        setError('');
-    };
-
     const handleSave = async () => {
+        // 🛑 ADD THESE LOGS AT THE VERY START
+        console.log("🚦 [Gatekeeper] handleSave triggered!");
+        console.log("🚦 [Gatekeeper] Current Content:", note);
+        console.log("🚦 [Gatekeeper] replyingTo state:", replyingTo);
+
+        if (!note?.trim()) {
+            console.log("🛑 [Gatekeeper] BLOCKED: Content is empty");
+            return;
+        }
+
         // If creating new moment: Check start/end. If replying: Ignore start/end.
-        if (!replyingTo && (startSec == null || endSec == null || !note)) return;
-        if (replyingTo && !note) return;
+        if (!replyingTo && (startSec == null || endSec == null)) return;
 
         console.log('[handleSave] Saving via API:', metadata);
         setIsSaving(true);
@@ -631,62 +702,104 @@ export default function Room({ params }: { params: { id: string } }) {
                     duration: (isSpotify ? spotifyProgress.duration : playbackState.duration) || metadata.duration_sec,
                 };
 
-                const res = await fetch('/api/moments', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
+                // 2. CONSTRUCT OPTIMISTIC MOMENT (The "Fake" Moment)
+                const tempId = `temp-${Date.now()}`;
+                const optimisticMoment: Moment = {
+                    id: tempId,
+                    service: isSpotify ? 'spotify' : 'youtube',
+                    sourceUrl: url,
+                    startSec: startSec!,
+                    endSec: endSec!,
+                    momentDurationSec: (endSec!) - (startSec!),
+                    title: metadata?.title || 'Unknown Title',
+                    artist: metadata?.artist || 'Unknown Artist',
+                    artwork: metadata?.artwork || null,
+                    note: note,
+                    likeCount: 0,
+                    savedByCount: 0, // Starts at 0, or 1 if we count self
+                    createdAt: new Date().toISOString(),
+                    user: {
+                        name: user?.name || user?.full_name || 'Me', // Assuming 'user' object from useAuth/props
+                        image: user?.image || user?.avatar_url || null
+                    },
+                    replies: []
+                } as unknown as Moment;
+
+                console.log("🔍 [Step 1] Constructing Optimistic Moment. ID:", optimisticMoment.id);
+
+                // 3. ⚡ INSTANT UPDATE: Inject into state immediately
+                setMoments((prev) => {
+                    console.log(`🔍 [Step 2] setMoments running. Previous count: ${prev.length}`);
+                    const newArray = [optimisticMoment, ...prev];
+                    console.log(`🔍 [Step 3] New State Array Length: ${newArray.length}`);
+                    return newArray;
                 });
 
-                const data = await res.json();
-
-                if (!res.ok) {
-                    throw new Error(data.error || 'Failed to save moment');
-                }
-
-                // Success!!
-                setSaved(true);
-                toast.success("Moment captured!");
-
-                // The API returns the new moment. We can add it directly.
-                if (data.moment) {
-                    // ... (Existing optimistic update logic, simplified for brevity in this replace block, 
-                    // BUT WE MUST PRESERVE IT. I will paste the original logic back in the next chunks if needed, 
-                    // or better, I will assume the original logic is after this block if I only replace specific lines.
-                    // Wait, I am replacing the whole try block entry.
-                    // I should adjust my strategy to be less invasive or include the original code.)
-                    // Let's REWRITE THE WHOLE TRY BLOCK to be safe and clean.
-
-                    const m = data.moment;
-                    const newMoment: Moment = {
-                        id: m.id,
-                        service: m.service ?? m.platform,
-                        sourceUrl: url,
-                        startSec: m.startSec ?? m.start_time,
-                        endSec: m.endSec ?? m.end_time,
-                        momentDurationSec: (m.endSec ?? m.end_time) - (m.startSec ?? m.start_time),
-                        title: m.title,
-                        artist: m.artist,
-                        artwork: m.artwork,
-                        note: m.note,
-                        likeCount: m.likeCount ?? 0,
-                        savedByCount: m.savedByCount ?? 1,
-                        createdAt: new Date(m.createdAt ?? m.created_at),
-                        user: {
-                            name: m.user?.name ?? m.user?.full_name ?? 'Me',
-                            image: m.user?.image ?? m.user?.avatar_url
-                        },
-                        trackSource: m.trackSource
-                    } as Moment;
-                    setMoments([newMoment, ...moments]);
-                }
-
-                setTimeout(() => setSaved(false), 3000);
-
-                // Reset UI
+                // Clear the input immediately for that "snappy" feel
                 setCaptureState('idle');
                 setStartSec(null);
                 setEndSec(null);
                 setNote('');
+
+                setSaved(true);
+                toast.success("Moment captured!");
+
+                // Keep trying network in background
+                try {
+                    const res = await fetch('/api/moments', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                    });
+
+                    const data = await res.json();
+
+                    if (!res.ok) {
+                        // ROLLBACK: If it failed, remove the temp item
+                        setMoments((prev) => prev.filter(m => m.id !== tempId));
+                        throw new Error(data.error || 'Failed to save moment');
+                    }
+
+                    // 5. RECONCILIATION (Swap Temp ID for Real ID)
+                    if (data.moment) {
+                        const m = data.moment;
+                        // Construct the 'real' moment object ensuring all fields match interface
+                        const realMoment: Moment = {
+                            id: m.id,
+                            service: m.service ?? m.platform,
+                            sourceUrl: url,
+                            startSec: m.startSec ?? m.start_time,
+                            endSec: m.endSec ?? m.end_time,
+                            momentDurationSec: (m.endSec ?? m.end_time) - (m.startSec ?? m.start_time),
+                            title: m.title,
+                            artist: m.artist,
+                            artwork: m.artwork,
+                            note: m.note,
+                            likeCount: m.likeCount ?? 0,
+                            savedByCount: m.savedByCount ?? 1,
+                            createdAt: new Date(m.createdAt ?? m.created_at).toISOString(), // Ensure string
+                            user: {
+                                name: m.user?.name ?? m.user?.full_name ?? 'Me',
+                                image: m.user?.image ?? m.user?.avatar_url
+                            },
+                            trackSource: m.trackSource,
+                            replies: []
+                        } as unknown as Moment;
+
+                        setMoments((prev) => prev.map((m) =>
+                            m.id === tempId ? realMoment : m
+                        ));
+                    }
+                } catch (innerError) {
+                    console.error("Network save failed:", innerError);
+                    // Rollback handled in if (!res.ok) block above for status errors
+                    // But for network exceptions:
+                    setMoments((prev) => prev.filter(m => m.id !== tempId));
+                    setSaved(false); // Revert saved state
+                    throw innerError; // Propagate to outer catch for toast
+                }
+
+                setTimeout(() => setSaved(false), 3000);
             }
 
         } catch (error: unknown) {
@@ -1069,36 +1182,52 @@ export default function Room({ params }: { params: { id: string } }) {
                         <div className="space-y-4">
                             <div className="glass-panel p-1 overflow-hidden aspect-video relative bg-black">
                                 {isYouTube && youtubeId ? (
-                                    <YouTube
-                                        videoId={youtubeId}
-                                        className="w-full h-full"
-                                        iframeClassName="w-full h-full rounded-xl"
-                                        onReady={onPlayerReady}
-                                        onStateChange={(event) => {
-                                            if (event.data === 1) setIsPlaying(true); // Playing
-                                            if (event.data === 2) setIsPlaying(false); // Paused
+                                    <>
+                                        <YouTube
+                                            videoId={youtubeId}
+                                            className="w-full h-full"
+                                            iframeClassName="w-full h-full rounded-xl"
+                                            onReady={onPlayerReady}
+                                            onStateChange={(event) => {
+                                                if (event.data === 1) setIsPlaying(true); // Playing
+                                                if (event.data === 2) setIsPlaying(false); // Paused
 
-                                            const videoData = event.target.getVideoData();
-                                            if (videoData && videoData.video_id) {
-                                                const currentId = getYouTubeId(url);
-                                                if (currentId && videoData.video_id !== currentId) {
-                                                    const newUrl = `https://www.youtube.com/watch?v=${videoData.video_id}`;
-                                                    router.push(`/room/view?url=${encodeURIComponent(newUrl)}`);
+                                                const videoData = event.target.getVideoData();
+                                                if (videoData && videoData.video_id) {
+                                                    const currentId = getYouTubeId(url);
+                                                    if (currentId && videoData.video_id !== currentId) {
+                                                        const newUrl = `https://www.youtube.com/watch?v=${videoData.video_id}`;
+                                                        router.push(`/room/view?url=${encodeURIComponent(newUrl)}`);
+                                                    }
                                                 }
-                                            }
-                                        }}
-                                        opts={{
-                                            width: '100%',
-                                            height: '100%',
-                                            playerVars: {
-                                                autoplay: 1,
-                                                rel: 0, // Show related videos from same channel only
-                                                modestbranding: 1,
-                                                iv_load_policy: 3, // Hide annotations
-                                                origin: typeof window !== 'undefined' ? window.location.origin : undefined,
-                                            },
-                                        }}
-                                    />
+                                            }}
+                                            onError={(e) => {
+                                                console.error('[YouTube Player Error] Code:', e.data);
+                                                // 2 – The request contains an invalid parameter value.
+                                                // 5 – The requested content cannot be played in an HTML5 player or another error related to the HTML5 player has occurred.
+                                                // 100 – The video requested was not found. This error occurs when a video has been removed (for any reason) or has been marked as private.
+                                                // 101 – The owner of the requested video does not allow it to be played in embedded players.
+                                                // 150 – This error is the same as 101. It's just a 101 error in disguise!
+                                            }}
+                                            opts={{
+                                                width: '100%',
+                                                height: '100%',
+                                                playerVars: {
+                                                    autoplay: 1,
+                                                    rel: 0, // Show related videos from same channel only
+                                                    modestbranding: 1,
+                                                    iv_load_policy: 3, // Hide annotations
+                                                    origin: typeof window !== 'undefined' ? window.location.origin : undefined,
+                                                },
+                                            }}
+                                        />
+                                        {isAd && (
+                                            <div className="absolute top-4 right-4 z-50 bg-yellow-400 text-black px-3 py-1 rounded-full text-xs font-bold shadow-lg flex items-center gap-2 animate-pulse pointer-events-none">
+                                                <span>⚠️</span>
+                                                <span>Ad Playing - Controls Paused</span>
+                                            </div>
+                                        )}
+                                    </>
                                 ) : isSpotify ? (
                                     <div className="relative w-full h-full">
                                         <div id="spotify-embed" className="w-full h-full rounded-xl" />
@@ -1207,8 +1336,9 @@ export default function Room({ params }: { params: { id: string } }) {
                             {/* Unified Player Timeline (Spotify & YouTube) */}
                             {(isSpotify || isYouTube) && (
                                 <PlayerTimeline
-                                    currentTime={isSpotify ? spotifyProgress.current : playbackState.current}
-                                    duration={isSpotify ? spotifyProgress.duration : playbackState.duration}
+                                    currentTime={isSpotify ? spotifyProgress.current : guardCurrentTime}
+                                    duration={isSpotify ? spotifyProgress.duration : guardDuration}
+                                    disabled={controlsDisabled}
                                     isPlaying={isPlaying}
                                     moments={moments}
                                     onSeek={handleSeek}
@@ -1301,53 +1431,57 @@ export default function Room({ params }: { params: { id: string } }) {
                                 ) : (
                                     groupMoments(moments)
                                         .sort((a, b) => (activeMoment?.id === a.main.id ? -1 : activeMoment?.id === b.main.id ? 1 : 0))
-                                        .map((group) => (
-                                            <MomentGroup
-                                                key={group.main.id}
-                                                mainMoment={group.main}
-                                                replies={group.replies}
-                                                trackDuration={(isSpotify ? spotifyProgress.duration : playbackState.duration) || metadata.duration_sec || group.main.trackSource?.durationSec}
-                                                onDelete={async (id) => {
-                                                    try {
-                                                        const res = await fetch(`/api/moments/${id}`, { method: 'DELETE' });
-                                                        if (res.ok) {
-                                                            // Smart Cleanup: Remove all moments that match the deleted one (duplicates)
-                                                            setMoments(prev => {
-                                                                const target = prev.find(m => m.id === id);
-                                                                if (!target) return prev.filter(m => m.id !== id);
+                                        .map((group) => {
+                                            if (group.main.id.toString().includes('temp')) {
+                                                console.log("👀 [Render Loop] Found Optimistic Moment in JSX:", group.main.id);
+                                            }
+                                            return (
+                                                <MomentGroup
+                                                    key={group.main.id}
+                                                    mainMoment={group.main}
+                                                    replies={group.replies}
+                                                    trackDuration={(isSpotify ? spotifyProgress.duration : playbackState.duration) || metadata.duration_sec || group.main.trackSource?.durationSec}
+                                                    onDelete={async (id) => {
+                                                        try {
+                                                            const res = await fetch(`/api/moments/${id}`, { method: 'DELETE' });
+                                                            if (res.ok) {
+                                                                setMoments(prev => {
+                                                                    const target = prev.find(m => m.id === id);
+                                                                    if (!target) return prev.filter(m => m.id !== id);
 
-                                                                return prev.filter(m =>
-                                                                    // Removing the exact ID OR any strict duplicate
-                                                                    !(m.id === id || (
-                                                                        m.sourceUrl === target.sourceUrl &&
-                                                                        m.startSec === target.startSec &&
-                                                                        m.endSec === target.endSec
-                                                                    ))
-                                                                );
-                                                            });
+                                                                    return prev.filter(m =>
+                                                                        !(m.id === id || (
+                                                                            m.sourceUrl === target.sourceUrl &&
+                                                                            m.startSec === target.startSec &&
+                                                                            m.endSec === target.endSec
+                                                                        ))
+                                                                    );
+                                                                });
+                                                            }
+                                                        } catch (e) {
+                                                            console.error(e);
                                                         }
-                                                    } catch (e) {
-                                                        console.error(e);
-                                                    }
-                                                }}
-                                                showDelete={user?.id === group.main.userId}
-                                                onPlayFull={() => {
-                                                    router.push(`/room/view?url=${encodeURIComponent(group.main.sourceUrl)}`);
-                                                }}
-                                                onPlayMoment={playMoment}
-                                                onPauseMoment={handlePauseMoment}
-                                                currentTime={isSpotify ? spotifyProgress.current : playbackState.current}
-                                                activeMomentId={activeMoment?.id}
-                                                isPlaying={isPlaying}
-                                                currentUserId={user?.id || ''}
-                                                onReply={(momentId, username) => {
-                                                    setReplyingTo({ id: momentId, username });
-                                                    // Scroll to input? Or just focus if visible
-                                                    // Ideally scroll to bottom right column
-                                                    noteInputRef.current?.focus();
-                                                }}
-                                            />
-                                        ))
+                                                    }}
+                                                    showDelete={user?.id === group.main.userId}
+                                                    onPlayFull={() => {
+                                                        router.push(`/room/view?url=${encodeURIComponent(group.main.sourceUrl)}`);
+                                                    }}
+                                                    onPlayMoment={playMoment}
+                                                    onPauseMoment={handlePauseMoment}
+                                                    currentTime={isSpotify ? spotifyProgress.current : playbackState.current}
+                                                    activeMomentId={activeMoment?.id}
+                                                    isPlaying={isPlaying}
+                                                    currentUserId={user?.id || ''}
+                                                    currentUser={user ? { id: user.id, name: user.email, image: null } : undefined}
+                                                    onReply={(momentId, username) => {
+                                                        setReplyingTo({ id: momentId, username });
+                                                        noteInputRef.current?.focus();
+                                                    }}
+                                                    onRefresh={fetchMoments}
+                                                    onNewReply={handleNewReply}
+                                                />
+                                            );
+                                        })
                                 )}
                             </div>
                         </div>
@@ -1538,7 +1672,7 @@ export default function Room({ params }: { params: { id: string } }) {
 
                             <button
                                 onClick={handleSave}
-                                disabled={isSaving || saved || (!replyingTo && (startSec === null || endSec === null)) || !note}
+                                disabled={isSaving || saved || (!replyingTo && (startSec === null || endSec === null)) || !note || controlsDisabled}
                                 className={`w-full btn-primary flex items-center justify-center gap-2 ${saved ? 'bg-green-600 hover:bg-green-600 from-green-600 to-green-500' : ''} disabled:opacity-50 disabled:cursor-not-allowed`}
                             >
                                 {saved ? (
@@ -1549,7 +1683,7 @@ export default function Room({ params }: { params: { id: string } }) {
                                 ) : (
                                     <>
                                         {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                                        {isSaving ? 'Saving...' : (replyingTo ? 'Post Reply' : 'Save Moment')}
+                                        {isSaving ? 'Saving...' : (controlsDisabled ? 'Ad Playing...' : (replyingTo ? 'Post Reply' : 'Save Moment'))}
                                     </>
                                 )}
                             </button>

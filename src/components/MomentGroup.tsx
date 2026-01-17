@@ -20,7 +20,10 @@ interface MomentGroupProps {
     isPlaying?: boolean;
     trackDuration?: number;
     currentUserId: string;
-    onReply?: (momentId: string, username: string) => void; // Optional for now
+    currentUser?: { id: string; name?: string | null; image?: string | null };
+    onReply?: (momentId: string, username: string) => void;
+    onRefresh?: () => void;
+    onNewReply?: (parentId: string, reply: any) => void;
 }
 
 export default function MomentGroup({
@@ -36,7 +39,10 @@ export default function MomentGroup({
     isPlaying,
     trackDuration,
     currentUserId,
+    currentUser,
     onReply,
+    onRefresh,
+    onNewReply,
 }: MomentGroupProps) {
     const [isExpanded, setIsExpanded] = useState(false);
     const pathname = usePathname();
@@ -45,49 +51,100 @@ export default function MomentGroup({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [optimisticReplies, setOptimisticReplies] = useState<Moment[]>([]);
 
-    // Combine props.replies + optimisticReplies, sort by Date DESC (newest top)
-    const allReplies = [...replies, ...optimisticReplies].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    // Filter out optimistic replies that have now arrived in props (deduplication)
+    const effectiveOptimistic = optimisticReplies.filter(op =>
+        !replies.some(r => r.id === op.id) &&
+        op.parentId === mainMoment.id
     );
+
+    // 🛠️ FIX: Normalize incoming replies.
+    // If 'profiles' is undefined, grab the data from 'user' so the UI doesn't crash.
+    const normalizedReplies = replies.map(r => ({
+        ...r,
+        profiles: r.profiles || (r as any).user
+    }));
+
+    // Combine normalized props + effective optimistic, sort by Date DESC
+    // FILTER: Ensure we ONLY show direct replies to this moment (Level 2), excluding nested ones (Level 3+)
+    const allReplies = [...normalizedReplies, ...effectiveOptimistic]
+        .filter(r => r.parentId === mainMoment.id)
+        .sort(
+            (a, b) => {
+                const timeA = new Date(a.createdAt || 0).getTime();
+                const timeB = new Date(b.createdAt || 0).getTime();
+                return timeB - timeA;
+            }
+        );
 
     const handleMainReplySubmit = async () => {
         if (!replyText.trim()) return;
 
-        setIsSubmitting(true);
+        const textToSubmit = replyText;
+        setReplyText(""); // Clear immediately for speed
+
+        // 1. Prepare Robust Data (The "Perfect Fake")
+        const nowISO = new Date().toISOString();
+        const currentUserData = {
+            id: currentUser?.id || currentUserId || "unknown",
+            name: currentUser?.name || "Me",
+            image: currentUser?.image || null,
+        };
+
+        const tempId = `temp-${Date.now()}`;
+        const optimReply = {
+            id: tempId,
+            content: textToSubmit,
+            note: textToSubmit,
+            createdAt: nowISO,
+            userId: currentUserData.id,
+            user: currentUserData,
+            profiles: currentUserData, // Fallback for specific schemas
+            momentId: mainMoment.id,
+            parentId: mainMoment.id,
+            likes: [],
+            replies: [],
+            _count: { likes: 0, replies: 0 }
+        } as unknown as Moment;
+
+        // 2. Optimistic Update (Show it NOW)
+        setIsExpanded(true);
+        setOptimisticReplies(prev => [optimReply, ...prev]);
+
         try {
-            const newComment = await createComment(mainMoment.id, replyText, pathname, true);
-            if (newComment) {
-                // Map DB response to Moment type
-                const optimReply = {
-                    ...newComment,
-                    // Ensure user object is structured correctly for UI
-                    user: {
-                        name: newComment.profiles?.name || 'Me',
-                        image: newComment.profiles?.image || null
-                    },
-                    // Fallbacks for safety
-                    createdAt: new Date().toISOString(),
-                    id: newComment.id,
-                    replies: []
-                } as unknown as Moment; // Type assertion needed due to potential mismatch with server action return
+            // 3. API Call
+            const serverResponse = await createComment(mainMoment.id, textToSubmit, pathname, true);
 
-                setOptimisticReplies(prev => [...prev, optimReply]);
+            if (serverResponse) {
+                // 4. DATA PATCHING (The Fix for "NaNy")
+                // If server misses date/user, force our local versions
+                // Handle both camelCase and snake_case from server
+                const finalReply = {
+                    ...serverResponse,
+                    createdAt: serverResponse.createdAt || (serverResponse as any).created_at || nowISO, // 👈 Critical Patch
+                    user: serverResponse.user || (serverResponse as any).profiles || currentUserData,  // 👈 Critical Patch
+                    profiles: (serverResponse as any).profiles || serverResponse.user || currentUserData
+                } as unknown as Moment;
 
-                toast.success("Reply posted!");
-                setReplyText("");
-                setIsReplying(false);
-                setIsExpanded(true); // Ensure thread is open
+                // 5. Reconciliation (Swap Temp -> Real)
+                setOptimisticReplies(prev =>
+                    prev.map(item => item.id === tempId ? finalReply : item)
+                );
+
+                // 6. Notify Parent (if prop exists)
+                if (onNewReply) {
+                    onNewReply(mainMoment.id, finalReply);
+                }
             }
-        } catch (error) {
-            console.error('Failed to reply', error);
-            toast.error("Failed to post reply");
-        } finally {
-            setIsSubmitting(false);
+        } catch (e) {
+            console.error("Failed to submit reply", e);
+            // Rollback on error
+            setOptimisticReplies(prev => prev.filter(i => i.id !== tempId));
+            setReplyText(textToSubmit); // Restore text
         }
     };
 
     return (
-        <div className="space-y-2">
+        <div className="space-y-2 min-w-0">
             {/* Main Moment Card - Always Visible */}
             <div className="relative">
                 <MomentCard
@@ -106,6 +163,7 @@ export default function MomentGroup({
                     isRepliesExpanded={isExpanded}
                     replyCount={allReplies.length}
                     onReplyClick={() => setIsReplying(!isReplying)}
+                    onNewReply={onNewReply}
                 />
             </div>
 
@@ -164,6 +222,7 @@ export default function MomentGroup({
                                 comment={reply}
                                 currentUserId={currentUserId}
                                 onReply={(id, username) => onReply && onReply(id, username)}
+                                onRefresh={onRefresh}
                             />
                         ))}
                     </div>

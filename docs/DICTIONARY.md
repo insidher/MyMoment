@@ -1,6 +1,6 @@
 # MyMoment Architecture Dictionary
 
-**Last Updated**: 2025-12-27
+**Last Updated**: 2025-12-29
 **Purpose**: Reference document for codebase architecture, migration status, and component naming conventions.
 
 ---
@@ -37,6 +37,7 @@ The following files are **candidates for deletion** as they use the legacy Prism
 - `platform`: 'spotify' | 'youtube' | 'apple-music'
 - `start_time` / `end_time`: Integer (Seconds)
 - `moment_duration_sec`: Integer (Cached duration)
+- `track_duration_sec`: Integer (Full track length, denormalized)
 - `note`: Text (Comment/Caption)
 
 **`track_sources` Table**:

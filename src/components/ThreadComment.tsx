@@ -23,9 +23,10 @@ interface ThreadCommentProps {
     comment: Moment;
     currentUserId: string;
     onReply: (momentId: string, username: string) => void;
+    onRefresh?: () => void;
 }
 
-export default function ThreadComment({ comment, currentUserId, onReply }: ThreadCommentProps) {
+export default function ThreadComment({ comment, currentUserId, onReply, onRefresh }: ThreadCommentProps) {
     const pathname = usePathname();
     const [showReplies, setShowReplies] = useState(false);
 
@@ -36,9 +37,13 @@ export default function ThreadComment({ comment, currentUserId, onReply }: Threa
     const [optimisticReplies, setOptimisticReplies] = useState<Moment[]>([]);
 
     // Merge & Sort (Newest first for conversation flow)
+    const effectiveOptimistic = optimisticReplies.filter(op =>
+        !comment.replies?.some(r => r.id === op.id)
+    );
+
     const allReplies = [
         ...(comment.replies || []),
-        ...optimisticReplies
+        ...effectiveOptimistic
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     const hasReplies = allReplies.length > 0;
@@ -75,6 +80,13 @@ export default function ThreadComment({ comment, currentUserId, onReply }: Threa
                 setIsReplying(false);
                 setShowReplies(true); // Auto-Expand!
                 toast.success("Reply posted!");
+
+                // Trigger full refresh
+                if (onRefresh) {
+                    setTimeout(() => {
+                        onRefresh();
+                    }, 500);
+                }
             }
         } catch (error) {
             console.error(error);
@@ -83,6 +95,14 @@ export default function ThreadComment({ comment, currentUserId, onReply }: Threa
             setIsSubmitting(false);
         }
     };
+
+    // 🕵️ DEBUG TRACER: Diagnose date format issue
+    console.log("🕵️ Date Audit:", {
+        id: comment.id,
+        createdAt: comment.createdAt,
+        type: typeof comment.createdAt,
+        isOptimistic: comment.id.toString().startsWith('temp-')
+    });
 
     return (
         <div className="relative">
@@ -104,7 +124,7 @@ export default function ThreadComment({ comment, currentUserId, onReply }: Threa
                         <div className="flex items-center justify-between mb-1">
                             <span className="font-semibold text-sm">{comment.user?.name || 'Unknown User'}</span>
                             <span className="text-xs text-white/40">
-                                {getRelativeTime(comment.createdAt)}
+                                {getRelativeTime(comment.createdAt)} <span className="text-purple-400 font-mono" title="Debug ID">{comment.id.slice(0, 8)}</span>
                             </span>
                         </div>
                         <p className="text-sm text-white/80 break-words">{comment.note || 'No comment'}</p>
@@ -187,7 +207,7 @@ export default function ThreadComment({ comment, currentUserId, onReply }: Threa
                                         <div className="flex items-center justify-between mb-0.5">
                                             <span className="font-semibold text-xs text-white/90">{reply.user?.name || 'Unknown User'}</span>
                                             <span className="text-[10px] text-white/40">
-                                                {getRelativeTime(reply.createdAt)}
+                                                {getRelativeTime(reply.createdAt)} <span className="text-purple-400 font-mono" title="Debug ID">{reply.id.slice(0, 8)}</span>
                                             </span>
                                         </div>
                                         <p className="text-xs text-white/70 break-words">{reply.note || 'No comment'}</p>
