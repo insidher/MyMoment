@@ -77,7 +77,7 @@ export async function GET() {
         const results = [];
 
         for (const moment of orphanedMoments) {
-            const videoId = getYouTubeId(moment.resource_id);
+            const videoId = getYouTubeId(moment.resource_id!);
 
             if (!videoId) {
                 results.push({
@@ -96,7 +96,7 @@ export async function GET() {
             const { data: existingTrackSource } = await supabase
                 .from('track_sources')
                 .select('id')
-                .eq('source_url', moment.resource_id)
+                .eq('source_url', moment.resource_id!)
                 .eq('service', 'youtube')
                 .single();
 
@@ -104,7 +104,8 @@ export async function GET() {
 
             // 2. If no track_source exists, create one
             if (!trackSourceId) {
-                const metadata = await fetchYouTubeMetadata(videoId);
+                // videoId is guaranteed to be string here (passed null check above)
+                const metadata = await fetchYouTubeMetadata(videoId!);
 
                 if (!metadata) {
                     results.push({
@@ -122,7 +123,7 @@ export async function GET() {
                     .from('track_sources')
                     .insert({
                         service: 'youtube',
-                        source_url: moment.resource_id,
+                        source_url: moment.resource_id!,
                         title: metadata.title,
                         artist: metadata.artist,
                         artwork: metadata.artwork || null,

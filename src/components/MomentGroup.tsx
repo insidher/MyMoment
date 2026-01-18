@@ -4,6 +4,7 @@ import MomentCard from '@/components/MomentCard';
 import { ChevronDown, ChevronUp, MessageCircle, Loader2, Send, X } from 'lucide-react';
 import ThreadComment from './ThreadComment';
 import { createComment } from '../../app/actions/moments';
+import { sanitizeMoment } from '@/lib/sanitize';
 import { toast } from 'sonner';
 import { usePathname } from 'next/navigation';
 
@@ -61,7 +62,7 @@ export default function MomentGroup({
     // If 'profiles' is undefined, grab the data from 'user' so the UI doesn't crash.
     const normalizedReplies = replies.map(r => ({
         ...r,
-        profiles: r.profiles || (r as any).user
+        profiles: (r as any).profiles || (r as any).user
     }));
 
     // Combine normalized props + effective optimistic, sort by Date DESC
@@ -117,13 +118,7 @@ export default function MomentGroup({
             if (serverResponse) {
                 // 4. DATA PATCHING (The Fix for "NaNy")
                 // If server misses date/user, force our local versions
-                // Handle both camelCase and snake_case from server
-                const finalReply = {
-                    ...serverResponse,
-                    createdAt: serverResponse.createdAt || (serverResponse as any).created_at || nowISO, // 👈 Critical Patch
-                    user: serverResponse.user || (serverResponse as any).profiles || currentUserData,  // 👈 Critical Patch
-                    profiles: (serverResponse as any).profiles || serverResponse.user || currentUserData
-                } as unknown as Moment;
+                const finalReply = sanitizeMoment(serverResponse);
 
                 // 5. Reconciliation (Swap Temp -> Real)
                 setOptimisticReplies(prev =>

@@ -6,7 +6,7 @@ import { fetchSpotifyMetadata } from '@/lib/metadata';
 
 export async function POST(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const supabase = await createClient();
@@ -16,7 +16,8 @@ export async function POST(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const momentId = params.id;
+        // Await params to get the id
+        const { id: momentId } = await params;
         const moment = await prisma.moment.findUnique({
             where: { id: momentId },
             include: { trackSource: true },

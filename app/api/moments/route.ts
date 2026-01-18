@@ -17,19 +17,130 @@ export async function POST(request: Request) {
         const body = await request.json();
         console.log('[API] POST /api/moments - Payload:', JSON.stringify(body, null, 2));
 
-        // Validation
+        // ========================================
+        // COMPREHENSIVE INPUT VALIDATION
+        // ========================================
+
+        // 1. Required fields check
         if (!body.sourceUrl || body.startSec == null || body.endSec == null) {
             return NextResponse.json(
-                { error: 'Missing required fields' },
+                { error: 'Missing required fields: sourceUrl, startSec, and endSec are required' },
                 { status: 400 }
             );
         }
 
-        // Duration validation
+        // 2. URL validation
+        if (typeof body.sourceUrl !== 'string' || body.sourceUrl.trim().length === 0) {
+            return NextResponse.json(
+                { error: 'Invalid sourceUrl: must be a non-empty string' },
+                { status: 400 }
+            );
+        }
+
+        // Basic URL format check (must contain http/https and a domain)
+        const urlPattern = /^https?:\/\/.+\..+/;
+        if (!urlPattern.test(body.sourceUrl)) {
+            return NextResponse.json(
+                { error: 'Invalid sourceUrl: must be a valid HTTP/HTTPS URL' },
+                { status: 400 }
+            );
+        }
+
+        // URL length check (prevent extremely long URLs)
+        if (body.sourceUrl.length > 2048) {
+            return NextResponse.json(
+                { error: 'Invalid sourceUrl: URL too long (max 2048 characters)' },
+                { status: 400 }
+            );
+        }
+
+        // 3. Numeric validation for timestamps
+        if (typeof body.startSec !== 'number' || typeof body.endSec !== 'number') {
+            return NextResponse.json(
+                { error: 'Invalid timestamps: startSec and endSec must be numbers' },
+                { status: 400 }
+            );
+        }
+
+        // Check for NaN or Infinity
+        if (!Number.isFinite(body.startSec) || !Number.isFinite(body.endSec)) {
+            return NextResponse.json(
+                { error: 'Invalid timestamps: must be finite numbers' },
+                { status: 400 }
+            );
+        }
+
+        // Timestamps must be non-negative
+        if (body.startSec < 0 || body.endSec < 0) {
+            return NextResponse.json(
+                { error: 'Invalid timestamps: cannot be negative' },
+                { status: 400 }
+            );
+        }
+
+        // 4. Duration validation
         const duration = body.endSec - body.startSec;
+
         if (duration <= 0) {
             return NextResponse.json(
-                { error: 'End time must be after start time' },
+                { error: 'Invalid duration: end time must be after start time' },
+                { status: 400 }
+            );
+        }
+
+        // Maximum moment duration: 10 minutes (600 seconds)
+        const MAX_MOMENT_DURATION = 600;
+        if (duration > MAX_MOMENT_DURATION) {
+            return NextResponse.json(
+                { error: `Invalid duration: moment cannot exceed ${MAX_MOMENT_DURATION} seconds (10 minutes)` },
+                { status: 400 }
+            );
+        }
+
+        // Minimum moment duration: 1 second
+        if (duration < 1) {
+            return NextResponse.json(
+                { error: 'Invalid duration: moment must be at least 1 second' },
+                { status: 400 }
+            );
+        }
+
+        // 5. Note validation
+        if (body.note !== undefined && body.note !== null) {
+            if (typeof body.note !== 'string') {
+                return NextResponse.json(
+                    { error: 'Invalid note: must be a string' },
+                    { status: 400 }
+                );
+            }
+
+            const MAX_NOTE_LENGTH = 500;
+            if (body.note.length > MAX_NOTE_LENGTH) {
+                return NextResponse.json(
+                    { error: `Invalid note: cannot exceed ${MAX_NOTE_LENGTH} characters` },
+                    { status: 400 }
+                );
+            }
+        }
+
+        // 6. Optional fields validation
+        if (body.title !== undefined && typeof body.title !== 'string') {
+            return NextResponse.json(
+                { error: 'Invalid title: must be a string' },
+                { status: 400 }
+            );
+        }
+
+        if (body.artist !== undefined && typeof body.artist !== 'string') {
+            return NextResponse.json(
+                { error: 'Invalid artist: must be a string' },
+                { status: 400 }
+            );
+        }
+
+        if (body.duration !== undefined && (typeof body.duration !== 'number' || !Number.isFinite(body.duration) || body.duration < 0)) {
+            return NextResponse.json(
+                { error: 'Invalid duration: must be a non-negative number' },
                 { status: 400 }
             );
         }
@@ -183,7 +294,7 @@ export async function POST(request: Request) {
             sourceUrl: newMoment.resource_id,
             startSec: newMoment.start_time,
             endSec: newMoment.end_time,
-            trackDurationSec: newMoment.track_duration_sec,
+            trackDurationSec: newMoment.track_sources?.duration_sec || 0,
             note: newMoment.note,
             title: newMoment.track_sources?.title || newMoment.title || 'Unknown Title',
             artist: newMoment.track_sources?.artist || newMoment.artist || 'Unknown Artist',
@@ -286,7 +397,7 @@ export async function GET(request: Request) {
             artist: m.track_sources?.artist || m.artist || 'Unknown Artist',
             artwork: m.track_sources?.artwork || m.artwork || null,
             likeCount: m.like_count || 0,
-            replyCount: m.replies?.[0]?.count || 0,
+            replyCount: (m.replies as any)?.[0]?.count || 0,
             savedByCount: m.saved_by_count || 1,
             createdAt: m.created_at,
             updatedAt: m.updated_at,

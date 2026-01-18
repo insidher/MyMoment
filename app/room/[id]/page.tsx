@@ -16,7 +16,8 @@ import MomentGroup from '@/components/MomentGroup';
 import PlayerTimeline from '@/components/PlayerTimeline';
 import { RelatedItem } from '@/lib/related';
 import { useAuth } from '@/context/AuthContext';
-import { getTrackMoments, healTrackSource } from '../../explore/actions';
+import { getTrackMoments, healTrackSource, fetchYoutubeMetadata } from '../../explore/actions';
+import { sanitizeMoment } from '@/lib/sanitize';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
 import { MyMomentIcon } from '@/components/icons/MyMomentIcon';
 import { parseChapters, getCurrentChapter, Chapter } from '@/lib/chapters';
@@ -246,19 +247,8 @@ export default function Room({ params }: { params: { id: string } }) {
     };
 
     const handleNewReply = (parentId: string, rawReply: any) => {
-
         // 🛡️ SANITIZATION: Protect against bad API data
-        const newReply = {
-            ...rawReply,
-            // If date is missing, default to NOW
-            createdAt: rawReply.createdAt || rawReply.created_at || new Date().toISOString(),
-            // If user is missing, try to construct a fallback
-            user: rawReply.user || rawReply.profiles || { name: 'Unknown', image: null },
-            // Ensure profiles exists (some schemas use this)
-            profiles: rawReply.profiles || rawReply.user || { name: 'Unknown', image: null },
-            // Ensure ID is a string
-            id: rawReply.id || `temp-fallback-${Date.now()}`
-        };
+        const newReply = sanitizeMoment(rawReply);
 
         setMoments((prevMoments) => {
 
@@ -334,6 +324,98 @@ export default function Room({ params }: { params: { id: string } }) {
         }
 
     }, [url, isSpotify, isYouTube, startParam, endParam]);
+
+    // 🔴 REALTIME: Subscribe to new moments and updates
+    useEffect(() => {
+        if (!url) return;
+
+        const supabase = createClient();
+
+        // Create a channel for this specific room
+        const channel = supabase
+            .channel(`room:${url}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'moments',
+                    filter: `resource_id=eq.${url}`
+                },
+                async (payload) => {
+                    // Fetch the profile data for the new moment
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('name, image')
+                        .eq('id', payload.new.user_id)
+                        .single();
+
+                    // Map database fields (snake_case) to Moment interface (camelCase)
+                    const newMoment = {
+                        id: payload.new.id,
+                        parentId: payload.new.parent_id, // ← Critical: map parent_id
+                        service: payload.new.platform,
+                        sourceUrl: payload.new.resource_id || url,
+                        startSec: payload.new.start_time,
+                        endSec: payload.new.end_time,
+                        momentDurationSec: payload.new.end_time - payload.new.start_time,
+                        title: payload.new.title,
+                        artist: payload.new.artist,
+                        artwork: payload.new.artwork,
+                        note: payload.new.note,
+                        likeCount: payload.new.like_count || 0,
+                        createdAt: payload.new.created_at,
+                        updatedAt: payload.new.updated_at,
+                        userId: payload.new.user_id,
+                        user: profile || { name: 'Unknown', image: null },
+                        profiles: profile || { name: 'Unknown', image: null },
+                        isLiked: false,
+                        likes: [],
+                        replies: []
+                    };
+
+                    // Sanitize the moment
+                    const sanitized = sanitizeMoment(newMoment);
+
+                    // Add to state (avoid duplicates)
+                    setMoments((prev) => {
+                        // Check if moment already exists
+                        if (prev.some(m => m.id === sanitized.id)) {
+                            return prev;
+                        }
+                        return [...prev, sanitized];
+                    });
+
+                    toast.success(`New comment from ${profile?.name || 'someone'}!`);
+                }
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'moments',
+                    filter: `resource_id=eq.${url}`
+                },
+                (payload) => {
+                    // Update the specific moment in state
+                    setMoments((prev) =>
+                        prev.map((m) =>
+                            m.id === payload.new.id
+                                ? { ...m, ...payload.new }
+                                : m
+                        )
+                    );
+                }
+            )
+            .subscribe();
+
+        // Cleanup on unmount
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [url]);
+
 
     // YouTube Polling for Timeline - REPLACED BY AD GUARD
     /*
@@ -532,45 +614,22 @@ export default function Room({ params }: { params: { id: string } }) {
                 : null;
 
         if (videoId) {
-            // Fetch metadata from YouTube Data API for reliable channel info
+            // Fetch metadata from YouTube Data API using secure server action
             try {
-                // Next.js will replace this at build time
-                const apiKey = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY as string;
+                const metadata = await fetchYoutubeMetadata(videoId);
 
-                if (apiKey) {
-                    const response = await fetch(
-                        `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${videoId}&key=${apiKey}`
-                    );
-                    const data = await response.json();
-
-                    if (data.items && data.items.length > 0) {
-                        const snippet = data.items[0].snippet;
-                        const contentDetails = data.items[0].contentDetails;
-
-                        // Parse ISO 8601 duration (PT1M13S)
-                        const parseDuration = (duration: string) => {
-                            const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
-                            if (!match) return 0;
-                            const hours = (parseInt(match[1]) || 0);
-                            const minutes = (parseInt(match[2]) || 0);
-                            const seconds = (parseInt(match[3]) || 0);
-                            return hours * 3600 + minutes * 60 + seconds;
-                        };
-
-                        const durationSec = parseDuration(contentDetails.duration);
-
-                        setMetadata({
-                            title: snippet.title,
-                            artist: snippet.channelTitle, // Reliable channel name from API
-                            artwork: snippet.thumbnails.maxres?.url || snippet.thumbnails.high?.url || '',
-                            description: snippet.description || '',
-                            duration_sec: durationSec,
-                        });
-                        console.log('[YouTube API] Metadata set:', snippet.title, 'by', snippet.channelTitle, 'Duration:', durationSec);
-                    }
+                if (metadata) {
+                    setMetadata({
+                        title: metadata.title,
+                        artist: metadata.channelTitle,
+                        artwork: metadata.thumbnail,
+                        description: metadata.description,
+                        duration_sec: metadata.durationSec,
+                    });
+                    console.log('[YouTube API] Metadata set:', metadata.title, 'by', metadata.channelTitle, 'Duration:', metadata.durationSec);
                 } else {
-                    console.warn('[YouTube] API key is undefined, using iframe fallback');
-                    // Fallback to iframe API (less reliable)
+                    // Fallback to iframe API if server action fails
+                    console.warn('[YouTube] Server action failed, using iframe fallback');
                     const videoData = event.target.getVideoData();
                     setMetadata({
                         title: videoData.title || 'YouTube Video',
@@ -719,8 +778,8 @@ export default function Room({ params }: { params: { id: string } }) {
                     savedByCount: 0, // Starts at 0, or 1 if we count self
                     createdAt: new Date().toISOString(),
                     user: {
-                        name: user?.name || user?.full_name || 'Me', // Assuming 'user' object from useAuth/props
-                        image: user?.image || user?.avatar_url || null
+                        name: (user as any)?.name || (user as any)?.full_name || 'Me',
+                        image: (user as any)?.image || (user as any)?.avatar_url || null
                     },
                     replies: []
                 } as unknown as Moment;

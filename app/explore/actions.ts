@@ -48,7 +48,7 @@ export async function getGroupedSongs(): Promise<SongGroup[]> {
             if (!existing) {
                 groups.set(key, {
                     service: m.platform,
-                    resource_id: m.resource_id,
+                    resource_id: m.resource_id || '',
                     title: m.track_sources?.title || m.title,
                     artist: m.track_sources?.artist || m.artist,
                     artwork: m.track_sources?.artwork || m.artwork,
@@ -180,7 +180,7 @@ export async function getArtistSongs(userId: string, artistName: string, exclude
             if (!existing) {
                 groups.set(key, {
                     service: m.platform,
-                    resource_id: m.resource_id,
+                    resource_id: m.resource_id || '',
                     title: m.track_sources?.title || m.title,
                     artist: m.track_sources?.artist || m.artist,
                     artwork: m.track_sources?.artwork || m.artwork,
@@ -665,5 +665,62 @@ export async function healTrackSource(sourceUrl: string, durationSec: number) {
         }
     } catch (err) {
         console.error('[healTrackSource] Error healing:', err);
+    }
+}
+
+/**
+ * Fetch YouTube video metadata securely from server-side
+ * This prevents exposing the YouTube API key to the client
+ */
+export async function fetchYoutubeMetadata(videoId: string) {
+    try {
+        const apiKey = process.env.YOUTUBE_API_KEY;
+
+        if (!apiKey) {
+            console.error('[fetchYoutubeMetadata] YouTube API key not configured');
+            return null;
+        }
+
+        const response = await fetch(
+            `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${videoId}&key=${apiKey}`
+        );
+
+        if (!response.ok) {
+            console.error('[fetchYoutubeMetadata] YouTube API error:', response.status);
+            return null;
+        }
+
+        const data = await response.json();
+
+        if (!data.items || data.items.length === 0) {
+            console.error('[fetchYoutubeMetadata] No video found for ID:', videoId);
+            return null;
+        }
+
+        const snippet = data.items[0].snippet;
+        const contentDetails = data.items[0].contentDetails;
+
+        // Parse ISO 8601 duration (PT1M13S)
+        const parseDuration = (duration: string): number => {
+            const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
+            if (!match) return 0;
+            const hours = (parseInt(match[1]) || 0);
+            const minutes = (parseInt(match[2]) || 0);
+            const seconds = (parseInt(match[3]) || 0);
+            return hours * 3600 + minutes * 60 + seconds;
+        };
+
+        const durationSec = parseDuration(contentDetails.duration);
+
+        return {
+            title: snippet.title,
+            channelTitle: snippet.channelTitle,
+            description: snippet.description || '',
+            thumbnail: snippet.thumbnails.maxres?.url || snippet.thumbnails.high?.url || '',
+            durationSec,
+        };
+    } catch (error) {
+        console.error('[fetchYoutubeMetadata] Failed to fetch metadata:', error);
+        return null;
     }
 }

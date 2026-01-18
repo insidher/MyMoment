@@ -96,14 +96,6 @@ export default function ThreadComment({ comment, currentUserId, onReply, onRefre
         }
     };
 
-    // 🕵️ DEBUG TRACER: Diagnose date format issue
-    console.log("🕵️ Date Audit:", {
-        id: comment.id,
-        createdAt: comment.createdAt,
-        type: typeof comment.createdAt,
-        isOptimistic: comment.id.toString().startsWith('temp-')
-    });
-
     return (
         <div className="relative">
             {/* Connector Line */}
