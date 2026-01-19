@@ -9,13 +9,13 @@ import Link from 'next/link';
 import YouTube, { YouTubeEvent } from 'react-youtube';
 import { toast } from 'sonner';
 import { Moment } from '@/types';
-import RelatedStrip from '@/components/RelatedStrip';
+import { useAuth } from '@/context/AuthContext';
+
+
 import MomentTimeline from '@/components/MomentTimeline';
 import MomentCard from '@/components/MomentCard';
 import MomentGroup from '@/components/MomentGroup';
 import PlayerTimeline from '@/components/PlayerTimeline';
-import { RelatedItem } from '@/lib/related';
-import { useAuth } from '@/context/AuthContext';
 import { getTrackMoments, healTrackSource, fetchYoutubeMetadata } from '../../explore/actions';
 import { sanitizeMoment } from '@/lib/sanitize';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
@@ -172,10 +172,9 @@ export default function Room({ params }: { params: { id: string } }) {
     // Moments List State
     const [moments, setMoments] = useState<Moment[]>([]);
 
-    // Related Content State
-    const [relatedItems, setRelatedItems] = useState<RelatedItem[]>([]);
-    const [isLoadingRelated, setIsLoadingRelated] = useState(false);
-    const [relatedError, setRelatedError] = useState<string | null>(null);
+
+
+
 
     // Spotify UX State
     const [youtubeFallbackUrl, setYoutubeFallbackUrl] = useState('');
@@ -559,46 +558,8 @@ export default function Room({ params }: { params: { id: string } }) {
     }, [url, isSpotify]);
 
     // Fetch Related Content
-    useEffect(() => {
-        if (!url) return;
-
-        // Only fetch for YouTube or Spotify
-        if (!isYouTube && !isSpotify) {
-            setRelatedItems([]);
-            return;
-        }
-
-        console.log('Fetching related content for:', url);
-        setIsLoadingRelated(true);
-        setRelatedError(null);
-
-        fetch('/api/related', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                service: isSpotify ? 'spotify' : 'youtube',
-                sourceUrl: url,
-            }),
-        })
-            .then(res => res.json())
-            .then(data => {
-                console.log('Related content response:', data);
-                if (data.error) {
-                    setRelatedError(data.error);
-                    setRelatedItems([]);
-                } else if (data.items) {
-                    setRelatedItems(data.items);
-                }
-            })
-            .catch(err => {
-                console.error('Failed to fetch related content', err);
-                setRelatedError('Failed to load recommendations');
-                setRelatedItems([]);
-            })
-            .finally(() => {
-                setIsLoadingRelated(false);
-            });
-    }, [url, isYouTube, isSpotify]);
+    // Fetch Related Content - Disabled
+    // useEffect(() => {}, []);
 
     const onPlayerReady = async (event: YouTubeEvent) => {
         setYoutubePlayer(event.target);
@@ -1094,30 +1055,7 @@ export default function Room({ params }: { params: { id: string } }) {
         }
     };
 
-    const handleSelectRelated = (item: RelatedItem) => {
-        // Reset capture state
-        setStartSec(null);
-        setEndSec(null);
-        setNote('');
-        setCaptureState('idle');
-        setError('');
-        setSaved(false);
 
-        // Load new video in player if available (YouTube only optimization)
-        if (isYouTube && item.service === 'youtube' && youtubePlayer && item.id) {
-            youtubePlayer.loadVideoById(item.id);
-        }
-
-        // Load new track in Spotify player if available
-        if (isSpotify && item.service === 'spotify' && spotifyPlayer) {
-            console.log('Optimistic Spotify load:', item.sourceUrl);
-            spotifyPlayer.loadUri(item.sourceUrl);
-            spotifyPlayer.play();
-        }
-
-        // Navigate to new URL (this will trigger the useEffects to fetch metadata and moments)
-        router.push(`/room/view?url=${encodeURIComponent(item.sourceUrl)}`);
-    };
 
     // --- Playback Controls ---
     const handleTogglePlay = (playing: boolean) => {
@@ -1199,29 +1137,8 @@ export default function Room({ params }: { params: { id: string } }) {
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                     {/* Left Column: Recommendations */}
-                    <div className="lg:col-span-3 h-[calc(100vh-120px)] sticky top-6 overflow-hidden flex flex-col hidden lg:flex">
-                        <h3 className="text-sm font-semibold text-white/70 mb-4 flex-shrink-0">More to explore</h3>
-
-                        <div className="flex-1 min-h-0 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
-                            {isLoadingRelated && (
-                                <div className="text-white/30 text-sm animate-pulse">Loading recommendations...</div>
-                            )}
-
-                            {relatedError && (
-                                <p className="text-red-400 text-sm">Couldn’t load recommendations: {relatedError}</p>
-                            )}
-
-                            {!isLoadingRelated && !relatedError && relatedItems.length === 0 && (
-                                <p className="text-white/30 text-sm italic">No recommendations found for this track.</p>
-                            )}
-
-                            {relatedItems.length > 0 && (
-                                <RelatedStrip items={relatedItems} onSelect={handleSelectRelated} orientation="vertical" />
-                            )}
-                        </div>
-                    </div>
                     {/* Center Column: Player & Metadata */}
-                    <div className="lg:col-span-6 space-y-6">
+                    <div className="lg:col-span-9 space-y-6">
                         {/* Metadata (Compact & Above Player) */}
                         <div className="flex items-center gap-4 px-1">
                             {metadata.artwork ? (
@@ -1453,26 +1370,7 @@ export default function Room({ params }: { params: { id: string } }) {
 
 
 
-                        {/* Related Content (Mobile Only) */}
-                        <div className="mt-6 block lg:hidden">
-                            <h3 className="text-sm font-semibold text-white/70 mb-2">More to explore</h3>
-
-                            {isLoadingRelated && (
-                                <div className="text-white/30 text-sm animate-pulse">Loading recommendations...</div>
-                            )}
-
-                            {relatedError && (
-                                <p className="text-red-400 text-sm">Couldn’t load recommendations: {relatedError}</p>
-                            )}
-
-                            {!isLoadingRelated && !relatedError && relatedItems.length === 0 && (
-                                <p className="text-white/30 text-sm italic">No recommendations found for this track.</p>
-                            )}
-
-                            {relatedItems.length > 0 && (
-                                <RelatedStrip items={relatedItems} onSelect={handleSelectRelated} />
-                            )}
-                        </div>
+                        {/* Related Content Removed */}
 
                         {/* Moments List */}
                         <div className="glass-panel p-6 space-y-6">
@@ -1746,6 +1644,10 @@ export default function Room({ params }: { params: { id: string } }) {
                                     </>
                                 )}
                             </button>
+                        </div>
+                        {/* Right Column Placeholder */}
+                        <div className="hidden lg:block w-80 shrink-0 border-l border-white/10 p-4">
+                            {/* Future content goes here */}
                         </div>
                     </div>
                 </div >
