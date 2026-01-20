@@ -16,6 +16,7 @@ import MomentTimeline from '@/components/MomentTimeline';
 import MomentCard from '@/components/MomentCard';
 import MomentGroup from '@/components/MomentGroup';
 import PlayerTimeline from '@/components/PlayerTimeline';
+import MomentEditor from '@/components/MomentEditor';
 import { getTrackMoments, healTrackSource, fetchYoutubeMetadata } from '../../explore/actions';
 import { sanitizeMoment } from '@/lib/sanitize';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
@@ -1128,530 +1129,285 @@ export default function Room({ params }: { params: { id: string } }) {
     };
 
     return (
-        <main className="min-h-screen p-6 flex flex-col items-center">
-            <div className="w-full max-w-6xl mx-auto">
-                <Link href="/" className="inline-flex items-center text-white/50 hover:text-white mb-8 transition-colors">
-                    <ArrowLeft size={18} className="mr-2" />
-                    Back to Home
-                </Link>
+        <main className="flex flex-col h-[100dvh] overflow-hidden bg-black text-white">
+            {/* RIGID ZONE: Fixed Video Player + Timeline */}
+            <section className="shrink-0 w-full relative z-10 bg-black">
+                {/* Desktop: 65/35 Split | Mobile: Full Width */}
+                <div className="flex flex-col lg:flex-row lg:gap-4 lg:px-4">
+                    {/* Left: Video Player + Timeline (65% on desktop) */}
+                    <div className="w-full lg:w-[65%] px-4 lg:px-0">
+                        <div className="glass-panel p-1 overflow-hidden aspect-video relative bg-black">
+                            {isYouTube && youtubeId ? (
+                                <>
+                                    <YouTube
+                                        videoId={youtubeId}
+                                        className="w-full h-full"
+                                        iframeClassName="w-full h-full rounded-xl"
+                                        onReady={onPlayerReady}
+                                        onStateChange={(event) => {
+                                            if (event.data === 1) setIsPlaying(true); // Playing
+                                            if (event.data === 2) setIsPlaying(false); // Paused
 
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                    {/* Left Column: Recommendations */}
-                    {/* Center Column: Player & Metadata */}
-                    <div className="lg:col-span-9 space-y-6">
-                        {/* Metadata (Compact & Above Player) */}
-                        <div className="flex items-center gap-4 px-1">
-                            {metadata.artwork ? (
-                                <img
-                                    src={metadata.artwork}
-                                    alt="Album Art"
-                                    className="w-12 h-12 rounded-md object-cover shadow-lg"
-                                />
-                            ) : (
-                                <div className="w-12 h-12 rounded-md bg-white/10 animate-pulse" />
-                            )}
-                            <div className="min-w-0">
-                                <h2 className="text-lg font-bold leading-tight truncate">{metadata.title}</h2>
-                                <p className="text-sm text-white/60 truncate">{metadata.artist}</p>
-                            </div>
-                        </div>
-                        <div className="space-y-4">
-                            <div className="glass-panel p-1 overflow-hidden aspect-video relative bg-black">
-                                {isYouTube && youtubeId ? (
-                                    <>
-                                        <YouTube
-                                            videoId={youtubeId}
-                                            className="w-full h-full"
-                                            iframeClassName="w-full h-full rounded-xl"
-                                            onReady={onPlayerReady}
-                                            onStateChange={(event) => {
-                                                if (event.data === 1) setIsPlaying(true); // Playing
-                                                if (event.data === 2) setIsPlaying(false); // Paused
+                                            if (event.data === 1 && !hasUpdatedDuration.current) {
+                                                const dur = event.target.getDuration();
+                                                if (dur > 0 && Math.abs(dur - metadata.duration_sec) > 5) {
+                                                    console.log(`[YouTube] Updating duration: ${metadata.duration_sec} -> ${dur}`);
+                                                    setMetadata(prev => ({ ...prev, duration_sec: dur }));
 
-                                                const videoData = event.target.getVideoData();
-                                                if (videoData && videoData.video_id) {
-                                                    const currentId = getYouTubeId(url);
-                                                    if (currentId && videoData.video_id !== currentId) {
-                                                        const newUrl = `https://www.youtube.com/watch?v=${videoData.video_id}`;
-                                                        router.push(`/room/view?url=${encodeURIComponent(newUrl)}`);
-                                                    }
+                                                    // Heal DB
+                                                    // Use URL as the key since that's what getTrackMoments uses
+                                                    healTrackSource(url, dur).then(() => {
+                                                        console.log('[YouTube] DB duration healed');
+                                                    });
+
+                                                    hasUpdatedDuration.current = true;
                                                 }
-                                            }}
-                                            onError={(e) => {
-                                                console.error('[YouTube Player Error] Code:', e.data);
-                                                // 2 – The request contains an invalid parameter value.
-                                                // 5 – The requested content cannot be played in an HTML5 player or another error related to the HTML5 player has occurred.
-                                                // 100 – The video requested was not found. This error occurs when a video has been removed (for any reason) or has been marked as private.
-                                                // 101 – The owner of the requested video does not allow it to be played in embedded players.
-                                                // 150 – This error is the same as 101. It's just a 101 error in disguise!
-                                            }}
-                                            opts={{
-                                                width: '100%',
-                                                height: '100%',
-                                                playerVars: {
-                                                    autoplay: 1,
-                                                    rel: 0, // Show related videos from same channel only
-                                                    modestbranding: 1,
-                                                    iv_load_policy: 3, // Hide annotations
-                                                    origin: typeof window !== 'undefined' ? window.location.origin : undefined,
-                                                },
-                                            }}
-                                        />
-                                        {isAd && (
-                                            <div className="absolute top-4 right-4 z-50 bg-yellow-400 text-black px-3 py-1 rounded-full text-xs font-bold shadow-lg flex items-center gap-2 animate-pulse pointer-events-none">
-                                                <span>⚠️</span>
-                                                <span>Ad Playing - Controls Paused</span>
-                                            </div>
-                                        )}
-                                    </>
-                                ) : isSpotify ? (
-                                    <div className="relative w-full h-full">
-                                        <div id="spotify-embed" className="w-full h-full rounded-xl" />
-
-                                        {/* Reloading Banner - Keep for user awareness if it happens */}
-                                        {isReloading && (
-                                            <div className="absolute top-0 left-0 right-0 z-[60] bg-red-500/90 text-white text-xs font-bold px-4 py-2 flex items-center justify-center gap-2 animate-in slide-in-from-top-full">
-                                                <Loader2 className="w-3 h-3 animate-spin" />
-                                                Refreshing...
-                                            </div>
-                                        )}
-
-                                        {isSeekingToStart && !isReloading && (
-                                            <div className="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center gap-4 animate-in fade-in duration-300 rounded-xl">
-                                                <Loader2 className="w-10 h-10 text-orange-500 animate-spin" />
-                                                <div className="text-white/80 font-medium font-mono text-sm">
-                                                    Loading song at moment...
-                                                </div>
-                                            </div>
-                                        )}
+                                            }
+                                        }}
+                                        opts={{
+                                            playerVars: {
+                                                autoplay: 1,
+                                                controls: 0, // Hide native controls
+                                                modestbranding: 1,
+                                                rel: 0,
+                                                start: startParam ? parseInt(startParam) : undefined
+                                            }
+                                        }}
+                                    />
+                                    {/* Scrubber Overlay */}
+                                    <div className="absolute inset-x-0 bottom-0 h-1 bg-transparent group hover:h-2 transition-all z-10 cursor-pointer pointer-events-none">
+                                        {/* Visual scrubber bar could go here if we wanted a native-like overlay */}
                                     </div>
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-white/30">
-                                        <p>Invalid or unsupported URL</p>
-                                    </div>
-                                )}
-                            </div>
+                                </>
+                            ) : isSpotify ? (
+                                <div className="relative w-full h-full">
+                                    <div id="spotify-embed" className="w-full h-full rounded-xl" />
 
-                            {/* Moment Timeline Overlay */}
-                            {/* <div className="px-1">
-                                <MomentTimeline
-                                    duration={playbackState.duration}
-                                    currentTime={playbackState.current}
-                                    moments={moments}
-                                    onSeek={handleSeek}
-                                    onMomentClick={playMoment}
-                                />
-                            </div> */}
-
-                            <div className="flex items-center justify-center gap-6 mt-4 mb-2 select-none">
-                                {/* Left Controls: Seek Back */}
-                                {(playbackState.duration > 1740) && (
-                                    <button
-                                        onClick={() => handleSeekRelative(-600)}
-                                        className="text-white/70 hover:text-white font-mono text-xl p-2 transition-colors"
-                                        title="-10 minutes"
-                                    >
-                                        &lt;&lt;&lt;
-                                    </button>
-                                )}
-                                <button
-                                    onClick={() => handleSeekRelative(-15)}
-                                    className="text-white/70 hover:text-white font-mono text-xl p-2 transition-colors"
-                                    title="-15 seconds"
-                                >
-                                    &lt;&lt;
-                                </button>
-                                <button
-                                    onClick={() => handleSeekRelative(-2)}
-                                    className="text-white/70 hover:text-white font-mono text-xl p-2 transition-colors"
-                                    title="-2 seconds"
-                                >
-                                    &lt;
-                                </button>
-
-                                {/* Center: Play/Pause */}
-                                <button
-                                    onClick={() => handleTogglePlay(!isPlaying)}
-                                    className="p-4 rounded-full bg-white text-black hover:scale-105 transition-transform shadow-lg"
-                                    title={isPlaying ? "Pause" : "Play"}
-                                >
-                                    {isPlaying ? (
-                                        <Pause className="w-6 h-6 fill-current" />
-                                    ) : (
-                                        <Play className="w-6 h-6 fill-current ml-0.5" />
+                                    {isReloading && (
+                                        <div className="absolute top-0 left-0 right-0 z-[60] bg-red-500/90 text-white text-xs font-bold px-4 py-2 flex items-center justify-center gap-2 animate-in slide-in-from-top-full">
+                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                            Refreshing...
+                                        </div>
                                     )}
-                                </button>
 
-                                {/* Right Controls: Seek Forward */}
-                                <button
-                                    onClick={() => handleSeekRelative(2)}
-                                    className="text-white/70 hover:text-white font-mono text-xl p-2 transition-colors"
-                                    title="+2 seconds"
-                                >
-                                    &gt;
-                                </button>
-                                <button
-                                    onClick={() => handleSeekRelative(15)}
-                                    className="text-white/70 hover:text-white font-mono text-xl p-2 transition-colors"
-                                    title="+15 seconds"
-                                >
-                                    &gt;&gt;
-                                </button>
-                                {(playbackState.duration > 1740) && (
-                                    <button
-                                        onClick={() => handleSeekRelative(600)}
-                                        className="text-white/70 hover:text-white font-mono text-xl p-2 transition-colors"
-                                        title="+10 minutes"
-                                    >
-                                        &gt;&gt;&gt;
-                                    </button>
-                                )}
-                            </div>
+                                    {isSeekingToStart && !isReloading && (
+                                        <div className="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center gap-4 animate-in fade-in duration-300 rounded-xl">
+                                            <Loader2 className="w-10 h-10 text-orange-500 animate-spin" />
+                                            <div className="text-white/80 font-medium font-mono text-sm">
+                                                Loading song at moment...
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-white/30">
+                                    <p>Invalid or unsupported URL</p>
+                                </div>
+                            )}
+                        </div>
 
+                        {/* Playback Controls - Hidden for now */}
 
-                            {/* Unified Player Timeline (Spotify & YouTube) */}
-                            {(isSpotify || isYouTube) && (
-                                <PlayerTimeline
-                                    currentTime={isSpotify ? spotifyProgress.current : guardCurrentTime}
-                                    duration={isSpotify ? spotifyProgress.duration : guardDuration}
-                                    disabled={controlsDisabled}
-                                    isPlaying={isPlaying}
-                                    moments={moments}
-                                    onSeek={handleSeek}
-                                    onMomentClick={playMoment}
-                                    onChapterClick={(chapter) => handleSeek(chapter.startSec)}
+                        {/* Unified Player Timeline (Spotify & YouTube) */}
+                        {(isSpotify || isYouTube) && (
+                            <PlayerTimeline
+                                currentTime={isSpotify ? spotifyProgress.current : guardCurrentTime}
+                                duration={isSpotify ? spotifyProgress.duration : guardDuration}
+                                disabled={controlsDisabled}
+                                isPlaying={isPlaying}
+                                moments={moments}
+                                onSeek={handleSeek}
+                                onMomentClick={playMoment}
+                                onChapterClick={(chapter) => handleSeek(chapter.startSec)}
+                                startSec={startSec}
+                                endSec={endSec}
+                                note={note}
+                                onNoteChange={setNote}
+                                onSaveMoment={handleSave}
+                                onCancelCapture={() => {
+                                    setStartSec(null);
+                                    setEndSec(null);
+                                    setCaptureState('idle');
+                                    setError('');
+                                }}
+                                onPreviewCapture={handlePreviewCapture}
+                                onCaptureStart={(time) => {
+                                    setStartSec(time);
+                                    setCaptureState('start-captured');
+                                    setError('');
+                                }}
+                                onCaptureEnd={(time) => {
+                                    setEndSec(time);
+                                    setCaptureState('end-captured');
+                                    setError('');
+                                }}
+                                onCaptureUpdate={(start, end) => {
+                                    // Allow clearing (null)
+                                    if (start === null && end === null) {
+                                        setStartSec(null);
+                                        setEndSec(null);
+                                        setCaptureState('idle');
+                                    } else {
+                                        if (start !== undefined) setStartSec(start);
+                                        if (end !== undefined) setEndSec(end);
+
+                                        // State Inference
+                                        if (start === null) {
+                                            setCaptureState('idle');
+                                        } else if (end === null) {
+                                            setCaptureState('start-captured');
+                                        } else if (start !== null && end !== null) {
+                                            setCaptureState('end-captured');
+                                        }
+                                    }
+                                }}
+                                activeMomentId={activeMoment?.id}
+                                chapters={chapters}
+                            />
+                        )}
+                    </div>
+
+                    {/* Right: Sidebar (35% on desktop, hidden on mobile) */}
+                    <div className="hidden lg:block lg:w-[35%] shrink-0">
+                        {/* Render MomentEditor in sidebar when active */}
+                        {(startSec !== null || endSec !== null) ? (
+                            <div className="sticky top-4">
+                                <MomentEditor
+                                    isOpen={true}
+                                    note={note}
                                     startSec={startSec}
                                     endSec={endSec}
-                                    note={note}
+                                    editingMomentId={null}
+                                    currentUser={user ? { name: user.email, image: null } : undefined}
                                     onNoteChange={setNote}
-                                    onSaveMoment={handleSave}
-                                    onCancelCapture={() => {
+                                    onSave={handleSave}
+                                    onCancel={() => {
                                         setStartSec(null);
                                         setEndSec(null);
                                         setCaptureState('idle');
                                         setError('');
                                     }}
-                                    onPreviewCapture={handlePreviewCapture}
-                                    onCaptureStart={(time) => {
-                                        setStartSec(time);
-                                        setCaptureState('start-captured');
-                                        setError('');
+                                    formatTime={(seconds) => {
+                                        const h = Math.floor(seconds / 3600);
+                                        const m = Math.floor((seconds % 3600) / 60);
+                                        const s = Math.floor(seconds % 60);
+                                        return h > 0
+                                            ? `${h}h ${m}m ${s}s`
+                                            : `${m}:${s.toString().padStart(2, '0')}`;
                                     }}
-                                    onCaptureEnd={(time) => {
-                                        setEndSec(time);
-                                        setCaptureState('end-captured');
-                                        setError('');
-                                    }}
-                                    onCaptureUpdate={(start, end) => {
-                                        // Allow clearing (null)
-                                        if (start === null && end === null) {
-                                            setStartSec(null);
-                                            setEndSec(null);
-                                            setCaptureState('idle');
-                                        } else {
-                                            if (start !== undefined) setStartSec(start);
-                                            if (end !== undefined) setEndSec(end);
-
-                                            // State Inference
-                                            if (start === null) {
-                                                setCaptureState('idle');
-                                            } else if (end === null) {
-                                                setCaptureState('start-captured');
-                                            } else if (start !== null && end !== null) {
-                                                setCaptureState('end-captured');
-                                            }
-                                        }
-                                    }}
-                                    activeMomentId={activeMoment?.id}
-                                    chapters={chapters}
                                 />
-                            )}
-                        </div>
-
-
-
-                        {/* Related Content Removed */}
-
-                        {/* Moments List */}
-                        <div className="glass-panel p-6 space-y-6">
-                            <h3 className="text-xl font-semibold flex items-center gap-2 border-b border-white/10 pb-6">
-                                <ListMusic size={20} className="text-blue-400" />
-                                {/* Show count of GROUPS (distinct moments), not total posts including replies */}
-                                Saved Moments ({groupMoments(moments).length})
-                            </h3>
-
-                            <div className="grid gap-3">
-                                {moments.length === 0 ? (
-                                    <div className="text-center py-8 text-white/30 italic">
-                                        No moments saved yet. Be the first!
-                                    </div>
-                                ) : (
-                                    groupMoments(moments)
-                                        .sort((a, b) => (activeMoment?.id === a.main.id ? -1 : activeMoment?.id === b.main.id ? 1 : 0))
-                                        .map((group) => {
-                                            if (group.main.id.toString().includes('temp')) {
-                                                console.log("👀 [Render Loop] Found Optimistic Moment in JSX:", group.main.id);
-                                            }
-                                            return (
-                                                <MomentGroup
-                                                    key={group.main.id}
-                                                    mainMoment={group.main}
-                                                    replies={group.replies}
-                                                    trackDuration={(isSpotify ? spotifyProgress.duration : playbackState.duration) || metadata.duration_sec || group.main.trackSource?.durationSec}
-                                                    onDelete={async (id) => {
-                                                        try {
-                                                            const res = await fetch(`/api/moments/${id}`, { method: 'DELETE' });
-                                                            if (res.ok) {
-                                                                setMoments(prev => {
-                                                                    const target = prev.find(m => m.id === id);
-                                                                    if (!target) return prev.filter(m => m.id !== id);
-
-                                                                    return prev.filter(m =>
-                                                                        !(m.id === id || (
-                                                                            m.sourceUrl === target.sourceUrl &&
-                                                                            m.startSec === target.startSec &&
-                                                                            m.endSec === target.endSec
-                                                                        ))
-                                                                    );
-                                                                });
-                                                            }
-                                                        } catch (e) {
-                                                            console.error(e);
-                                                        }
-                                                    }}
-                                                    showDelete={user?.id === group.main.userId}
-                                                    onPlayFull={() => {
-                                                        router.push(`/room/view?url=${encodeURIComponent(group.main.sourceUrl)}`);
-                                                    }}
-                                                    onPlayMoment={playMoment}
-                                                    onPauseMoment={handlePauseMoment}
-                                                    currentTime={isSpotify ? spotifyProgress.current : playbackState.current}
-                                                    activeMomentId={activeMoment?.id}
-                                                    isPlaying={isPlaying}
-                                                    currentUserId={user?.id || ''}
-                                                    currentUser={user ? { id: user.id, name: user.email, image: null } : undefined}
-                                                    onReply={(momentId, username) => {
-                                                        setReplyingTo({ id: momentId, username });
-                                                        noteInputRef.current?.focus();
-                                                    }}
-                                                    onRefresh={fetchMoments}
-                                                    onNewReply={handleNewReply}
-                                                />
-                                            );
-                                        })
-                                )}
                             </div>
-                        </div>
-                    </div>
-
-                    {/* Right Column: Controls */}
-                    <div className="lg:col-span-3 space-y-6">
-                        {/* Smart Capture Button (YouTube & Spotify) */}
-                        {(isYouTube || isSpotify) && (
-                            <div className="glass-panel p-6 flex flex-col items-center space-y-4">
-                                <button
-                                    onClick={handleSmartCapture}
-                                    disabled={!youtubePlayer && !spotifyPlayer}
-                                    className={`
-                    w-full py-4 rounded-xl font-bold text-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-lg
-                    ${captureState === 'idle' ? 'bg-white text-black hover:bg-gray-200' : ''}
-                    ${captureState === 'start-captured' ? 'bg-purple-600 text-white hover:bg-purple-500' : ''}
-                    ${captureState === 'end-captured' ? 'bg-white/10 text-white hover:bg-white/20' : ''}
-                  `}
-                                >
-                                    {captureState === 'idle' && 'Mark Start'}
-                                    {captureState === 'start-captured' && 'Mark End'}
-                                    {captureState === 'end-captured' && (
-                                        <span className="flex items-center justify-center gap-2">
-                                            <RotateCcw size={18} /> Reset
-                                        </span>
-                                    )}
-                                </button>
-
-                                <p className="text-sm text-center text-white/60">
-                                    {captureState === 'idle' && "Press when your favorite part begins."}
-                                    {captureState === 'start-captured' && startSec !== null && `Start: ${formatTime(startSec)}. Press when it ends.`}
-                                    {captureState === 'end-captured' && startSec !== null && endSec !== null && `Captured: ${formatTime(startSec)} – ${formatTime(endSec)}.`}
-                                </p>
-
-                                {error && <p className="text-red-400 text-sm">{error}</p>}
-                            </div>
-                        )}
-
-                        <div className="glass-panel p-6 h-fit space-y-6">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-xl font-semibold flex items-center gap-2">
-                                    <Clock size={20} className="text-purple-400" />
+                        ) : (
+                            <div className="glass-panel p-3 h-fit space-y-3 sticky top-4">
+                                <h3 className="text-sm font-semibold flex items-center gap-2">
+                                    <Clock size={16} className="text-purple-400" />
                                     Moment Details
                                 </h3>
-                                {(captureState === 'start-captured' || captureState === 'end-captured') && (
-                                    <div className={`flex items-center gap-2 px-3 py-1 rounded-full font-mono text-sm font-bold transition-all ${captureState === 'start-captured' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-purple-500/10 text-purple-300 border border-purple-500/20'}`}>
-                                        {captureState === 'start-captured' ? (
-                                            <>
-                                                <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
-                                                <span>
-                                                    {Math.max(0, (isSpotify ? spotifyProgress.current : playbackState.current) - (startSec || 0))}s
-                                                </span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <MyMomentIcon className="w-4 h-4 fill-current" />
-                                                <span>{(endSec || 0) - (startSec || 0)}s</span>
-                                            </>
-                                        )}
-                                    </div>
-                                )}
+                                <p className="text-xs text-white/50">
+                                    Capture controls and details will appear here when you create a moment.
+                                </p>
                             </div>
+                        )}
+                    </div>
+                </div>
+            </section>
 
-                            {/* Preview Chip - Only show if NOT replying */}
-                            {captureState === 'end-captured' && startSec !== null && endSec !== null && !replyingTo && (
-                                <div className="glass-panel p-4 bg-purple-600/20 border-2 border-purple-500">
-                                    <p className="text-xs text-white/50 uppercase tracking-wider mb-2">Preview</p>
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex items-center gap-2 font-mono text-lg">
-                                            <span className="text-purple-300">{formatTime(startSec)}</span>
-                                            <span className="text-white/30">→</span>
-                                            <span className="text-purple-300">{formatTime(endSec)}</span>
-                                        </div>
-                                        <span className="text-white/30">·</span>
-                                        <span className="text-white/60">
-                                            {note || '(add a label below)'}
-                                        </span>
-                                    </div>
-                                    <p className="text-xs text-white/40 mt-2">
-                                        Duration: {endSec - startSec}s
-                                    </p>
-                                </div>
-                            )}
-
-                            {/* Start/End Inputs - Hide if Replying */}
-                            {!replyingTo && (
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-xs text-white/50 uppercase tracking-wider">Start</label>
-                                        <input
-                                            type="text"
-                                            placeholder="0:45"
-                                            value={startSec !== null ? formatTime(startSec) : ''}
-                                            readOnly
-                                            className="input-field w-full text-center font-mono text-lg"
-                                            suppressHydrationWarning
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-xs text-white/50 uppercase tracking-wider">End</label>
-                                        <input
-                                            type="text"
-                                            placeholder="1:15"
-                                            value={endSec !== null ? formatTime(endSec) : ''}
-                                            readOnly
-                                            className="input-field w-full text-center font-mono text-lg"
-                                            suppressHydrationWarning
-                                        />
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="space-y-2">
-                                {/* Reply Banner */}
-                                {replyingTo && (
-                                    <div className="flex items-center justify-between bg-blue-500/10 border border-blue-500/20 px-3 py-2 rounded-lg mb-2">
-                                        <div className="flex items-center gap-2 text-sm text-blue-200">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                                            <span>Replying to <span className="font-bold">{replyingTo.username}</span></span>
-                                        </div>
-                                        <button
-                                            onClick={() => {
-                                                setReplyingTo(null);
-                                                setNote('');
-                                            }}
-                                            className="p-1 hover:bg-white/10 rounded-full transition-colors text-white/50 hover:text-white"
-                                        >
-                                            <X size={14} />
-                                        </button>
-                                    </div>
-                                )}
-
-                                {!replyingTo && (
-                                    <div className="flex items-center justify-between">
-                                        <label className="text-xs text-white/50 uppercase tracking-wider">Label / Note</label>
-                                        {currentChapter && (
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    type="checkbox"
-                                                    id="include-chapter"
-                                                    checked={includeChapterNote}
-                                                    onChange={(e) => {
-                                                        setIncludeChapterNote(e.target.checked);
-                                                        if (e.target.checked) {
-                                                            const suffix = `${currentChapter.title}\n`;
-                                                            if (!note.endsWith(suffix)) {
-                                                                setNote(prev => prev + suffix);
-                                                            }
-                                                        }
-                                                    }}
-                                                    className="rounded sr-only" // Use custom style or standard
-                                                />
-                                                <label
-                                                    htmlFor="include-chapter"
-                                                    onClick={() => {
-                                                        const checked = !includeChapterNote;
-                                                        setIncludeChapterNote(checked);
-                                                        if (checked) {
-                                                            const suffix = ` [${currentChapter.title}]`;
-                                                            if (!note.endsWith(suffix)) {
-                                                                setNote(prev => prev + suffix);
-                                                            }
-                                                        }
-                                                    }}
-                                                    className={`text-xs cursor-pointer select-none transition-colors ${includeChapterNote ? 'text-purple-300' : 'text-white/30 hover:text-white/50'}`}
-                                                >
-                                                    {includeChapterNote ? 'Start with chapter title' : 'Use chapter title?'}
-                                                </label>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                                <textarea
-                                    ref={noteInputRef}
-                                    placeholder={replyingTo ? "Write a reply..." : "Why this part hits different..."}
-                                    value={note}
-                                    onChange={(e) => setNote(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && !e.shiftKey) {
-                                            e.preventDefault();
-                                            handleSave();
-                                        }
-                                    }}
-                                    className={`input-field w-full min-h-[100px] resize-none ${replyingTo ? 'border-blue-500/50 focus:border-blue-400' : ''}`}
+            {/* SCROLL ZONE: Scrollable Moments Feed */}
+            <section className="flex-1 overflow-y-auto overscroll-contain w-full">
+                {/* Changed mx-auto to w-full lg:max-w-4xl lg:ml-0 to left justify on desktop if needed, or just remove mx-auto */}
+                {/* User requested left justify "saved moments container". Removing mx-auto. */}
+                <div className="w-full max-w-4xl px-4 py-3 space-y-3 pb-16">
+                    {/* Moments List */}
+                    <div className="glass-panel p-3 space-y-3">
+                        <div className="flex items-center gap-3 border-b border-white/10 pb-3">
+                            {metadata.artwork ? (
+                                <img
+                                    src={metadata.artwork}
+                                    alt="Album Art"
+                                    className="w-12 h-12 rounded-md object-cover shadow-lg shrink-0"
                                 />
+                            ) : (
+                                <div className="w-12 h-12 rounded-md bg-white/10 animate-pulse shrink-0" />
+                            )}
+                            <div className="min-w-0">
+                                <h3 className="text-base font-semibold text-white truncate">
+                                    Saved Moments
+                                </h3>
+                                <p className="text-xs text-white/60 truncate">
+                                    for <span className="text-white/90 font-medium">{metadata.title || 'Unknown Video'}</span>
+                                </p>
                             </div>
-
-                            <button
-                                onClick={handleSave}
-                                disabled={isSaving || saved || (!replyingTo && (startSec === null || endSec === null)) || !note || controlsDisabled}
-                                className={`w-full btn-primary flex items-center justify-center gap-2 ${saved ? 'bg-green-600 hover:bg-green-600 from-green-600 to-green-500' : ''} disabled:opacity-50 disabled:cursor-not-allowed`}
-                            >
-                                {saved ? (
-                                    <>
-                                        <Check size={18} />
-                                        Saved!
-                                    </>
-                                ) : (
-                                    <>
-                                        {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                                        {isSaving ? 'Saving...' : (controlsDisabled ? 'Ad Playing...' : (replyingTo ? 'Post Reply' : 'Save Moment'))}
-                                    </>
-                                )}
-                            </button>
+                            <div className="ml-auto text-xs text-white/40 font-mono bg-white/5 px-2 py-1 rounded-full">
+                                {groupMoments(moments).length}
+                            </div>
                         </div>
-                        {/* Right Column Placeholder */}
-                        <div className="hidden lg:block w-80 shrink-0 border-l border-white/10 p-4">
-                            {/* Future content goes here */}
+
+                        <div className="grid gap-2">
+                            {moments.length === 0 ? (
+                                <div className="text-center py-8 text-white/30 italic">
+                                    No moments saved yet. Be the first!
+                                </div>
+                            ) : (
+                                groupMoments(moments)
+                                    .sort((a, b) => (activeMoment?.id === a.main.id ? -1 : activeMoment?.id === b.main.id ? 1 : 0))
+                                    .map((group) => {
+                                        if (group.main.id.toString().includes('temp')) {
+                                            console.log("👀 [Render Loop] Found Optimistic Moment in JSX:", group.main.id);
+                                        }
+                                        return (
+                                            <MomentGroup
+                                                key={group.main.id}
+                                                mainMoment={group.main}
+                                                replies={group.replies}
+                                                trackDuration={(isSpotify ? spotifyProgress.duration : playbackState.duration) || metadata.duration_sec || group.main.trackSource?.durationSec}
+                                                onDelete={async (id) => {
+                                                    try {
+                                                        const res = await fetch(`/api/moments/${id}`, { method: 'DELETE' });
+                                                        if (res.ok) {
+                                                            setMoments(prev => {
+                                                                const target = prev.find(m => m.id === id);
+                                                                if (!target) return prev.filter(m => m.id !== id);
+
+                                                                return prev.filter(m =>
+                                                                    !(m.id === id || (
+                                                                        m.sourceUrl === target.sourceUrl &&
+                                                                        m.startSec === target.startSec &&
+                                                                        m.endSec === target.endSec
+                                                                    ))
+                                                                );
+                                                            });
+                                                        }
+                                                    } catch (e) {
+                                                        console.error(e);
+                                                    }
+                                                }}
+                                                showDelete={user?.id === group.main.userId}
+                                                onPlayFull={() => {
+                                                    router.push(`/room/view?url=${encodeURIComponent(group.main.sourceUrl)}`);
+                                                }}
+                                                onPlayMoment={playMoment}
+                                                onPauseMoment={handlePauseMoment}
+                                                currentTime={isSpotify ? spotifyProgress.current : playbackState.current}
+                                                activeMomentId={activeMoment?.id}
+                                                isPlaying={isPlaying}
+                                                currentUserId={user?.id || ''}
+                                                currentUser={user ? { id: user.id, name: user.email, image: null } : undefined}
+                                                onReply={(momentId, username) => {
+                                                    setReplyingTo({ id: momentId, username });
+                                                    noteInputRef.current?.focus();
+                                                }}
+                                                onRefresh={fetchMoments}
+                                                onNewReply={handleNewReply}
+                                            />
+                                        );
+                                    })
+                            )}
                         </div>
                     </div>
-                </div >
-            </div >
-        </main >
+
+
+                </div>
+            </section>
+        </main>
     );
 }

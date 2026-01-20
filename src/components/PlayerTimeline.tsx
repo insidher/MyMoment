@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Moment } from '@/types';
 import { Chapter } from '@/lib/chapters';
 import { Plus, Square, Volume2, X, Star, Check, MessageSquare, Play, Pause, Trash2, ChevronDown, ChevronUp, Heart, Send, Pencil, Wrench } from 'lucide-react';
@@ -133,15 +134,24 @@ export default function PlayerTimeline({
     };
     const [draggingMarker, setDraggingMarker] = useState<'start' | 'end' | 'range' | null>(null);
     const [dragStartMouseX, setDragStartMouseX] = useState<number | null>(null); // To detect click vs drag
-    const [isHoveringButton, setIsHoveringButton] = useState(false);
     const [isEditorOpen, setIsEditorOpen] = useState(false);
     const [isHoveringRange, setIsHoveringRange] = useState(false);
 
-    const [showFloatingBtn, setShowFloatingBtn] = useState(false);
-    const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
-    const leaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+    // Mobile-First Draft State
+    const [draftMoment, setDraftMoment] = useState<{ start: number; end: number } | null>(null);
+    const [isDraggingDraft, setIsDraggingDraft] = useState(false);
+    const [showConfirmation, setShowConfirmation] = useState(false);
+
     const dragStartXRef = useRef<number>(0);
     const dragStartTimeRef = useRef<{ start: number, end: number } | null>(null);
+    const justDraggedRef = useRef<boolean>(false); // Track if we just finished dragging
+
+    // Smart Duration Calculation
+    const calculateDraftDuration = (totalDuration: number): number => {
+        // < 10 mins (600s) → 30s default
+        // >= 10 mins → 2 mins (120s) default
+        return totalDuration < 600 ? 30 : 120;
+    };
 
     const timelineRef = useRef<HTMLDivElement>(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -173,7 +183,9 @@ export default function PlayerTimeline({
         draggingMarker,
         duration, // Raw duration
         safeDuration,
-        timelineRect: null as DOMRect | null
+        timelineRect: null as DOMRect | null,
+        isDraggingDraft,
+        draftMoment
     });
 
     // Update ref on every render
@@ -184,9 +196,11 @@ export default function PlayerTimeline({
             draggingMarker,
             duration,
             safeDuration,
-            timelineRect: timelineRef.current?.getBoundingClientRect() || null
+            timelineRect: timelineRef.current?.getBoundingClientRect() || null,
+            isDraggingDraft,
+            draftMoment
         };
-    }, [startSec, endSec, draggingMarker, duration, safeDuration]);
+    }, [startSec, endSec, draggingMarker, duration, safeDuration, isDraggingDraft, draftMoment]);
 
     // Stabilize callback
     const onCaptureUpdateRef = useRef(onCaptureUpdate);
@@ -198,7 +212,7 @@ export default function PlayerTimeline({
     // Global Drag & Hover Handlers (Permanent Listener)
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {
-            const { startSec, endSec, draggingMarker, safeDuration } = stateRef.current;
+            const { startSec, endSec, draggingMarker, safeDuration, isDraggingDraft, draftMoment } = stateRef.current;
 
             // Re-implement getTimeFromX inline or using ref data
             let time = 0;
@@ -217,8 +231,12 @@ export default function PlayerTimeline({
                 time = Math.floor(percent * effectiveDuration);
             }
 
-            // Store current rect width for range calculation if needed (or just get it fresh there too)
-            // For now, let's keep it simple.
+            // DRAFT DRAGGING LOGIC
+            if (isDraggingDraft && draftMoment) {
+                const newEnd = Math.max(draftMoment.start + 1, Math.min(time, safeDuration));
+                setDraftMoment({ ...draftMoment, end: newEnd });
+                return;
+            }
 
             // GLOBAL TRACKING FOR STICKY BRACKET
             if (startSec !== null && endSec === null && !draggingMarker) {
@@ -267,48 +285,69 @@ export default function PlayerTimeline({
         };
 
         const handleMouseUp = () => {
+            const { isDraggingDraft } = stateRef.current;
+            if (isDraggingDraft) {
+                setIsDraggingDraft(false);
+                setShowConfirmation(true); // Trigger confirmation modal
+                justDraggedRef.current = true; // Mark that we just dragged
+                // Reset the flag after a short delay
+                setTimeout(() => {
+                    justDraggedRef.current = false;
+                }, 100);
+            }
             setDraggingMarker(null);
+        };
+
+        const handleTouchMove = (e: TouchEvent) => {
+            const { isDraggingDraft, draftMoment, safeDuration } = stateRef.current;
+            if (!isDraggingDraft || !draftMoment) return;
+            const touch = e.touches[0];
+            if (!touch) return;
+
+            const rect = timelineRef.current?.getBoundingClientRect();
+            if (!rect) return;
+
+            const x = touch.clientX - rect.left;
+            const width = rect.width;
+            const percent = Math.max(0, Math.min(1, x / width));
+            const effectiveDuration = safeDuration > 1 ? safeDuration : 180;
+            const time = Math.floor(percent * effectiveDuration);
+
+            const newEnd = Math.max(draftMoment.start + 1, Math.min(time, safeDuration));
+            setDraftMoment({ ...draftMoment, end: newEnd });
         };
 
         window.addEventListener('mousemove', handleMouseMove);
         window.addEventListener('mouseup', handleMouseUp);
+        window.addEventListener('touchmove', handleTouchMove, { passive: false });
+        window.addEventListener('touchend', handleMouseUp);
 
         return () => {
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
+            window.removeEventListener('touchmove', handleTouchMove);
+            window.removeEventListener('touchend', handleMouseUp);
         };
     }, []); // EMPTY DEPENDENCY ARRAY - Permanent Listeners!
 
-    // Handle hover delay for button
+    // Prevent body scroll when confirmation modal is open
     useEffect(() => {
-        if (isHovering) {
-            hoverTimerRef.current = setTimeout(() => {
-                setShowFloatingBtn(true);
-            }, 1000);
-        } else {
-            if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-            setShowFloatingBtn(false);
+        if (showConfirmation) {
+            // Save current scroll position
+            const scrollY = window.scrollY;
+            document.body.style.position = 'fixed';
+            document.body.style.top = `-${scrollY}px`;
+            document.body.style.width = '100%';
+
+            return () => {
+                // Restore scroll position
+                document.body.style.position = '';
+                document.body.style.top = '';
+                document.body.style.width = '';
+                window.scrollTo(0, scrollY);
+            };
         }
-
-        return () => {
-            if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-        };
-    }, [isHovering]);
-
-    // Derived Logic for Floating Button
-    const getButtonState = () => {
-        if (!isHovering && !hoverTime) return null;
-        const time = hoverTime || 0; // Cursor time
-
-        // 1. Idle (No Start Set) -> "Start Moment"
-        if (startSec === null) {
-            return { label: 'Start Moment', action: 'start', time };
-        }
-
-        return null; // When capturing, we use the sticky bracket, no floating button
-    };
-
-    const buttonState = getButtonState();
+    }, [showConfirmation]);
 
     return (
         <div className="space-y-2 relative">
@@ -326,17 +365,6 @@ export default function PlayerTimeline({
                 <div
                     ref={timelineRef}
                     className="flex-1 h-3 relative cursor-pointer" // made taller (h-3) for easier interaction
-                    onMouseEnter={() => {
-                        setIsHovering(true);
-                        if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
-                    }}
-                    onMouseLeave={() => {
-                        // Delay leaving to allow bridging to button
-                        leaveTimerRef.current = setTimeout(() => {
-                            setIsHovering(false);
-                            setHoverTime(null);
-                        }, 300);
-                    }}
                     onMouseMove={(e) => {
                         // Use timelineRef for consistent calculation
                         if (!timelineRef.current) return;
@@ -349,6 +377,21 @@ export default function PlayerTimeline({
                     onClick={(e) => {
                         const time = getTimeFromX(e.clientX);
 
+                        // CLICK-TO-DRAFT LOGIC
+                        // Ignore if we just finished dragging
+                        if (justDraggedRef.current) return;
+
+                        // Ignore if already dragging
+                        if (isDraggingDraft) return;
+
+                        // If draft exists, reposition it
+                        if (draftMoment) {
+                            const defaultDuration = calculateDraftDuration(safeDuration);
+                            const endTime = Math.min(time + defaultDuration, safeDuration);
+                            setDraftMoment({ start: time, end: endTime });
+                            return;
+                        }
+
                         // If in Capture Mode (Start Set, End Not Set), THIS CLICK sets the end
                         if (startSec !== null && endSec === null) {
                             // Ensure End > Start
@@ -359,6 +402,11 @@ export default function PlayerTimeline({
                                 // Let's just seek for now to let them find a new spot, or maybe specific cancel logic?
                                 onSeek(time);
                             }
+                        } else if (startSec === null && endSec === null) {
+                            // CREATE DRAFT: Click-to-Draft Flow
+                            const defaultDuration = calculateDraftDuration(safeDuration);
+                            const endTime = Math.min(time + defaultDuration, safeDuration);
+                            setDraftMoment({ start: time, end: endTime });
                         } else {
                             // Normal Seek
                             onSeek(time);
@@ -587,64 +635,52 @@ export default function PlayerTimeline({
                     })}
 
 
-                    {/* FLOATING ACTION BUTTON */}
-                    {buttonState && !draggingMarker && showFloatingBtn && (
+                    {/* DRAFT MOMENT VISUALIZATION */}
+                    {draftMoment && (
                         <>
-                            {/* Faint Vertical Line */}
+                            {/* Draft Background Fill */}
                             <div
-                                className="absolute top-0 bottom-0 w-[1px] bg-white/20 pointer-events-none z-40"
-                                style={{ left: `${(buttonState.time / safeDuration) * 100}%` }}
-                            />
-
-                            <div
-                                className="absolute z-[60] cursor-pointer transition-transform duration-300 ease-out" // pointer-events-auto implicitly
-                                onMouseEnter={() => {
-                                    if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
-                                    setIsHovering(true); // Ensure it stays active
-                                    setIsHoveringButton(true);
-                                }}
-                                onMouseLeave={() => {
-                                    setIsHoveringButton(false);
-                                    leaveTimerRef.current = setTimeout(() => {
-                                        setIsHovering(false);
-                                        setHoverTime(null);
-                                    }, 300);
-                                }}
-                                onClick={(e) => {
-                                    e.stopPropagation(); // Prevent Seek
-                                    if (buttonState.action === 'start') {
-                                        onCaptureStart?.(buttonState.time);
-                                    } else if (buttonState.action === 'end') {
-                                        onCaptureEnd?.(buttonState.time);
-                                    } else if (buttonState.action === 'stop') {
-                                        onCaptureEnd?.(buttonState.time);
-                                    }
-                                }}
+                                className="absolute top-0 bottom-0 z-30 bg-blue-500/20 border-l-2 border-blue-500"
                                 style={{
-                                    left: `${(buttonState.time / safeDuration) * 100}%`,
-                                    top: '100%',
-                                    // Adjusted Y to ensure pointer touches track bottom (h-3 track)
-                                    // 2px ensures tip touches.
-                                    transform: `translateX(-50%) translateY(${isHoveringButton ? '-2px' : '2px'})`
+                                    left: `${(draftMoment.start / safeDuration) * 100}%`,
+                                    width: `${((draftMoment.end - draftMoment.start) / safeDuration) * 100}%`
                                 }}
                             >
-                                <div className={`relative
-                                    flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold shadow-lg backdrop-blur-md border transition-all duration-300 whitespace-nowrap
-                                    ${buttonState.action === 'stop' || buttonState.action === 'end'
-                                        ? 'bg-red-500 border-red-400 text-white'
-                                        : (isHoveringButton ? 'bg-orange-500 border-orange-400 text-black' : 'bg-white/10 border-white/20 text-white')}
-                                `}>
-                                    {/* Tic Pointer */}
-                                    <div className={`absolute -top-[5px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-b-[5px] transition-colors duration-300
-                                        ${buttonState.action === 'stop' || buttonState.action === 'end'
-                                            ? 'border-b-red-500'
-                                            : (isHoveringButton ? 'border-b-orange-500' : 'border-b-white/20')}
-                                    `} />
+                                {/* "Edit Moment" Button (Reused from existing design) - Hidden while dragging */}
+                                {!isDraggingDraft && (
+                                    <div
+                                        className="absolute inset-0 flex items-center justify-center bg-black/40 pointer-events-auto cursor-pointer transition-all duration-200 hover:bg-black/60"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            // Trigger save flow
+                                            onCaptureStart?.(draftMoment.start);
+                                            onCaptureEnd?.(draftMoment.end);
+                                            setDraftMoment(null);
+                                            setIsEditorOpen(true);
+                                        }}
+                                    >
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-blue-300 whitespace-nowrap">
+                                            {((draftMoment.end - draftMoment.start) / safeDuration) * 100 < 15 ? 'Edit' : 'Edit Moment'}
+                                        </span>
+                                    </div>
+                                )}
 
-                                    {buttonState.action === 'start' && <Plus size={10} />}
-                                    {buttonState.action === 'stop' && <Square size={8} className="fill-current animate-pulse" />}
-                                    {buttonState.action === 'end' && <span className="font-mono">{'}'}</span>}
-                                    {buttonState.label}
+                                {/* Drag Handle (End Time) */}
+                                <div
+                                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-40 cursor-ew-resize"
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setIsDraggingDraft(true);
+                                    }}
+                                    onTouchStart={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setIsDraggingDraft(true);
+                                    }}
+                                    style={{ padding: '14px' }} // 40px touch target (14px padding * 2 + 12px circle)
+                                >
+                                    <div className="w-3 h-3 rounded-full bg-blue-500 border-2 border-white shadow-lg animate-pulse" />
                                 </div>
                             </div>
                         </>
@@ -656,9 +692,9 @@ export default function PlayerTimeline({
                 </span>
             </div>
 
-            {/* Note Editor Popover */}
+            {/* Note Editor Popover - Only on Mobile (hidden on desktop where it's in sidebar) */}
             {isEditorOpen && (
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-4 p-4 bg-zinc-900/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl animate-in fade-in slide-in-from-top-2 z-50 min-w-[340px]">
+                <div className="lg:hidden absolute top-full left-1/2 -translate-x-1/2 mt-4 p-4 bg-zinc-900/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl animate-in fade-in slide-in-from-top-2 z-50 min-w-[340px]">
                     <div className="flex flex-col gap-3">
                         {/* Header: User & Context */}
                         <div className="flex items-center justify-between">
@@ -756,6 +792,46 @@ export default function PlayerTimeline({
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Confirmation Modal (Click-to-Draft Flow) */}
+            {showConfirmation && draftMoment && createPortal(
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] animate-in fade-in duration-200">
+                    <div className="bg-zinc-900 border border-white/10 rounded-xl p-6 max-w-sm mx-4 animate-in zoom-in-95 duration-200">
+                        <h3 className="text-lg font-bold mb-2">Complete Capture?</h3>
+                        <p className="text-sm text-white/60 mb-4">
+                            {formatTime(draftMoment.start)} - {formatTime(draftMoment.end)}
+                            <span className="block text-xs text-white/40 mt-1">
+                                Duration: {formatTime(draftMoment.end - draftMoment.start)}
+                            </span>
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => {
+                                    setShowConfirmation(false);
+                                    // Keep draft active for further adjustment
+                                }}
+                                className="flex-1 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-sm font-medium"
+                            >
+                                Keep Editing
+                            </button>
+                            <button
+                                onClick={() => {
+                                    // Trigger save flow
+                                    onCaptureStart?.(draftMoment.start);
+                                    onCaptureEnd?.(draftMoment.end);
+                                    setShowConfirmation(false);
+                                    setDraftMoment(null);
+                                    setIsEditorOpen(true);
+                                }}
+                                className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg font-bold transition-colors text-sm"
+                            >
+                                Continue
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
             )}
 
             {/* Unified Labels (Chapters & Moments) */}

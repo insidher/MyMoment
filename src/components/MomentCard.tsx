@@ -191,24 +191,24 @@ export default function MomentCard({
         <div className={`relative group transition-all duration-300 min-w-0 ${isDeleting ? 'scale-90 opacity-0' : 'scale-100 opacity-100'}`}>
             {showCommentInput && (
                 <div
-                    className="absolute inset-x-0 bottom-0 z-50 bg-black/90 p-3 backdrop-blur-md animate-in slide-in-from-bottom-2 duration-200 border-t border-white/10"
+                    className="absolute inset-x-0 bottom-0 z-50 bg-black/90 p-2 backdrop-blur-md animate-in slide-in-from-bottom-2 duration-200 border-t border-white/10"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <form onSubmit={handlePostComment} className="w-full flex gap-2 items-center">
+                    <form onSubmit={handlePostComment} className="w-full flex gap-1.5 items-center">
                         <input
                             autoFocus
                             type="text"
                             placeholder="Write a reply..."
-                            className="flex-1 bg-white/10 border border-white/10 rounded-full px-4 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                            className="flex-1 bg-white/10 border border-white/10 rounded-full px-3 py-1.5 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                             value={commentText}
                             onChange={(e) => setCommentText(e.target.value)}
                         />
                         <button
                             type="submit"
                             disabled={isPostingComment || !commentText.trim()}
-                            className="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="p-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            <Send size={14} />
+                            <Send size={12} />
                         </button>
                         <button
                             type="button"
@@ -216,9 +216,9 @@ export default function MomentCard({
                                 e.stopPropagation();
                                 setShowCommentInput(false);
                             }}
-                            className="p-2 text-white/60 hover:text-white"
+                            className="p-1.5 text-white/60 hover:text-white"
                         >
-                            <X size={16} />
+                            <X size={14} />
                         </button>
                     </form>
                 </div>
@@ -236,23 +236,23 @@ export default function MomentCard({
                 }}
             >
                 {/* Header Bar - User Info & Actions */}
-                <div className="flex items-center justify-between px-4 py-2 bg-black/40 border-b border-white/5">
+                <div className="flex items-center justify-between px-3 py-1.5 bg-black/40 border-b border-white/5">
                     {/* User Info - Left */}
-                    <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-[10px] font-bold shrink-0 overflow-hidden">
+                    <div className="flex items-center gap-1.5">
+                        <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-[9px] font-bold shrink-0 overflow-hidden">
                             {moment.user?.image ? (
                                 <img src={moment.user.image} alt={moment.user?.name || 'User'} className="w-full h-full object-cover" />
                             ) : (
                                 (moment.user?.name?.[0] || 'M')
                             )}
                         </div>
-                        <span className="text-xs font-medium text-white/80">
+                        <span className="text-[11px] font-medium text-white/80">
                             {moment.user?.name || 'Music Lover'} <span className="text-purple-400 font-mono ml-1" title="Debug ID">{moment.id.slice(0, 8)}</span>
                         </span>
                     </div>
 
                     {/* Actions - Right */}
-                    <div className="flex gap-1.5 pointer-events-auto">
+                    <div className="flex gap-1 pointer-events-auto">
                         {/* Toggle Replies (Stacked Feed) */}
                         {(replyCount > 0) && (
                             <button
@@ -260,15 +260,15 @@ export default function MomentCard({
                                     e.stopPropagation();
                                     if (onToggleReplies) onToggleReplies();
                                 }}
-                                className={`p-1.5 rounded-full bg-black/40 transition-all backdrop-blur-md flex items-center gap-1.5
+                                className={`p-1 rounded-full bg-black/40 transition-all backdrop-blur-md flex items-center gap-1
                                     ${onToggleReplies ? 'hover:bg-blue-500/20 cursor-pointer' : 'cursor-default opacity-80'}
                                     ${isRepliesExpanded ? 'text-blue-300 bg-blue-500/10' : 'text-blue-200'}
                                 `}
                                 title={onToggleReplies ? (isRepliesExpanded ? "Hide Replies" : "Show Replies") : `${replyCount} Replies`}
                             >
-                                <MessageSquare size={14} className="fill-current" />
-                                <span className="text-[10px] font-bold">{replyCount}</span>
-                                {onToggleReplies && (isRepliesExpanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
+                                <MessageSquare size={12} className="fill-current" />
+                                <span className="text-[9px] font-bold">{replyCount}</span>
+                                {onToggleReplies && (isRepliesExpanded ? <ChevronUp size={9} /> : <ChevronDown size={9} />)}
                             </button>
                         )}
 
@@ -281,10 +281,11 @@ export default function MomentCard({
                                     e.stopPropagation();
                                     setShowCommentInput(!showCommentInput);
                                 }}
-                                className="px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 text-blue-200 transition-colors"
+                                className="p-1 rounded-full bg-black/40 hover:bg-white/10 text-blue-200 transition-colors flex items-center gap-1"
                                 title="Add a comment"
                             >
-                                <span className="text-xs font-medium">Add comment</span>
+                                <MessageSquare size={12} />
+                                <span className="text-[10px] font-medium">Reply</span>
                             </button>
                         )}
 
@@ -294,15 +295,15 @@ export default function MomentCard({
                                 <button
                                     onClick={handleLike}
                                     disabled={isLiking}
-                                    className={`p-1.5 rounded-full bg-black/40 transition-all backdrop-blur-md flex items-center gap-1.5
+                                    className={`p-1 rounded-full bg-black/40 transition-all backdrop-blur-md flex items-center gap-1
                                         ${liked ? 'text-pink-500 hover:bg-pink-500/10' : 'text-white/40 hover:text-pink-400 hover:bg-pink-500/20'}
                                     `}
                                 >
-                                    <Heart size={14} className={liked ? 'fill-current' : ''} />
+                                    <Heart size={12} className={liked ? 'fill-current' : ''} />
                                     {likeCount > 0 ? (
-                                        <span className="text-[10px] font-bold">{likeCount}</span>
+                                        <span className="text-[9px] font-bold">{likeCount}</span>
                                     ) : (
-                                        <span className="text-[10px] font-medium opacity-50">0</span>
+                                        <span className="text-[9px] font-medium opacity-50">0</span>
                                     )}
                                 </button>
 
@@ -357,32 +358,32 @@ export default function MomentCard({
                         {showDelete && onDelete && (
                             <button
                                 onClick={handleDeleteWrapper}
-                                className="p-1.5 rounded-full bg-black/40 text-white/40 hover:text-white hover:bg-red-500/20 transition-all backdrop-blur-md opacity-0 group-hover:opacity-100"
+                                className="p-1 rounded-full bg-black/40 text-white/40 hover:text-white hover:bg-red-500/20 transition-all backdrop-blur-md opacity-0 group-hover:opacity-100"
                             >
-                                <X size={14} />
+                                <X size={12} />
                             </button>
                         )}
                     </div>
                 </div>
 
                 {/* Main Content Area */}
-                <div className="p-4">
+                <div className="p-2.5">
                     {/* Track Info */}
-                    <div className="flex items-center gap-3 mb-3 group/track">
+                    <div className="flex items-center gap-2 mb-2 group/track">
                         {/* Service Logo */}
                         {moment.service === 'spotify' && (
-                            <svg className="w-5 h-5 flex-shrink-0 opacity-75" viewBox="0 0 24 24" fill="#1DB954">
+                            <svg className="w-4 h-4 flex-shrink-0 opacity-75" viewBox="0 0 24 24" fill="#1DB954">
                                 <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
                             </svg>
                         )}
                         {moment.service === 'youtube' && (
-                            <svg className="w-5 h-5 flex-shrink-0 opacity-75" viewBox="0 0 24 24" fill="#FF0000">
+                            <svg className="w-4 h-4 flex-shrink-0 opacity-75" viewBox="0 0 24 24" fill="#FF0000">
                                 <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
                             </svg>
                         )}
 
                         {/* Tiny Artwork */}
-                        <div className="w-14 h-14 rounded-md bg-black/50 overflow-hidden flex-shrink-0 relative opacity-80 group-hover/track:opacity-100 transition-opacity">
+                        <div className="w-10 h-10 rounded-md bg-black/50 overflow-hidden flex-shrink-0 relative opacity-80 group-hover/track:opacity-100 transition-opacity">
                             {trackCardData.artwork ? (
                                 <img src={trackCardData.artwork} alt={trackCardData.title || 'Track artwork'} className="w-full h-full object-cover" />
                             ) : (
@@ -401,7 +402,7 @@ export default function MomentCard({
 
                     {/* Note Section - Separate Container */}
                     {moment.note && (
-                        <div className="mb-3 p-3 bg-black/20 rounded-lg border border-white/5">
+                        <div className="mb-2 p-2 bg-black/20 rounded-lg border border-white/5">
                             <div className="relative">
                                 <span className="absolute -top-2 -left-1 text-3xl text-white/10 font-serif leading-none">"</span>
                                 <div className="pl-3">
@@ -444,13 +445,13 @@ export default function MomentCard({
 
 
                     {/* Moment Timeline & Pill */}
-                    <div className="mt-1 flex flex-col gap-1 pointer-events-auto">
+                    <div className="mt-0.5 flex flex-col gap-0.5 pointer-events-auto">
                         {/* Full Track Strip (only if duration known) */}
                         {showMiniTimeline ? (
                             <div className="relative w-full mb-1 flex flex-col">
                                 {/* Aligned Pill Container (Moved Above) */}
-                                <div className="mb-2 relative flex items-center justify-between">
-                                    <div className="relative flex-1 h-7">
+                                <div className="mb-1.5 relative flex items-center justify-between">
+                                    <div className="relative flex-1 h-5">
                                         {effectiveDuration === 0 ? (
                                             <div className="absolute bottom-0 left-0 w-full h-full bg-white/5 animate-pulse rounded-full border border-white/10 flex items-center px-3 gap-2">
                                                 <div className="w-2 h-2 rounded-full bg-orange-500/40" />
@@ -476,7 +477,7 @@ export default function MomentCard({
                                                                 router.push(`/room/view?url=${encodeURIComponent(moment.sourceUrl)}&t=${moment.startSec}`);
                                                             }
                                                         }}
-                                                        className={`cursor-pointer inline-flex items-center justify-center gap-1 rounded-full px-3 py-1 text-[11px] font-mono min-w-[110px] transition-colors group/pill relative overflow-hidden
+                                                        className={`cursor-pointer inline-flex items-center justify-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-mono min-w-[100px] transition-colors group/pill relative overflow-hidden
                                                         ${isActive
                                                                 ? 'bg-orange-500/20 border border-yellow-400 hover:bg-orange-500/30'
                                                                 : 'bg-orange-500/20 border border-orange-500/40 hover:bg-orange-500/30'
@@ -514,7 +515,7 @@ export default function MomentCard({
                                 </div>
 
                                 {/* Gray Track Bar - Improved Visibility */}
-                                <div className="h-1.5 w-full bg-white/5 rounded-full relative overflow-hidden ring-1 ring-white/5">
+                                <div className="h-1 w-full bg-white/5 rounded-full relative overflow-hidden ring-1 ring-white/5">
                                     {/* Orange Moment Segment */}
                                     <div
                                         className={`absolute inset-y-0 rounded-full transition-colors bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.4)]`}
@@ -526,7 +527,7 @@ export default function MomentCard({
                                 </div>
 
                                 {/* Time Labels */}
-                                <div className="flex justify-between text-[10px] text-white/30 font-mono px-0.5 mt-1.5 font-medium">
+                                <div className="flex justify-between text-[9px] text-white/30 font-mono px-0.5 mt-1 font-medium">
                                     <span>0:00</span>
                                     <span>{formatTime(effectiveDuration)}</span>
                                 </div>

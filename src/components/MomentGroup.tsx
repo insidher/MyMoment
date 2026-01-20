@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Moment } from '@/types';
 import MomentCard from '@/components/MomentCard';
 import { ChevronDown, ChevronUp, MessageCircle, Loader2, Send, X } from 'lucide-react';
@@ -77,6 +77,19 @@ export default function MomentGroup({
             }
         );
 
+    // Auto-Expand Logic: Track reply count and auto-open drawer when new Level 2 comments arrive
+    // Initialize with current length so it doesn't auto-open on initial page load
+    const prevReplyCount = useRef(allReplies.length);
+
+    useEffect(() => {
+        // If the reply count has increased, auto-expand the drawer
+        if (allReplies.length > prevReplyCount.current) {
+            setIsExpanded(true);
+        }
+        // Update the ref to the current count for next comparison
+        prevReplyCount.current = allReplies.length;
+    }, [allReplies.length]);
+
     const handleMainReplySubmit = async () => {
         if (!replyText.trim()) return;
 
@@ -139,7 +152,7 @@ export default function MomentGroup({
     };
 
     return (
-        <div className="space-y-2 min-w-0">
+        <div className="space-y-1 min-w-0">
             {/* Main Moment Card - Always Visible */}
             <div className="relative">
                 <MomentCard
@@ -164,11 +177,11 @@ export default function MomentGroup({
 
             {/* Inline Reply Input for Main Moment */}
             {isReplying && (
-                <div className="mt-4 px-4">
+                <div className="mt-2 px-3">
                     <div className="relative">
                         <div className="absolute left-[-0.5rem] top-[-0.5rem] w-3 h-3 border-l text-white/10" /> {/* Visual connector hint */}
 
-                        <div className="glass-panel p-2 bg-black/40 border border-white/10 flex items-center gap-2">
+                        <div className="glass-panel p-1.5 bg-black/40 border border-white/10 flex items-center gap-2">
                             <input
                                 autoFocus
                                 type="text"
@@ -206,11 +219,11 @@ export default function MomentGroup({
 
             {/* Expanded Thread View */}
             {isExpanded && allReplies.length > 0 && (
-                <div className="pl-6 space-y-2 relative">
+                <div className="pl-4 space-y-1 relative">
                     {/* Thread Line */}
                     <div className="absolute left-3 top-0 bottom-4 w-0.5 bg-white/10" />
 
-                    <div className="space-y-4">
+                    <div className="space-y-2">
                         {allReplies.map((reply) => (
                             <ThreadComment
                                 key={reply.id}

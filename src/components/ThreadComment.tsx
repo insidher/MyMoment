@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Moment } from '@/types';
 import { MessageCircle, X, Send, Loader2 } from 'lucide-react';
 import { createComment } from '../../app/actions/moments';
@@ -47,6 +47,19 @@ export default function ThreadComment({ comment, currentUserId, onReply, onRefre
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     const hasReplies = allReplies.length > 0;
+
+    // Auto-Expand Logic: Track reply count and auto-open drawer when new replies arrive
+    // Initialize with current length so it doesn't auto-open on initial page load
+    const prevReplyCount = useRef(allReplies.length);
+
+    useEffect(() => {
+        // If the reply count has increased, auto-expand the drawer
+        if (allReplies.length > prevReplyCount.current) {
+            setShowReplies(true);
+        }
+        // Update the ref to the current count for next comparison
+        prevReplyCount.current = allReplies.length;
+    }, [allReplies.length]);
 
     const handleReplySubmit = async () => {
         if (!replyText.trim()) return;
@@ -102,9 +115,9 @@ export default function ThreadComment({ comment, currentUserId, onReply, onRefre
             <div className="absolute left-[-1.5rem] top-6 w-4 h-0.5 bg-white/10" />
 
             {/* LEVEL 2 CARD (The Comment) */}
-            <div className="glass-panel p-3 bg-black/20 hover:bg-white/5 transition-colors">
-                <div className="flex gap-3 items-start">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold shrink-0">
+            <div className="glass-panel p-2 bg-black/20 hover:bg-white/5 transition-colors">
+                <div className="flex gap-2 items-start">
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold shrink-0">
                         {comment.user?.image ? (
                             <img src={comment.user.image} alt={comment.user.name || 'User'} className="w-full h-full rounded-full" />
                         ) : (
@@ -122,7 +135,7 @@ export default function ThreadComment({ comment, currentUserId, onReply, onRefre
                         <p className="text-sm text-white/80 break-words">{comment.note || 'No comment'}</p>
 
                         {/* Action Bar (Only for Level 2) */}
-                        <div className="flex items-center gap-4 mt-2">
+                        <div className="flex items-center gap-3 mt-1.5">
                             <button
                                 onClick={() => setIsReplying(!isReplying)}
                                 className={`text-xs flex items-center gap-1 transition-colors ${isReplying ? 'text-white' : 'text-white/40 hover:text-white'}`}
@@ -146,7 +159,7 @@ export default function ThreadComment({ comment, currentUserId, onReply, onRefre
 
             {/* INLINE INPUT (Appears under Level 2) */}
             {isReplying && (
-                <div className="mt-3 pl-4 border-l-2 border-white/10">
+                <div className="mt-2 pl-3 border-l-2 border-white/10">
                     <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
                         <textarea
                             autoFocus
@@ -159,7 +172,7 @@ export default function ThreadComment({ comment, currentUserId, onReply, onRefre
                                 }
                             }}
                             placeholder={`Reply to ${comment.user?.name}...`}
-                            className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-white/30 resize-none min-h-[80px]"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-white/30 resize-none min-h-[60px]"
                         />
                         <div className="flex justify-end gap-2">
                             <button
@@ -183,10 +196,10 @@ export default function ThreadComment({ comment, currentUserId, onReply, onRefre
 
             {/* LEVEL 3 REPLIES (Rendered recursively, but NO reply buttons here) */}
             {showReplies && hasReplies && (
-                <div className="mt-3 pl-4 border-l-2 border-white/10 space-y-3">
+                <div className="mt-2 pl-3 border-l-2 border-white/10 space-y-2">
                     {allReplies.map((reply) => (
                         <div key={reply.id} className="relative animate-in fade-in slide-in-from-top-1">
-                            <div className="glass-panel p-3 bg-black/40 border border-white/5">
+                            <div className="glass-panel p-2 bg-black/40 border border-white/5">
                                 <div className="flex gap-3 items-start">
                                     <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-500 to-cyan-500 flex items-center justify-center text-[10px] font-bold shrink-0">
                                         {reply.user?.image ? (

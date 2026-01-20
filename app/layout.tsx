@@ -24,7 +24,7 @@ export default function RootLayout({
                 <AuthProvider>
                     <FilterProvider>
                         <Navbar />
-                        <div className="pt-28">
+                        <div className="pt-14">
                             {children}
                         </div>
                         <Toaster position="bottom-right" />

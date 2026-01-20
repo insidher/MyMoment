@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Sparkles, Compass, User, LogOut, Search, Music } from 'lucide-react';
+import { Sparkles, Compass, User, LogOut, Search, Music, Home, Menu } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useFilter } from '@/context/FilterContext';
 import { useState } from 'react';
@@ -13,6 +13,7 @@ export default function Navbar() {
     const { user, signOut } = useAuth();
     const { showSpotify, toggleSpotify } = useFilter();
     const [searchQuery, setSearchQuery] = useState('');
+    const [showMenu, setShowMenu] = useState(false);
 
     const isActive = (path: string) => pathname === path;
 
@@ -20,13 +21,9 @@ export default function Navbar() {
         e.preventDefault();
         if (!searchQuery.trim()) return;
 
-        // Simple heuristic: if it looks like a URL, go to room view. Otherwise, explore.
-        // For now, let's assume it's a URL for "paste another link" request.
-        // We can refine this later or make it explicit.
         if (searchQuery.includes('.') || searchQuery.includes('http')) {
             router.push(`/room/view?url=${encodeURIComponent(searchQuery)}`);
         } else {
-            // Fallback to explore/search if we had one, or just try to play it as a query
             router.push(`/explore?q=${encodeURIComponent(searchQuery)}`);
         }
         setSearchQuery('');
@@ -35,15 +32,54 @@ export default function Navbar() {
     return (
         <nav className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-b border-white/5">
             <div className="max-w-7xl mx-auto px-4">
-                {/* Top Row: Logo, Search, User */}
-                <div className="h-16 flex items-center justify-between gap-4">
-                    {/* Logo */}
-                    <Link href="/" className="flex items-center gap-2 group flex-shrink-0">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <Sparkles size={18} className="text-white" />
-                        </div>
-                        <span className="font-bold text-xl tracking-tight hidden sm:block">Moments</span>
-                    </Link>
+                {/* Single Row: Logo with Menu, Search, User */}
+                <div className="h-14 flex items-center justify-between gap-4">
+                    {/* Logo with Dropdown Menu */}
+                    <div className="relative flex-shrink-0">
+                        <button
+                            onClick={() => setShowMenu(!showMenu)}
+                            className="flex items-center gap-2 group"
+                        >
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <Sparkles size={18} className="text-white" />
+                            </div>
+                            <span className="font-bold text-xl tracking-tight hidden sm:block">Moments</span>
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {showMenu && (
+                            <>
+                                <div
+                                    className="fixed inset-0 z-40"
+                                    onClick={() => setShowMenu(false)}
+                                />
+                                <div className="absolute top-full left-0 mt-2 w-48 bg-black/95 backdrop-blur-xl border border-white/10 rounded-lg shadow-xl z-50 overflow-hidden">
+                                    <Link
+                                        href="/"
+                                        onClick={() => setShowMenu(false)}
+                                        className={`flex items-center gap-3 px-4 py-3 text-sm transition-colors ${isActive('/')
+                                                ? 'bg-white/10 text-white'
+                                                : 'text-white/70 hover:bg-white/5 hover:text-white'
+                                            }`}
+                                    >
+                                        <Home size={16} />
+                                        Home
+                                    </Link>
+                                    <Link
+                                        href="/explore"
+                                        onClick={() => setShowMenu(false)}
+                                        className={`flex items-center gap-3 px-4 py-3 text-sm transition-colors ${isActive('/explore')
+                                                ? 'bg-white/10 text-white'
+                                                : 'text-white/70 hover:bg-white/5 hover:text-white'
+                                            }`}
+                                    >
+                                        <Compass size={16} />
+                                        Explore
+                                    </Link>
+                                </div>
+                            </>
+                        )}
+                    </div>
 
                     {/* Search Bar (Centered) */}
                     <form onSubmit={handleSearch} className="flex-1 max-w-xl mx-4">
@@ -69,8 +105,8 @@ export default function Navbar() {
                                 <button
                                     onClick={toggleSpotify}
                                     className={`p-2 rounded-full transition-all ${showSpotify
-                                            ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                                            : 'bg-white/5 text-white/30 hover:bg-white/10 hover:text-white/50'
+                                        ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                                        : 'bg-white/5 text-white/30 hover:bg-white/10 hover:text-white/50'
                                         }`}
                                     title={showSpotify ? 'Hide Spotify moments' : 'Show Spotify moments'}
                                 >
@@ -98,31 +134,6 @@ export default function Navbar() {
                                 Sign In
                             </Link>
                         )}
-                    </div>
-                </div>
-
-                {/* Bottom Row: Navigation Links */}
-                <div className="h-10 flex items-center justify-center border-t border-white/5">
-                    <div className="flex items-center gap-1">
-                        <Link
-                            href="/"
-                            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${isActive('/')
-                                ? 'text-white bg-white/5'
-                                : 'text-white/50 hover:text-white hover:bg-white/5'
-                                }`}
-                        >
-                            Home
-                        </Link>
-                        <Link
-                            href="/explore"
-                            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-2 ${isActive('/explore')
-                                ? 'text-white bg-white/5'
-                                : 'text-white/50 hover:text-white hover:bg-white/5'
-                                }`}
-                        >
-                            <Compass size={12} />
-                            Explore
-                        </Link>
                     </div>
                 </div>
             </div>
