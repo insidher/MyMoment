@@ -15,11 +15,11 @@ export async function PATCH(
 
     try {
         const json = await request.json();
-        const { note } = json;
+        const { note, groupId } = json;
 
-        if (note === undefined) {
-            return NextResponse.json({ error: 'Note is required' }, { status: 400 });
-        }
+        const updates: any = { updated_at: new Date().toISOString() };
+        if (note !== undefined) updates.note = note;
+        if (groupId !== undefined) updates.group_id = groupId; // Support Peer-to-Peer grouping update
 
         //Verify ownership
         const { data: moment, error: fetchError } = await supabase
@@ -39,10 +39,7 @@ export async function PATCH(
         // Update
         const { data, error } = await supabase
             .from('moments')
-            .update({
-                note,
-                updated_at: new Date().toISOString()
-            })
+            .update(updates)
             .eq('id', id)
             .select()
             .single();

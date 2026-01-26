@@ -27,7 +27,7 @@ export default function Home() {
                 {/* Hero Text */}
                 <div className="space-y-4 animate-fade-in">
                     <h1 className="text-5xl md:text-7xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-white to-white/50">
-                        Capture the feeling.
+                        This is your moment.
                     </h1>
                     <p className="text-xl text-white/60 max-w-2xl mx-auto">
                         Save and share your favorite parts of songs and videos.
@@ -51,9 +51,10 @@ export default function Home() {
                         <button
                             type="submit"
                             disabled={!url.trim()}
-                            className="bg-white text-black p-3 rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-orange-900/30 hover:scale-105 active:scale-95"
+                            title="Submit"
                         >
-                            <ArrowRight size={24} />
+                            <ArrowRight size={20} strokeWidth={2.5} />
                         </button>
                     </div>
                 </form>

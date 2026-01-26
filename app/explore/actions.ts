@@ -508,6 +508,7 @@ export async function getTrackMoments(resourceId: string): Promise<Moment[]> {
             .select(`
             id,
             parent_id,
+            group_id,
             platform,
             resource_id,
             start_time,
@@ -573,6 +574,7 @@ export async function getTrackMoments(resourceId: string): Promise<Moment[]> {
         return moments.map((m: any) => ({
             id: m.id,
             parentId: m.parent_id,
+            groupId: m.group_id,
             service: m.platform as any,
             sourceUrl: m.resource_id,
             startSec: m.start_time,

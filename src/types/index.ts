@@ -13,6 +13,7 @@ export interface TrackSource {
 
 export interface Moment {
   id: string;
+  groupId?: string | null;
   parentId?: string | null; // Added for hierarchy
   userId?: string;
 

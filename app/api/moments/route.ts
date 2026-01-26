@@ -245,6 +245,7 @@ export async function POST(request: Request) {
             platform: service,
             track_source_id: trackSourceId, // Link to track_source
             parent_id: parentId, // Set the determined parent (Manual or Fuzzy)
+            group_id: body.groupId || null, // Peer-to-Peer Grouping
             start_time: body.startSec,
             end_time: body.endSec,
             track_duration_sec: body.duration || 0, // Store track duration directly
@@ -290,6 +291,7 @@ export async function POST(request: Request) {
         // Transform to match expected client format
         const transformedMoment = {
             id: newMoment.id,
+            groupId: (newMoment as any).group_id,
             service: newMoment.platform,
             sourceUrl: newMoment.resource_id,
             startSec: newMoment.start_time,
@@ -386,6 +388,7 @@ export async function GET(request: Request) {
         // Transform to match expected client format
         let transformedMoments = moments.map(m => ({
             id: m.id,
+            groupId: (m as any).group_id,
             userId: m.user_id,
             service: m.platform,
             sourceUrl: m.resource_id,

@@ -1,6 +1,6 @@
 'use client';
 
-import { X, Star, Send } from 'lucide-react';
+import { X, Star, Send, Play, Square } from 'lucide-react';
 
 interface MomentEditorProps {
     isOpen: boolean;
@@ -14,6 +14,8 @@ interface MomentEditorProps {
     onUpdate?: (momentId: string, note: string) => Promise<boolean>;
     onCancel: () => void;
     formatTime: (seconds: number) => string;
+    onPreview?: () => void;
+    isPreviewing?: boolean;
 }
 
 export default function MomentEditor({
@@ -27,7 +29,9 @@ export default function MomentEditor({
     onSave,
     onUpdate,
     onCancel,
-    formatTime
+    formatTime,
+    onPreview,
+    isPreviewing
 }: MomentEditorProps) {
     if (!isOpen) return null;
 
@@ -52,7 +56,7 @@ export default function MomentEditor({
     };
 
     return (
-        <div className="glass-panel p-3 space-y-3 animate-in slide-in-from-right-2 duration-200">
+        <div data-moment-editor className="glass-panel p-3 space-y-3 animate-in slide-in-from-right-2 duration-200">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     {/* User Avatar */}
@@ -96,6 +100,21 @@ export default function MomentEditor({
                         >
                             <X size={16} />
                         </button>
+
+                        {/* Preview Play Button */}
+                        {onPreview && (
+                            <button
+                                onClick={onPreview}
+                                className={`p-1.5 rounded-md hover:bg-white/10 transition-colors ${isPreviewing ? 'text-orange-400' : 'text-white/60 hover:text-white'}`}
+                                title={isPreviewing ? "Stop Preview" : "Play Preview"}
+                            >
+                                {isPreviewing ? (
+                                    <Square size={16} className="fill-current" />
+                                ) : (
+                                    <Play size={16} className="fill-current" />
+                                )}
+                            </button>
+                        )}
                     </div>
 
                     {/* Save/Update Button */}

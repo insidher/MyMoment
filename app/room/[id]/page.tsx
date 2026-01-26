@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/client';
 import { createComment } from '../../actions/moments';
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Play, Pause, Save, Clock, ArrowLeft, Check, RotateCcw, ListMusic, Loader2, X } from 'lucide-react';
 import Link from 'next/link';
@@ -23,6 +24,7 @@ import { useSoundEffects } from '@/hooks/useSoundEffects';
 import { MyMomentIcon } from '@/components/icons/MyMomentIcon';
 import { parseChapters, getCurrentChapter, Chapter } from '@/lib/chapters';
 import { usePlaybackGuard } from '@/hooks/usePlaybackGuard';
+import GroupingPromptModal from '@/components/GroupingPromptModal';
 
 type CaptureState = 'idle' | 'start-captured' | 'end-captured';
 
@@ -132,6 +134,10 @@ export default function Room({ params }: { params: { id: string } }) {
     const [youtubePlayer, setYoutubePlayer] = useState<any>(null);
     const [spotifyPlayer, setSpotifyPlayer] = useState<SpotifyController | null>(null);
     const [error, setError] = useState('');
+    const [groupingConfirmation, setGroupingConfirmation] = useState<{
+        payload: any;
+        conflictMoment: Moment;
+    } | null>(null);
 
     // Unified Playback State (for Timeline)
     const [playbackState, setPlaybackState] = useState({ current: 0, duration: 0 });
@@ -354,6 +360,7 @@ export default function Room({ params }: { params: { id: string } }) {
                     const newMoment = {
                         id: payload.new.id,
                         parentId: payload.new.parent_id, // ← Critical: map parent_id
+                        groupId: payload.new.group_id, // ← Critical: map group_id for clustering
                         service: payload.new.platform,
                         sourceUrl: payload.new.resource_id || url,
                         startSec: payload.new.start_time,
@@ -671,157 +678,107 @@ export default function Room({ params }: { params: { id: string } }) {
         setError('');
     };
 
-    const handleSave = async () => {
-        // 🛑 ADD THESE LOGS AT THE VERY START
-        console.log("🚦 [Gatekeeper] handleSave triggered!");
-        console.log("🚦 [Gatekeeper] Current Content:", note);
-        console.log("🚦 [Gatekeeper] replyingTo state:", replyingTo);
-
-        if (!note?.trim()) {
-            console.log("🛑 [Gatekeeper] BLOCKED: Content is empty");
-            return;
-        }
-
-        // If creating new moment: Check start/end. If replying: Ignore start/end.
-        if (!replyingTo && (startSec == null || endSec == null)) return;
-
-        console.log('[handleSave] Saving via API:', metadata);
+    // Extracted Creation Logic
+    const executeCreateMoment = async (basePayload: any, groupId: string | null = null) => {
         setIsSaving(true);
-
         try {
-            if (replyingTo) {
-                // REPLY FLOW
-                const isHead = replyingTo.id === params.id;
-                const newComment = await createComment(replyingTo.id, note, window.location.pathname, isHead);
+            // Peer-to-Peer: parentId is NULL for grouped moments
+            const payload = { ...basePayload, groupId };
 
-                if (newComment) {
-                    toast.success('Reply posted!');
-                    setSaved(true);
+            // 2. CONSTRUCT OPTIMISTIC MOMENT (The "Fake" Moment)
+            const tempId = `temp-${Date.now()}`;
+            const optimisticMoment: Moment = {
+                id: tempId,
+                service: isSpotify ? 'spotify' : 'youtube',
+                sourceUrl: url,
+                startSec: payload.startSec!,
+                endSec: payload.endSec!,
+                momentDurationSec: (payload.endSec!) - (payload.startSec!),
+                title: metadata?.title || 'Unknown Title',
+                artist: metadata?.artist || 'Unknown Artist',
+                artwork: metadata?.artwork || null,
+                note: payload.note,
+                likeCount: 0,
+                savedByCount: 0,
+                createdAt: new Date().toISOString(),
+                user: {
+                    name: (user as any)?.name || (user as any)?.full_name || 'Me',
+                    image: (user as any)?.image || (user as any)?.avatar_url || null
+                },
+                replies: [],
+                groupId: groupId, // Set Group ID
+                parentId: null // Always null for Peer-to-Peer
+            } as unknown as Moment;
 
-                    // We need to fetch moments again or optimistically update. 
-                    // For now, let's just clear state. The Real-time nature or a re-fetch would be ideal.
-                    // But to see it instantly, we might want to reload or utilize the revalidatePath from server action.
+            console.log("🔍 [Step 1] Constructing Optimistic Moment. ID:", optimisticMoment.id);
 
-                    setTimeout(() => setSaved(false), 2000);
-                    setReplyingTo(null);
-                    setNote('');
-                }
-            } else {
-                // CREATE MOMENT FLOW
-                const payload = {
-                    sourceUrl: url,
-                    startSec,
-                    endSec,
-                    note,
-                    // Pass metadata if available
-                    title: metadata?.title || 'Unknown Title',
-                    artist: metadata?.artist || 'Unknown Artist',
-                    artwork: metadata?.artwork || null,
-                    service: isSpotify ? 'spotify' : 'youtube',
-                    // Add track duration for track_sources table
-                    // Prioritize player duration if it's > 0, otherwise fallback to metadata
-                    duration: (isSpotify ? spotifyProgress.duration : playbackState.duration) || metadata.duration_sec,
-                };
+            // 3. ⚡ INSTANT UPDATE
+            setMoments((prev) => {
+                const newArray = [optimisticMoment, ...prev];
+                return newArray;
+            });
 
-                // 2. CONSTRUCT OPTIMISTIC MOMENT (The "Fake" Moment)
-                const tempId = `temp-${Date.now()}`;
-                const optimisticMoment: Moment = {
-                    id: tempId,
-                    service: isSpotify ? 'spotify' : 'youtube',
-                    sourceUrl: url,
-                    startSec: startSec!,
-                    endSec: endSec!,
-                    momentDurationSec: (endSec!) - (startSec!),
-                    title: metadata?.title || 'Unknown Title',
-                    artist: metadata?.artist || 'Unknown Artist',
-                    artwork: metadata?.artwork || null,
-                    note: note,
-                    likeCount: 0,
-                    savedByCount: 0, // Starts at 0, or 1 if we count self
-                    createdAt: new Date().toISOString(),
-                    user: {
-                        name: (user as any)?.name || (user as any)?.full_name || 'Me',
-                        image: (user as any)?.image || (user as any)?.avatar_url || null
-                    },
-                    replies: []
-                } as unknown as Moment;
+            setCaptureState('idle');
+            setStartSec(null);
+            setEndSec(null);
+            setNote('');
+            setSaved(true);
+            toast.success("Moment captured!");
 
-                console.log("🔍 [Step 1] Constructing Optimistic Moment. ID:", optimisticMoment.id);
+            // Clear confirmation if any
+            setGroupingConfirmation(null);
 
-                // 3. ⚡ INSTANT UPDATE: Inject into state immediately
-                setMoments((prev) => {
-                    console.log(`🔍 [Step 2] setMoments running. Previous count: ${prev.length}`);
-                    const newArray = [optimisticMoment, ...prev];
-                    console.log(`🔍 [Step 3] New State Array Length: ${newArray.length}`);
-                    return newArray;
+            try {
+                const res = await fetch('/api/moments', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
                 });
 
-                // Clear the input immediately for that "snappy" feel
-                setCaptureState('idle');
-                setStartSec(null);
-                setEndSec(null);
-                setNote('');
+                const data = await res.json();
 
-                setSaved(true);
-                toast.success("Moment captured!");
-
-                // Keep trying network in background
-                try {
-                    const res = await fetch('/api/moments', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload),
-                    });
-
-                    const data = await res.json();
-
-                    if (!res.ok) {
-                        // ROLLBACK: If it failed, remove the temp item
-                        setMoments((prev) => prev.filter(m => m.id !== tempId));
-                        throw new Error(data.error || 'Failed to save moment');
-                    }
-
-                    // 5. RECONCILIATION (Swap Temp ID for Real ID)
-                    if (data.moment) {
-                        const m = data.moment;
-                        // Construct the 'real' moment object ensuring all fields match interface
-                        const realMoment: Moment = {
-                            id: m.id,
-                            service: m.service ?? m.platform,
-                            sourceUrl: url,
-                            startSec: m.startSec ?? m.start_time,
-                            endSec: m.endSec ?? m.end_time,
-                            momentDurationSec: (m.endSec ?? m.end_time) - (m.startSec ?? m.start_time),
-                            title: m.title,
-                            artist: m.artist,
-                            artwork: m.artwork,
-                            note: m.note,
-                            likeCount: m.likeCount ?? 0,
-                            savedByCount: m.savedByCount ?? 1,
-                            createdAt: new Date(m.createdAt ?? m.created_at).toISOString(), // Ensure string
-                            user: {
-                                name: m.user?.name ?? m.user?.full_name ?? 'Me',
-                                image: m.user?.image ?? m.user?.avatar_url
-                            },
-                            trackSource: m.trackSource,
-                            replies: []
-                        } as unknown as Moment;
-
-                        setMoments((prev) => prev.map((m) =>
-                            m.id === tempId ? realMoment : m
-                        ));
-                    }
-                } catch (innerError) {
-                    console.error("Network save failed:", innerError);
-                    // Rollback handled in if (!res.ok) block above for status errors
-                    // But for network exceptions:
+                if (!res.ok) {
                     setMoments((prev) => prev.filter(m => m.id !== tempId));
-                    setSaved(false); // Revert saved state
-                    throw innerError; // Propagate to outer catch for toast
+                    throw new Error(data.error || 'Failed to save moment');
                 }
 
-                setTimeout(() => setSaved(false), 3000);
+                if (data.moment) {
+                    const m = data.moment;
+                    const realMoment: Moment = {
+                        id: m.id,
+                        groupId: m.groupId ?? m.group_id, // ← CRITICAL: Map group_id from server
+                        service: m.service ?? m.platform,
+                        sourceUrl: url,
+                        startSec: m.startSec ?? m.start_time,
+                        endSec: m.endSec ?? m.end_time,
+                        momentDurationSec: (m.endSec ?? m.end_time) - (m.startSec ?? m.start_time),
+                        title: m.title,
+                        artist: m.artist,
+                        artwork: m.artwork,
+                        note: m.note,
+                        likeCount: m.likeCount ?? 0,
+                        savedByCount: m.savedByCount ?? 1,
+                        createdAt: new Date(m.createdAt ?? m.created_at).toISOString(),
+                        user: {
+                            name: m.user?.name ?? m.user?.full_name ?? 'Me',
+                            image: m.user?.image ?? m.user?.avatar_url
+                        },
+                        trackSource: m.trackSource,
+                        replies: [],
+                        parentId: m.parentId ?? m.parent_id // Ensure strict typing
+                    } as unknown as Moment;
+
+                    setMoments((prev) => prev.map((curr) =>
+                        curr.id === tempId ? realMoment : curr
+                    ));
+                }
+            } catch (innerError) {
+                console.error("Network save failed:", innerError);
+                setMoments((prev) => prev.filter(m => m.id !== tempId));
+                setSaved(false);
+                throw innerError;
             }
+            setTimeout(() => setSaved(false), 3000);
 
         } catch (error: unknown) {
             console.error('Failed to save', error);
@@ -831,6 +788,133 @@ export default function Room({ params }: { params: { id: string } }) {
         } finally {
             setIsSaving(false);
         }
+    };
+
+    const executeSmartGroup = async (targetMoment: Moment, payload: any) => {
+        let targetGroupId = targetMoment.groupId;
+
+        if (!targetGroupId) {
+            // Create new Group ID
+            targetGroupId = crypto.randomUUID();
+
+            // Optimistic Update for Target
+            setMoments(prev => prev.map(m => m.id === targetMoment.id ? { ...m, groupId: targetGroupId } : m));
+
+            // DB Update for Target (Fire & Forget)
+            fetch(`/api/moments/${targetMoment.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ groupId: targetGroupId })
+            }).catch(e => console.error("Failed to update target group", e));
+        }
+
+        await executeCreateMoment(payload, targetGroupId);
+        setGroupingConfirmation(null);
+    };
+
+    const handleSave = async () => {
+        // 🛑 ADD THESE LOGS AT THE VERY START
+        console.log("🚦 [Gatekeeper] handleSave triggered!");
+
+        if (!note?.trim()) {
+            console.log("🛑 [Gatekeeper] BLOCKED: Content is empty");
+            return;
+        }
+
+        if (!replyingTo && (startSec == null || endSec == null)) return;
+
+        setIsSaving(true);
+
+        // 1. REPLY FLOW
+        if (replyingTo) {
+            try {
+                const isHead = replyingTo.id === params.id;
+                const newComment = await createComment(replyingTo.id, note, window.location.pathname, isHead);
+                if (newComment) {
+                    toast.success('Reply posted!');
+                    setSaved(true);
+
+                    // We need to fetch moments again or optimistically update. 
+                    // For now, let's just clear state.
+                    setTimeout(() => setSaved(false), 2000);
+                    setReplyingTo(null);
+                    setNote('');
+                }
+            } catch (e) {
+                console.error(e);
+                toast.error('Failed to reply');
+            } finally {
+                setIsSaving(false);
+            }
+            return;
+        }
+
+        // 2. CREATE MOMENT FLOW
+        const payload = {
+            sourceUrl: url,
+            startSec,
+            endSec,
+            note,
+            title: metadata?.title || 'Unknown Title',
+            artist: metadata?.artist || 'Unknown Artist',
+            artwork: metadata?.artwork || null,
+            service: isSpotify ? 'spotify' : 'youtube',
+            duration: (isSpotify ? spotifyProgress.duration : playbackState.duration) || metadata.duration_sec,
+        };
+
+        // --- CONFLICT & SMART GROUPING DETECTION (TRI-STATE) ---
+        const AUTO_GROUP_TOLERANCE = 0.5; // seconds - tight tolerance for auto-grouping
+        const PROMPT_PROXIMITY = 3.0; // seconds - ask user if within this range
+
+        // Sort moments by Duration (Largest to Smallest) to prioritize "Container" moments
+        const candidateParents = moments
+            .filter(m => !m.parentId) // Only consider root moments for grouping
+            .sort((a, b) => (b.endSec - b.startSec) - (a.endSec - a.startSec));
+
+        const s = startSec!;
+        const e = endSec!;
+
+        // Find the best parent match
+        const potentialGroup = candidateParents.find(parent => {
+            // Check if there's any relationship (containment, overlap, or proximity)
+            const startsNear = s >= (parent.startSec - PROMPT_PROXIMITY);
+            const endsNear = e <= (parent.endSec + PROMPT_PROXIMITY);
+            const hasOverlap = s < parent.endSec && e > parent.startSec;
+
+            return (startsNear && endsNear) || hasOverlap;
+        });
+
+        if (potentialGroup) {
+            // ZONE 1: Strict Containment (Auto-Group)
+            const strictlyContained =
+                s >= (potentialGroup.startSec - AUTO_GROUP_TOLERANCE) &&
+                e <= (potentialGroup.endSec + AUTO_GROUP_TOLERANCE) &&
+                (potentialGroup.endSec - potentialGroup.startSec) > (e - s); // Parent must be larger
+
+            if (strictlyContained) {
+                console.log("🔒 [Capture] Auto-Grouping (Strictly Contained)");
+                await executeSmartGroup(potentialGroup, payload);
+                return;
+            }
+
+            // ZONE 2: Overlap or Proximity (Ask User)
+            const hasOverlap = s < potentialGroup.endSec && e > potentialGroup.startSec;
+            const isNearStart = Math.abs(s - potentialGroup.startSec) <= PROMPT_PROXIMITY;
+            const isNearEnd = Math.abs(e - potentialGroup.endSec) <= PROMPT_PROXIMITY;
+
+            if (hasOverlap || isNearStart || isNearEnd) {
+                console.log("❓ [Capture] Prompting User (Overlap/Proximity)");
+                setIsSaving(false); // Pause save
+                setGroupingConfirmation({
+                    payload,
+                    conflictMoment: potentialGroup
+                });
+                return; // Wait for user decision
+            }
+        }
+
+        // ZONE 3: No Match (Create New)
+        await executeCreateMoment(payload, null);
     };
 
     const handleUpdateMoment = async (id: string, newNote: string) => {
@@ -968,7 +1052,17 @@ export default function Room({ params }: { params: { id: string } }) {
     }, [playbackState.duration, spotifyProgress.duration, moments, url, isSpotify]);
 
     const playMoment = (moment: Moment) => {
-        // If clicking the active moment, toggle play/pause
+        // STOP PREVIEW LOGIC
+        // If we are currently previewing and validly click preview again, STOP it.
+        if (activeMoment?.id === 'preview-draft' && moment.id === 'preview-draft') {
+            setActiveMoment(null);
+            if (isYouTube && youtubePlayer) youtubePlayer.pauseVideo();
+            if (isSpotify && spotifyPlayer) spotifyPlayer.pause();
+            setIsPlaying(false);
+            return;
+        }
+
+        // If clicking the active moment (normal moments), toggle play/pause or resume
         if (activeMoment?.id === moment.id) {
             // Resume logic
             if (moment.service === 'youtube' && youtubePlayer) {
@@ -1073,22 +1167,32 @@ export default function Room({ params }: { params: { id: string } }) {
 
     const handleSeekRelative = (seconds: number) => {
         // Stop any active moment logic
-        if (activeMoment) setActiveMoment(null);
+        if (activeMoment) {
+            setActiveMoment(null);
+            // Reset volume for YouTube when exiting moment mode
+            if (isYouTube && youtubePlayer) {
+                youtubePlayer.setVolume(100);
+            }
+        }
 
         let current = 0;
-        // Ensure duration is safe
-        const duration = playbackState.duration || 0;
-
-        if (isYouTube && youtubePlayer) {
-            current = youtubePlayer.getCurrentTime();
-        } else if (isSpotify && spotifyPlayer) {
+        // Use the appropriate time source based on platform
+        if (isYouTube) {
+            // Use guardCurrentTime from playback guard to avoid frozen time during ads
+            current = guardCurrentTime;
+        } else if (isSpotify) {
             current = spotifyTimeRef.current;
         }
+
+        // Ensure duration is safe - use guard duration for YouTube
+        const duration = isYouTube ? guardDuration : (playbackState.duration || 0);
 
         let newTime = current + seconds;
         // Clamp time
         if (newTime < 0) newTime = 0;
         if (newTime > duration) newTime = duration;
+
+        console.log(`[Skip] Current: ${current}s, Seeking to: ${newTime}s (${seconds > 0 ? '+' : ''}${seconds}s)`);
 
         if (isYouTube && youtubePlayer) {
             youtubePlayer.seekTo(newTime, true);
@@ -1129,7 +1233,7 @@ export default function Room({ params }: { params: { id: string } }) {
     };
 
     return (
-        <main className="flex flex-col h-[100dvh] overflow-hidden bg-black text-white">
+        <main className="flex flex-col min-h-screen bg-black text-white">
             {/* RIGID ZONE: Fixed Video Player + Timeline */}
             <section className="shrink-0 w-full relative z-10 bg-black">
                 {/* Desktop: 65/35 Split | Mobile: Full Width */}
@@ -1206,65 +1310,255 @@ export default function Room({ params }: { params: { id: string } }) {
                             )}
                         </div>
 
-                        {/* Playback Controls - Hidden for now */}
+                        {/* Sticky Header: Controls + Timeline */}
+                        <div className="sticky top-14 z-40 bg-black/95 backdrop-blur-md pb-2 -mx-4 px-4 lg:mx-0 lg:px-0 lg:bg-black lg:border-b lg:border-white/10 lg:rounded-b-xl lg:mb-4 lg:pt-2">
 
-                        {/* Unified Player Timeline (Spotify & YouTube) */}
-                        {(isSpotify || isYouTube) && (
-                            <PlayerTimeline
-                                currentTime={isSpotify ? spotifyProgress.current : guardCurrentTime}
-                                duration={isSpotify ? spotifyProgress.duration : guardDuration}
-                                disabled={controlsDisabled}
-                                isPlaying={isPlaying}
-                                moments={moments}
-                                onSeek={handleSeek}
-                                onMomentClick={playMoment}
-                                onChapterClick={(chapter) => handleSeek(chapter.startSec)}
-                                startSec={startSec}
-                                endSec={endSec}
-                                note={note}
-                                onNoteChange={setNote}
-                                onSaveMoment={handleSave}
-                                onCancelCapture={() => {
-                                    setStartSec(null);
-                                    setEndSec(null);
-                                    setCaptureState('idle');
-                                    setError('');
-                                }}
-                                onPreviewCapture={handlePreviewCapture}
-                                onCaptureStart={(time) => {
-                                    setStartSec(time);
-                                    setCaptureState('start-captured');
-                                    setError('');
-                                }}
-                                onCaptureEnd={(time) => {
-                                    setEndSec(time);
-                                    setCaptureState('end-captured');
-                                    setError('');
-                                }}
-                                onCaptureUpdate={(start, end) => {
-                                    // Allow clearing (null)
-                                    if (start === null && end === null) {
+                            {/* Compact Playback Controls */}
+                            {(isYouTube || isSpotify) && (
+                                <div className="flex items-center justify-center gap-1.5 py-1.5 px-2">
+                                    {/* Skip Back 10 min */}
+                                    <button
+                                        onClick={() => handleSeekRelative(-600)}
+                                        disabled={controlsDisabled}
+                                        className="px-1.5 py-0.5 rounded text-[10px] font-mono hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-white/60"
+                                        title="Skip back 10 min"
+                                    >
+                                        -10m
+                                    </button>
+
+                                    {/* Skip Back 1 min */}
+                                    <button
+                                        onClick={() => handleSeekRelative(-60)}
+                                        disabled={controlsDisabled}
+                                        className="px-1.5 py-0.5 rounded text-[10px] font-mono hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-white/60"
+                                        title="Skip back 1 min"
+                                    >
+                                        -1m
+                                    </button>
+
+                                    {/* Skip Back 15s */}
+                                    <button
+                                        onClick={() => handleSeekRelative(-15)}
+                                        disabled={controlsDisabled}
+                                        className="p-1 rounded hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                        title="Skip back 15s"
+                                    >
+                                        <RotateCcw size={14} className="text-white/70" />
+                                    </button>
+
+                                    {/* Play/Pause */}
+                                    <button
+                                        onClick={() => handleTogglePlay(!isPlaying)}
+                                        disabled={controlsDisabled}
+                                        className="p-1.5 rounded-full hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                        title={isPlaying ? 'Pause' : 'Play'}
+                                    >
+                                        {isPlaying ? (
+                                            <Pause size={16} className="text-white" fill="white" />
+                                        ) : (
+                                            <Play size={16} className="text-white" fill="white" />
+                                        )}
+                                    </button>
+
+                                    {/* Skip Forward 15s */}
+                                    <button
+                                        onClick={() => handleSeekRelative(15)}
+                                        disabled={controlsDisabled}
+                                        className="p-1 rounded hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                        title="Skip forward 15s"
+                                    >
+                                        <RotateCcw size={14} className="text-white/70 scale-x-[-1]" />
+                                    </button>
+
+                                    {/* Skip Forward 1 min */}
+                                    <button
+                                        onClick={() => handleSeekRelative(60)}
+                                        disabled={controlsDisabled}
+                                        className="px-1.5 py-0.5 rounded text-[10px] font-mono hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-white/60"
+                                        title="Skip forward 1 min"
+                                    >
+                                        +1m
+                                    </button>
+
+                                    {/* Skip Forward 10 min */}
+                                    <button
+                                        onClick={() => handleSeekRelative(600)}
+                                        disabled={controlsDisabled}
+                                        className="px-1.5 py-0.5 rounded text-[10px] font-mono hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-white/60"
+                                        title="Skip forward 10 min"
+                                    >
+                                        +10m
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Unified Player Timeline (Spotify & YouTube) */}
+                            {(isSpotify || isYouTube) && (
+                                <PlayerTimeline
+                                    currentTime={isSpotify ? spotifyProgress.current : guardCurrentTime}
+                                    duration={isSpotify ? spotifyProgress.duration : guardDuration}
+                                    disabled={controlsDisabled}
+                                    isPlaying={isPlaying}
+                                    moments={moments}
+                                    onSeek={handleSeek}
+                                    onMomentClick={playMoment}
+                                    service={isYouTube ? 'youtube' : 'spotify'}
+                                    onChapterClick={(chapter) => handleSeek(chapter.startSec)}
+                                    onPause={() => {
+                                        // Pause the video when clicking draft markers
+                                        if (isYouTube && youtubePlayer) {
+                                            youtubePlayer.pauseVideo();
+                                        } else if (isSpotify && spotifyPlayer) {
+                                            spotifyPlayer.pause();
+                                        }
+                                        setIsPlaying(false);
+                                    }}
+                                    startSec={startSec}
+                                    endSec={endSec}
+                                    note={note}
+                                    onNoteChange={setNote}
+                                    onSaveMoment={handleSave}
+                                    onCancelCapture={() => {
                                         setStartSec(null);
                                         setEndSec(null);
                                         setCaptureState('idle');
-                                    } else {
-                                        if (start !== undefined) setStartSec(start);
-                                        if (end !== undefined) setEndSec(end);
-
-                                        // State Inference
-                                        if (start === null) {
+                                        setError('');
+                                        setNote('');
+                                    }}
+                                    onCancelDraft={() => {
+                                        setStartSec(null);
+                                        setEndSec(null);
+                                        setCaptureState('idle');
+                                        setError('');
+                                        setNote('');
+                                    }}
+                                    onPreviewCapture={handlePreviewCapture}
+                                    onCaptureStart={(time) => {
+                                        setStartSec(time);
+                                        setCaptureState('start-captured');
+                                        setError('');
+                                    }}
+                                    onCaptureEnd={(time) => {
+                                        setEndSec(time);
+                                        setCaptureState('end-captured');
+                                        setError('');
+                                    }}
+                                    onCaptureUpdate={(start, end) => {
+                                        // Allow clearing (null)
+                                        if (start === null && end === null) {
+                                            setStartSec(null);
+                                            setEndSec(null);
                                             setCaptureState('idle');
-                                        } else if (end === null) {
-                                            setCaptureState('start-captured');
-                                        } else if (start !== null && end !== null) {
-                                            setCaptureState('end-captured');
+                                        } else {
+                                            if (start !== undefined) setStartSec(start);
+                                            if (end !== undefined) setEndSec(end);
+
+                                            // State Inference
+                                            if (start === null) {
+                                                setCaptureState('idle');
+                                            } else if (end === null) {
+                                                setCaptureState('start-captured');
+                                            } else if (start !== null && end !== null) {
+                                                setCaptureState('end-captured');
+                                            }
                                         }
-                                    }
-                                }}
-                                activeMomentId={activeMoment?.id}
-                                chapters={chapters}
-                            />
-                        )}
+                                    }}
+                                    activeMomentId={activeMoment?.id}
+                                    chapters={chapters}
+                                />
+                            )}
+                        </div>
+
+                        {/* SCROLLABLE MOMENTS FEED (Moved here for Sticky Behavior) */}
+                        <div className="w-full space-y-3 pb-16">
+                            {/* Moments List */}
+                            <div className="glass-panel p-3 space-y-3">
+                                <div className="flex items-center gap-3 border-b border-white/10 pb-3">
+                                    {metadata.artwork ? (
+                                        <img
+                                            src={metadata.artwork}
+                                            alt="Album Art"
+                                            className="w-12 h-12 rounded-md object-cover shadow-lg shrink-0"
+                                        />
+                                    ) : (
+                                        <div className="w-12 h-12 rounded-md bg-white/10 animate-pulse shrink-0" />
+                                    )}
+                                    <div className="min-w-0">
+                                        <h3 className="text-base font-semibold text-white truncate">
+                                            Saved Moments
+                                        </h3>
+                                        <p className="text-xs text-white/60 truncate">
+                                            for <span className="text-white/90 font-medium">{metadata.title || 'Unknown Video'}</span>
+                                        </p>
+                                    </div>
+                                    <div className="ml-auto text-xs text-white/40 font-mono bg-white/5 px-2 py-1 rounded-full">
+                                        {groupMoments(moments).length}
+                                    </div>
+                                </div>
+
+                                <div className="grid gap-2">
+                                    {moments.length === 0 ? (
+                                        <div className="text-center py-8 text-white/30 italic">
+                                            No moments saved yet. Be the first!
+                                        </div>
+                                    ) : (
+                                        groupMoments(moments)
+                                            .sort((a, b) => (activeMoment?.id === a.main.id ? -1 : activeMoment?.id === b.main.id ? 1 : 0))
+                                            .map((group) => {
+                                                if (group.main.id.toString().includes('temp')) {
+                                                    console.log("👀 [Render Loop] Found Optimistic Moment in JSX:", group.main.id);
+                                                }
+                                                return (
+                                                    <MomentGroup
+                                                        key={group.main.id}
+                                                        mainMoment={group.main}
+                                                        replies={group.replies}
+                                                        trackDuration={(isSpotify ? spotifyProgress.duration : playbackState.duration) || metadata.duration_sec || group.main.trackSource?.durationSec}
+                                                        onDelete={async (id) => {
+                                                            try {
+                                                                const res = await fetch(`/api/moments/${id}`, { method: 'DELETE' });
+                                                                if (res.ok) {
+                                                                    setMoments(prev => {
+                                                                        const target = prev.find(m => m.id === id);
+                                                                        if (!target) return prev.filter(m => m.id !== id);
+
+                                                                        return prev.filter(m =>
+                                                                            !(m.id === id || (
+                                                                                m.sourceUrl === target.sourceUrl &&
+                                                                                m.startSec === target.startSec &&
+                                                                                m.endSec === target.endSec
+                                                                            ))
+                                                                        );
+                                                                    });
+                                                                }
+                                                            } catch (e) {
+                                                                console.error(e);
+                                                            }
+                                                        }}
+                                                        showDelete={user?.id === group.main.userId}
+                                                        onPlayFull={() => {
+                                                            router.push(`/room/view?url=${encodeURIComponent(group.main.sourceUrl)}`);
+                                                        }}
+                                                        onPlayMoment={playMoment}
+                                                        onPauseMoment={handlePauseMoment}
+                                                        currentTime={isSpotify ? spotifyProgress.current : playbackState.current}
+                                                        activeMomentId={activeMoment?.id}
+                                                        isPlaying={isPlaying}
+                                                        currentUserId={user?.id || ''}
+                                                        currentUser={user ? { id: user.id, name: user.email, image: null } : undefined}
+                                                        onReply={(momentId, username) => {
+                                                            setReplyingTo({ id: momentId, username });
+                                                            noteInputRef.current?.focus();
+                                                        }}
+                                                        onRefresh={fetchMoments}
+                                                        onNewReply={handleNewReply}
+                                                    />
+                                                );
+                                            })
+                                    )}
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Right: Sidebar (35% on desktop, hidden on mobile) */}
@@ -1287,6 +1581,20 @@ export default function Room({ params }: { params: { id: string } }) {
                                         setCaptureState('idle');
                                         setError('');
                                     }}
+                                    onPreview={() => {
+                                        if (startSec === null || endSec === null) return;
+                                        const mockMoment = {
+                                            id: 'preview-draft',
+                                            startSec,
+                                            endSec,
+                                            service: isYouTube ? 'youtube' : 'spotify',
+                                            userId: user ? user.id : 'me',
+                                            note: note,
+                                            createdAt: new Date().toISOString()
+                                        };
+                                        playMoment(mockMoment as any);
+                                    }}
+                                    isPreviewing={activeMoment?.id === 'preview-draft'}
                                     formatTime={(seconds) => {
                                         const h = Math.floor(seconds / 3600);
                                         const m = Math.floor((seconds % 3600) / 60);
@@ -1312,102 +1620,26 @@ export default function Room({ params }: { params: { id: string } }) {
                 </div>
             </section>
 
-            {/* SCROLL ZONE: Scrollable Moments Feed */}
-            <section className="flex-1 overflow-y-auto overscroll-contain w-full">
-                {/* Changed mx-auto to w-full lg:max-w-4xl lg:ml-0 to left justify on desktop if needed, or just remove mx-auto */}
-                {/* User requested left justify "saved moments container". Removing mx-auto. */}
-                <div className="w-full max-w-4xl px-4 py-3 space-y-3 pb-16">
-                    {/* Moments List */}
-                    <div className="glass-panel p-3 space-y-3">
-                        <div className="flex items-center gap-3 border-b border-white/10 pb-3">
-                            {metadata.artwork ? (
-                                <img
-                                    src={metadata.artwork}
-                                    alt="Album Art"
-                                    className="w-12 h-12 rounded-md object-cover shadow-lg shrink-0"
-                                />
-                            ) : (
-                                <div className="w-12 h-12 rounded-md bg-white/10 animate-pulse shrink-0" />
-                            )}
-                            <div className="min-w-0">
-                                <h3 className="text-base font-semibold text-white truncate">
-                                    Saved Moments
-                                </h3>
-                                <p className="text-xs text-white/60 truncate">
-                                    for <span className="text-white/90 font-medium">{metadata.title || 'Unknown Video'}</span>
-                                </p>
-                            </div>
-                            <div className="ml-auto text-xs text-white/40 font-mono bg-white/5 px-2 py-1 rounded-full">
-                                {groupMoments(moments).length}
-                            </div>
-                        </div>
 
-                        <div className="grid gap-2">
-                            {moments.length === 0 ? (
-                                <div className="text-center py-8 text-white/30 italic">
-                                    No moments saved yet. Be the first!
-                                </div>
-                            ) : (
-                                groupMoments(moments)
-                                    .sort((a, b) => (activeMoment?.id === a.main.id ? -1 : activeMoment?.id === b.main.id ? 1 : 0))
-                                    .map((group) => {
-                                        if (group.main.id.toString().includes('temp')) {
-                                            console.log("👀 [Render Loop] Found Optimistic Moment in JSX:", group.main.id);
-                                        }
-                                        return (
-                                            <MomentGroup
-                                                key={group.main.id}
-                                                mainMoment={group.main}
-                                                replies={group.replies}
-                                                trackDuration={(isSpotify ? spotifyProgress.duration : playbackState.duration) || metadata.duration_sec || group.main.trackSource?.durationSec}
-                                                onDelete={async (id) => {
-                                                    try {
-                                                        const res = await fetch(`/api/moments/${id}`, { method: 'DELETE' });
-                                                        if (res.ok) {
-                                                            setMoments(prev => {
-                                                                const target = prev.find(m => m.id === id);
-                                                                if (!target) return prev.filter(m => m.id !== id);
-
-                                                                return prev.filter(m =>
-                                                                    !(m.id === id || (
-                                                                        m.sourceUrl === target.sourceUrl &&
-                                                                        m.startSec === target.startSec &&
-                                                                        m.endSec === target.endSec
-                                                                    ))
-                                                                );
-                                                            });
-                                                        }
-                                                    } catch (e) {
-                                                        console.error(e);
-                                                    }
-                                                }}
-                                                showDelete={user?.id === group.main.userId}
-                                                onPlayFull={() => {
-                                                    router.push(`/room/view?url=${encodeURIComponent(group.main.sourceUrl)}`);
-                                                }}
-                                                onPlayMoment={playMoment}
-                                                onPauseMoment={handlePauseMoment}
-                                                currentTime={isSpotify ? spotifyProgress.current : playbackState.current}
-                                                activeMomentId={activeMoment?.id}
-                                                isPlaying={isPlaying}
-                                                currentUserId={user?.id || ''}
-                                                currentUser={user ? { id: user.id, name: user.email, image: null } : undefined}
-                                                onReply={(momentId, username) => {
-                                                    setReplyingTo({ id: momentId, username });
-                                                    noteInputRef.current?.focus();
-                                                }}
-                                                onRefresh={fetchMoments}
-                                                onNewReply={handleNewReply}
-                                            />
-                                        );
-                                    })
-                            )}
-                        </div>
-                    </div>
-
-
-                </div>
-            </section>
+            {/* Grouping Confirmation Modal */}
+            <GroupingPromptModal
+                isOpen={!!groupingConfirmation}
+                parentMoment={groupingConfirmation?.conflictMoment!}
+                draftStart={startSec || 0}
+                draftEnd={endSec || 0}
+                onConfirm={() => {
+                    if (groupingConfirmation) {
+                        executeSmartGroup(groupingConfirmation.conflictMoment, groupingConfirmation.payload);
+                        setGroupingConfirmation(null);
+                    }
+                }}
+                onCancel={() => {
+                    if (groupingConfirmation) {
+                        executeCreateMoment(groupingConfirmation.payload, null);
+                        setGroupingConfirmation(null);
+                    }
+                }}
+            />
         </main>
     );
 }

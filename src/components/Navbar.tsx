@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Sparkles, Compass, User, LogOut, Search, Music, Home, Menu } from 'lucide-react';
+import { Sparkles, Compass, User, LogOut, Search, Music, Home, Menu, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useFilter } from '@/context/FilterContext';
 import { useState } from 'react';
@@ -43,7 +43,7 @@ export default function Navbar() {
                             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
                                 <Sparkles size={18} className="text-white" />
                             </div>
-                            <span className="font-bold text-xl tracking-tight hidden sm:block">Moments</span>
+                            <span className="font-bold text-xl tracking-tight hidden sm:block">MyMoment.io</span>
                         </button>
 
                         {/* Dropdown Menu */}
@@ -58,8 +58,8 @@ export default function Navbar() {
                                         href="/"
                                         onClick={() => setShowMenu(false)}
                                         className={`flex items-center gap-3 px-4 py-3 text-sm transition-colors ${isActive('/')
-                                                ? 'bg-white/10 text-white'
-                                                : 'text-white/70 hover:bg-white/5 hover:text-white'
+                                            ? 'bg-white/10 text-white'
+                                            : 'text-white/70 hover:bg-white/5 hover:text-white'
                                             }`}
                                     >
                                         <Home size={16} />
@@ -69,8 +69,8 @@ export default function Navbar() {
                                         href="/explore"
                                         onClick={() => setShowMenu(false)}
                                         className={`flex items-center gap-3 px-4 py-3 text-sm transition-colors ${isActive('/explore')
-                                                ? 'bg-white/10 text-white'
-                                                : 'text-white/70 hover:bg-white/5 hover:text-white'
+                                            ? 'bg-white/10 text-white'
+                                            : 'text-white/70 hover:bg-white/5 hover:text-white'
                                             }`}
                                     >
                                         <Compass size={16} />
@@ -83,17 +83,27 @@ export default function Navbar() {
 
                     {/* Search Bar (Centered) */}
                     <form onSubmit={handleSearch} className="flex-1 max-w-xl mx-4">
-                        <div className="relative group">
-                            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-white/30 group-focus-within:text-purple-400 transition-colors">
-                                <Search size={16} />
+                        <div className="relative group flex items-center gap-2">
+                            <div className="flex-1 relative">
+                                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-white/30 group-focus-within:text-purple-400 transition-colors">
+                                    <Search size={16} />
+                                </div>
+                                <input
+                                    type="text"
+                                    placeholder="Paste a YouTube or Spotify link..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full bg-white/5 border border-white/10 rounded-full py-2 pl-10 pr-4 text-sm text-white placeholder:text-white/30 focus:outline-none focus:bg-white/10 focus:border-purple-500/50 transition-all"
+                                />
                             </div>
-                            <input
-                                type="text"
-                                placeholder="Paste a YouTube or Spotify link..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full bg-white/5 border border-white/10 rounded-full py-2 pl-10 pr-4 text-sm text-white placeholder:text-white/30 focus:outline-none focus:bg-white/10 focus:border-purple-500/50 transition-all"
-                            />
+                            <button
+                                type="submit"
+                                disabled={!searchQuery.trim()}
+                                className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-orange-900/30 hover:scale-105 active:scale-95 flex-shrink-0"
+                                title="Submit"
+                            >
+                                <Search size={16} strokeWidth={2.5} />
+                            </button>
                         </div>
                     </form>
 
