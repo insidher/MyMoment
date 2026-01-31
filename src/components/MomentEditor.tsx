@@ -1,5 +1,7 @@
 'use client';
 
+import { useRef, useEffect } from 'react';
+
 import { X, Star, Send, Play, Square } from 'lucide-react';
 
 interface MomentEditorProps {
@@ -16,6 +18,7 @@ interface MomentEditorProps {
     formatTime: (seconds: number) => string;
     onPreview?: () => void;
     isPreviewing?: boolean;
+    focusTrigger?: number;
 }
 
 export default function MomentEditor({
@@ -31,8 +34,18 @@ export default function MomentEditor({
     onCancel,
     formatTime,
     onPreview,
-    isPreviewing
+    isPreviewing,
+    focusTrigger
 }: MomentEditorProps) {
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    // Focus on trigger change
+    useEffect(() => {
+        if (isOpen && focusTrigger && focusTrigger > 0) {
+            textareaRef.current?.focus();
+        }
+    }, [focusTrigger, isOpen]);
+
     if (!isOpen) return null;
 
     const handleSaveClick = async () => {
@@ -83,6 +96,7 @@ export default function MomentEditor({
                     <span>{formatTime(startSec || 0)} - {formatTime(endSec || 0)}</span>
                 </div>
                 <textarea
+                    ref={textareaRef}
                     autoFocus
                     value={note}
                     onChange={(e) => onNoteChange(e.target.value)}

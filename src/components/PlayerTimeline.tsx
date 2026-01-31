@@ -33,6 +33,8 @@ interface PlayerTimelineProps {
     disabled?: boolean;
     onPause?: () => void; // Callback to pause the video
     service?: 'youtube' | 'spotify';
+    onEditorOpenChange?: (isOpen: boolean) => void;
+    onFocusRequest?: () => void;
 }
 
 export default function PlayerTimeline({
@@ -60,7 +62,9 @@ export default function PlayerTimeline({
     currentUser,
     onUpdateMoment,
     disabled = false,
-    onPause
+    onPause,
+    onEditorOpenChange,
+    onFocusRequest
 }: PlayerTimelineProps) {
     const [isHovering, setIsHovering] = useState(false);
     const [expandedMomentId, setExpandedMomentId] = useState<string | null>(null);
@@ -68,8 +72,32 @@ export default function PlayerTimeline({
     const [hoverTime, setHoverTime] = useState<number | null>(null);
     const [cycleIndex, setCycleIndex] = useState<Record<string, number>>({});
 
+    // Onboarding state
+    const [showOnboarding, setShowOnboarding] = useState(false);
+    const [capturePhase, setCapturePhase] = useState<'idle' | 'positioning' | 'active'>('idle');
+
     // Use all moments for timeline visualization so we can group them visibly using clustering logic
     const rootMoments = moments.filter(m => !m.parentId);
+
+    // Check if user has seen onboarding
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const hasSeenOnboarding = localStorage.getItem('timeline-onboarding-seen');
+            setShowOnboarding(!hasSeenOnboarding && !disabled);
+        }
+    }, [disabled]);
+
+    // Reset onboarding when moments are empty and no active capture (new video loaded)
+    useEffect(() => {
+        if (moments.length === 0 && startSec === null && endSec === null && !disabled) {
+            // Clear the localStorage flag to show onboarding again
+            if (typeof window !== 'undefined') {
+                localStorage.removeItem('timeline-onboarding-seen');
+                setShowOnboarding(true);
+                setCapturePhase('idle');
+            }
+        }
+    }, [moments.length, startSec, endSec, disabled]);
 
     // Social State
     const [replyText, setReplyText] = useState('');
@@ -143,7 +171,29 @@ export default function PlayerTimeline({
     const [draggingMarker, setDraggingMarker] = useState<'start' | 'end' | 'range' | null>(null);
     const [dragStartMouseX, setDragStartMouseX] = useState<number | null>(null); // To detect click vs drag
     const [isEditorOpen, setIsEditorOpen] = useState(false);
+
+    // Sync editor state with parent
+    useEffect(() => {
+        onEditorOpenChange?.(isEditorOpen);
+    }, [isEditorOpen, onEditorOpenChange]);
+
     const [isHoveringRange, setIsHoveringRange] = useState(false);
+
+    // Focus textarea when editor opens
+    useEffect(() => {
+        if (isEditorOpen && textareaRef.current) {
+            setTimeout(() => {
+                textareaRef.current?.focus();
+            }, 100);
+        }
+    }, [isEditorOpen]);
+
+    // Reset editor state when capture ends (e.g. Cancel or Save)
+    useEffect(() => {
+        if (startSec === null) {
+            setIsEditorOpen(false);
+        }
+    }, [startSec]);
 
     // Mobile-First Draft State
     const [draftMoment, setDraftMoment] = useState<{ start: number; end: number } | null>(null);
@@ -162,6 +212,7 @@ export default function PlayerTimeline({
     };
 
     const timelineRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     const formatTime = (seconds: number): string => {
@@ -317,6 +368,12 @@ export default function PlayerTimeline({
                     justDraggedRef.current = false;
                 }, 100);
             }
+
+            // Transition from positioning to active phase when user releases drag
+            if (capturePhase === 'positioning' && draggingMarker === 'start') {
+                setCapturePhase('active');
+            }
+
             setDraggingMarker(null);
         };
 
@@ -496,8 +553,8 @@ export default function PlayerTimeline({
         const hasDraft = startSec !== null || endSec !== null || note.trim() !== '';
         const hasEngagedWithEditor = note.trim() !== ''; // User has started typing
 
-        // Don't activate click-away when user is actively editing (has typed something)
-        if (!hasDraft || hasEngagedWithEditor) return;
+        // Don't activate click-away when user is actively editing (has typed something) OR when editor is open
+        if (!hasDraft || hasEngagedWithEditor || isEditorOpen) return;
 
         const handleClickAway = (e: MouseEvent) => {
             const target = e.target as HTMLElement;
@@ -560,6 +617,19 @@ export default function PlayerTimeline({
                         setHoverTime(Math.floor(percent * safeDuration));
                     }}
                     onClick={(e) => {
+                        // ONBOARDING: If showing onboarding, dismiss it and enter positioning phase
+                        if (showOnboarding) {
+                            setShowOnboarding(false);
+                            setCapturePhase('positioning');
+                            if (typeof window !== 'undefined') {
+                                localStorage.setItem('timeline-onboarding-seen', 'true');
+                            }
+                            // Start capture at current time
+                            const time = getTimeFromX(e.clientX);
+                            onCaptureStart?.(time);
+                            return;
+                        }
+
                         const time = getTimeFromX(e.clientX);
 
                         // CLICK-TO-DRAFT LOGIC
@@ -598,6 +668,20 @@ export default function PlayerTimeline({
                         }
                     }}
                 >
+                    {/* Onboarding Overlay */}
+                    {showOnboarding && (
+                        <div className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-sm rounded-lg flex items-center justify-center cursor-pointer animate-in fade-in duration-300">
+                            <div className="text-center space-y-2 px-4">
+                                <div className="text-sm md:text-base font-medium text-white">
+                                    <span className="hidden md:inline">Click here to start moment capture</span>
+                                    <span className="md:hidden">Tap here to start</span>
+                                </div>
+                                <div className="text-xs text-white/60">
+                                    Drag to find your favorite moment
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     {/* Track Background */}
                     <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-white/10 overflow-visible">
                         {/* Green Progress */}
@@ -668,7 +752,7 @@ export default function PlayerTimeline({
                             {endSec !== null && (
                                 <div
                                     data-draft-marker
-                                    className="absolute top-0 bottom-0 z-15 bg-orange-500/10 border-x border-orange-500/30 cursor-pointer hover:bg-orange-500/20 transition-colors flex items-center justify-center group/range"
+                                    className="absolute top-0 bottom-0 z-15 bg-[#1a2332]/90 cursor-grab active:cursor-grabbing flex items-center justify-center group/range"
                                     style={{
                                         left: `${(startSec / safeDuration) * 100}%`,
                                         width: `${((endSec - startSec) / safeDuration) * 100}%`
@@ -701,57 +785,57 @@ export default function PlayerTimeline({
                                         setDragStartMouseX(null);
                                     }}
                                 >
-                                    {!isEditorOpen && (
-                                        <div
-                                            // Positioned ABOVE the timeline track for mobile accessibility
-                                            className="absolute left-1/2 -translate-x-1/2 -top-6 pointer-events-auto cursor-pointer transition-all duration-200"
-                                            onMouseDown={(e) => e.stopPropagation()}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onPreviewCapture?.();
-                                                setIsEditorOpen(true);
-                                            }}
-                                        >
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-orange-300 whitespace-nowrap bg-black/80 px-2 py-1 rounded border border-orange-500/30 hover:bg-orange-500/20 transition-colors">
-                                                {((endSec - startSec) / safeDuration) * 100 < 15 ? 'Edit' : 'Edit Moment'}
-                                            </span>
-                                        </div>
-                                    )}
+                                    {/* VISUALS: +Create Text & Vertical Borders */}
+                                    {/* VISUALS: +Create Text & Vertical Borders */}
+                                    <button
+                                        className="text-[10px] font-bold text-white tracking-widest uppercase select-none drop-shadow-md hover:scale-110 transition-transform cursor-pointer pointer-events-auto"
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setIsEditorOpen(true);
+                                            // Re-focus logic
+                                            textareaRef.current?.focus();
+                                            onFocusRequest?.();
+                                        }}
+                                    >
+                                        {isEditorOpen ? 'EDIT' : '+CREATE'}
+                                    </button>
+
+                                    {/* Left Border (Extended) */}
+                                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-[140%] w-[3px] bg-orange-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.3)]" />
+
+                                    {/* Right Border (Extended) */}
+                                    <div className="absolute right-0 top-1/2 -translate-y-1/2 h-[140%] w-[3px] bg-orange-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.3)]" />
 
                                 </div>
                             )}
 
                             {/* Start Marker Component */}
                             <div
-                                className={`absolute top-1/2 h-5 w-3 cursor-ew-resize z-20 group/marker transition-transform duration-200 
-                                    ${(isHoveringRange || draggingMarker) ? 'scale-125' : 'hover:scale-125'}
+                                className={`absolute top-1/2 h-8 w-8 cursor-ew-resize z-20 group/marker transition-transform duration-200 
+                                    ${(isHoveringRange || draggingMarker) ? 'scale-110' : 'hover:scale-110'}
                                 `}
                                 style={{
                                     left: `${(startSec / safeDuration) * 100}%`,
-                                    transform: 'translateX(-50%) translateY(-42%)',
-                                    transformOrigin: 'left center'
+                                    transform: 'translateX(-50%) translateY(-50%)', // Center the wrapper
+                                    transformOrigin: 'center'
                                 }}
                                 onMouseDown={(e) => {
                                     e.stopPropagation();
                                     setDraggingMarker('start');
                                 }}
                             >
-                                {/* Bracket Visual */}
-                                <div className="absolute inset-0 border-l-2 border-t border-b border-orange-500 rounded-l-sm bg-black/50" />
-
-                                {/* Tiny Orange Play/Pause Button INSIDE Pocket */}
+                                {/* Circle Handle (Offset Left) */}
                                 <div
-                                    className="absolute left-[2px] top-1/2 -translate-y-1/2 pointer-events-auto z-30"
-                                    onMouseDown={(e) => e.stopPropagation()}
+                                    className="absolute right-[calc(50%+4px)] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-orange-500 border-2 border-black shadow-md flex items-center justify-center"
                                 >
+                                    {/* Tiny Play/Pause inside handle (Preserving Functionality) */}
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             onPreviewCapture?.();
                                         }}
-                                        // Small circle, flush inside bracket
-                                        className="h-2 w-2 rounded-full flex items-center justify-center text-orange-500 hover:text-orange-300 hover:scale-125 transition-all"
-                                        title="Preview"
+                                        className="flex items-center justify-center w-full h-full text-black hover:text-white transition-colors"
                                     >
                                         {isPlaying && currentTime >= startSec && (endSec === null || currentTime <= endSec) ?
                                             <Pause size={8} className="fill-current" /> :
@@ -759,6 +843,9 @@ export default function PlayerTimeline({
                                         }
                                     </button>
                                 </div>
+
+                                {/* Vertical Orange Line (Extended) */}
+                                <div className="absolute left-1/2 top-1/2 -translate-y-1/2 h-[140%] w-[3px] bg-orange-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.3)]" />
 
                                 {/* Timestamp Popover */}
                                 {(isHovering || draggingMarker === 'start') && (
@@ -789,8 +876,8 @@ export default function PlayerTimeline({
                                 transform: 'translateX(-50%) translateY(-42%)',
                             }}
                         >
-                            {/* Visual Component: Orange Close Bracket */}
-                            <div className="absolute inset-0 border-r-2 border-t border-b border-orange-500 rounded-r-sm bg-orange-500/10 shadow-[0_0_10px_rgba(249,115,22,0.3)] anim-pulse-border" />
+                            {/* Visual Component: Orange Vertical Line (Cursor Follower) */}
+                            <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 h-[140%] w-[3px] bg-orange-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.3)] animate-pulse" />
 
                             {/* Floating "Set End" Label */}
                             <div
@@ -808,16 +895,18 @@ export default function PlayerTimeline({
                     {/* End Marker } */}
                     {endSec !== null && (
                         <div
-                            className={`absolute top-1/2 h-5 w-3 cursor-ew-resize z-20 group/marker transition-transform duration-200 
-                                ${(isHoveringRange || draggingMarker) ? 'scale-125' : 'hover:scale-125'}
+                            className={`absolute top-1/2 h-8 w-8 cursor-ew-resize z-20 group/marker transition-transform duration-200 
+                                ${(isHoveringRange || draggingMarker) ? 'scale-110' : 'hover:scale-110'}
                             `}
-                            style={{ left: `${(endSec / safeDuration) * 100}%`, transform: 'translateX(-50%) translateY(-42%)' }}
+                            style={{ left: `${(endSec / safeDuration) * 100}%`, transform: 'translateX(-50%) translateY(-50%)' }}
                             onMouseDown={(e) => {
                                 e.stopPropagation();
                                 setDraggingMarker('end');
                             }}
                         >
-                            <div className="absolute inset-0 border-r-2 border-t border-b border-orange-500 rounded-r-sm bg-black/50" />
+                            {/* Circle Handle (Offset Right) */}
+                            <div className="absolute left-[calc(50%+4px)] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-orange-500 border-2 border-black shadow-md" />
+
                             {(isHovering || draggingMarker !== null) && (
                                 <div className="absolute -top-6 left-1/2 -translate-x-1/2 flex items-center gap-1 text-[10px] font-mono font-bold bg-orange-500 text-black px-1 rounded opacity-0 group-hover/marker:opacity-100 transition-opacity whitespace-nowrap">
                                     {formatTime(endSec)}
@@ -863,64 +952,49 @@ export default function PlayerTimeline({
                     {/* DRAFT MOMENT VISUALIZATION */}
                     {draftMoment && (
                         <>
-                            {/* Draft Background Fill */}
+                            {/* Draft Background Fill (Dark Pill) */}
                             <div
-                                className="absolute top-0 bottom-0 z-30 bg-blue-500/20 border-l-2 border-blue-500"
+                                className="absolute top-0 bottom-0 z-30 bg-[#1a2332]/90 flex items-center justify-center cursor-pointer group/draft"
                                 style={{
                                     left: `${(draftMoment.start / safeDuration) * 100}%`,
                                     width: `${((draftMoment.end - draftMoment.start) / safeDuration) * 100}%`
                                 }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    // Confirm Draft -> Open Editor
+                                    onCaptureStart?.(draftMoment.start);
+                                    onCaptureEnd?.(draftMoment.end);
+                                    setDraftMoment(null);
+                                    setIsEditorOpen(true);
+                                }}
                             >
-                                {/* "Edit Moment" Button - Pops above when moment is too short */}
-                                {!isDraggingDraft && (() => {
-                                    const widthPercent = ((draftMoment.end - draftMoment.start) / safeDuration) * 100;
-                                    const isTooNarrow = widthPercent < 5; // Less than 5% of timeline width
-                                    const buttonText = widthPercent < 15 ? 'Edit' : 'Edit Moment';
+                                {/* VISUALS: +Create Text & Vertical Borders */}
+                                {/* VISUALS: +Create Text & Vertical Borders */}
+                                <button
+                                    className="text-[10px] font-bold text-white tracking-widest uppercase select-none drop-shadow-md hover:scale-110 transition-transform cursor-pointer pointer-events-auto"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onCaptureStart?.(draftMoment.start);
+                                        onCaptureEnd?.(draftMoment.end);
+                                        setDraftMoment(null);
+                                        setIsEditorOpen(true);
+                                    }}
+                                >
+                                    +Create
+                                </button>
 
-                                    if (isTooNarrow) {
-                                        // Pop out above the timeline when too narrow
-                                        return (
-                                            <div
-                                                className="absolute left-1/2 -translate-x-1/2 -top-8 bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg shadow-lg cursor-pointer transition-all duration-200 pointer-events-auto z-60 whitespace-nowrap"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onCaptureStart?.(draftMoment.start);
-                                                    onCaptureEnd?.(draftMoment.end);
-                                                    setDraftMoment(null);
-                                                    setIsEditorOpen(true);
-                                                }}
-                                            >
-                                                <span className="text-[11px] font-bold uppercase tracking-wider">{buttonText}</span>
-                                            </div>
-                                        );
-                                    } else {
-                                        // Normal inline button
-                                        return (
-                                            <div
-                                                className="absolute inset-0 flex items-center justify-center bg-black/40 pointer-events-auto cursor-pointer transition-all duration-200 hover:bg-black/60"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onCaptureStart?.(draftMoment.start);
-                                                    onCaptureEnd?.(draftMoment.end);
-                                                    setDraftMoment(null);
-                                                    setIsEditorOpen(true);
-                                                }}
-                                            >
-                                                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-300 whitespace-nowrap">{buttonText}</span>
-                                            </div>
-                                        );
-                                    }
-                                })()}
+                                {/* Left Border (Extended) */}
+                                <div className="absolute left-0 top-1/2 -translate-y-1/2 h-[140%] w-[3px] bg-orange-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.3)]" />
 
-                                {/* Drag Handle (Start Time) */}
+                                {/* Right Border (Extended) */}
+                                <div className="absolute right-0 top-1/2 -translate-y-1/2 h-[140%] w-[3px] bg-orange-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.3)]" />
+
+                                {/* Drag Handle (Start Time) - Offset Left */}
                                 <div
-                                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-50 cursor-ew-resize"
+                                    className="absolute right-full mr-1 top-1/2 -translate-y-1/2 z-50 cursor-ew-resize group/handle-start"
                                     onMouseDown={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
-                                        console.log('[Start Handle] Mouse down - starting drag');
-
-                                        // Direct drag handling like white scrubber
                                         const handleDrag = (moveEvent: MouseEvent) => {
                                             const time = getTimeFromX(moveEvent.clientX);
                                             const newStart = Math.max(0, Math.min(time, (draftMoment?.end || safeDuration) - 1));
@@ -931,11 +1005,8 @@ export default function PlayerTimeline({
                                             document.removeEventListener('mousemove', handleDrag);
                                             document.removeEventListener('mouseup', handleRelease);
                                             setIsDraggingDraft(false);
-                                            // Prevent timeline onClick from firing
                                             justDraggedRef.current = true;
-                                            setTimeout(() => {
-                                                justDraggedRef.current = false;
-                                            }, 100);
+                                            setTimeout(() => { justDraggedRef.current = false; }, 100);
                                         };
                                         document.addEventListener('mousemove', handleDrag);
                                         document.addEventListener('mouseup', handleRelease);
@@ -944,9 +1015,6 @@ export default function PlayerTimeline({
                                     onTouchStart={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
-                                        console.log('[Start Handle] Touch start - starting drag');
-
-                                        // Direct drag handling like white scrubber
                                         const handleDrag = (moveEvent: TouchEvent) => {
                                             const touch = moveEvent.touches[0];
                                             if (touch) {
@@ -960,30 +1028,24 @@ export default function PlayerTimeline({
                                             document.removeEventListener('touchmove', handleDrag);
                                             document.removeEventListener('touchend', handleRelease);
                                             setIsDraggingDraft(false);
-                                            // Prevent timeline onClick from firing
                                             justDraggedRef.current = true;
-                                            setTimeout(() => {
-                                                justDraggedRef.current = false;
-                                            }, 100);
+                                            setTimeout(() => { justDraggedRef.current = false; }, 100);
                                         };
                                         document.addEventListener('touchmove', handleDrag);
                                         document.addEventListener('touchend', handleRelease);
                                         setIsDraggingDraft('start');
                                     }}
-                                    style={{ padding: '14px' }} // 40px touch target
                                 >
-                                    <div className="w-3 h-3 rounded-full bg-blue-500 border-2 border-white shadow-lg animate-pulse" />
+                                    {/* Orange Circle Visual */}
+                                    <div className="w-4 h-4 rounded-full bg-orange-500 border-2 border-black shadow-md hover:scale-110 transition-transform" />
                                 </div>
 
-                                {/* Drag Handle (End Time) */}
+                                {/* Drag Handle (End Time) - Offset Right */}
                                 <div
-                                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-50 cursor-ew-resize"
+                                    className="absolute left-full ml-1 top-1/2 -translate-y-1/2 z-50 cursor-ew-resize group/handle-end"
                                     onMouseDown={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
-                                        console.log('[End Handle] Mouse down - starting drag');
-
-                                        // Direct drag handling like white scrubber
                                         const handleDrag = (moveEvent: MouseEvent) => {
                                             const time = getTimeFromX(moveEvent.clientX);
                                             const newEnd = Math.max((draftMoment?.start || 0) + 1, Math.min(time, safeDuration));
@@ -994,11 +1056,8 @@ export default function PlayerTimeline({
                                             document.removeEventListener('mousemove', handleDrag);
                                             document.removeEventListener('mouseup', handleRelease);
                                             setIsDraggingDraft(false);
-                                            // Prevent timeline onClick from firing
                                             justDraggedRef.current = true;
-                                            setTimeout(() => {
-                                                justDraggedRef.current = false;
-                                            }, 100);
+                                            setTimeout(() => { justDraggedRef.current = false; }, 100);
                                         };
                                         document.addEventListener('mousemove', handleDrag);
                                         document.addEventListener('mouseup', handleRelease);
@@ -1007,9 +1066,6 @@ export default function PlayerTimeline({
                                     onTouchStart={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
-                                        console.log('[End Handle] Touch start - starting drag');
-
-                                        // Direct drag handling like white scrubber
                                         const handleDrag = (moveEvent: TouchEvent) => {
                                             const touch = moveEvent.touches[0];
                                             if (touch) {
@@ -1023,19 +1079,16 @@ export default function PlayerTimeline({
                                             document.removeEventListener('touchmove', handleDrag);
                                             document.removeEventListener('touchend', handleRelease);
                                             setIsDraggingDraft(false);
-                                            // Prevent timeline onClick from firing
                                             justDraggedRef.current = true;
-                                            setTimeout(() => {
-                                                justDraggedRef.current = false;
-                                            }, 100);
+                                            setTimeout(() => { justDraggedRef.current = false; }, 100);
                                         };
                                         document.addEventListener('touchmove', handleDrag);
                                         document.addEventListener('touchend', handleRelease);
                                         setIsDraggingDraft('end');
                                     }}
-                                    style={{ padding: '14px' }} // 40px touch target (14px padding * 2 + 12px circle)
                                 >
-                                    <div className="w-3 h-3 rounded-full bg-blue-500 border-2 border-white shadow-lg animate-pulse" />
+                                    {/* Orange Circle Visual */}
+                                    <div className="w-4 h-4 rounded-full bg-orange-500 border-2 border-black shadow-md hover:scale-110 transition-transform" />
                                 </div>
                             </div>
                         </>
@@ -1076,6 +1129,7 @@ export default function PlayerTimeline({
                                 <span>{formatTime(startSec || 0)} - {formatTime(endSec || 0)}</span>
                             </div>
                             <textarea
+                                ref={textareaRef}
                                 autoFocus
                                 value={note}
                                 onChange={(e) => onNoteChange?.(e.target.value)}

@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import { AuthProvider } from "@/context/AuthContext";
 import { FilterProvider } from "@/context/FilterContext";
 import { Toaster } from "sonner";
+import FooterWrapper from "@/components/layout/FooterWrapper";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -24,8 +25,9 @@ export default function RootLayout({
                 <AuthProvider>
                     <FilterProvider>
                         <Navbar />
-                        <div className="pt-14">
+                        <div className="pt-14 min-h-screen flex flex-col">
                             {children}
+                            <FooterWrapper />
                         </div>
                         <Toaster position="bottom-right" />
                     </FilterProvider>

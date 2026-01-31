@@ -726,3 +726,49 @@ export async function fetchYoutubeMetadata(videoId: string) {
         return null;
     }
 }
+
+export async function submitFeedback(content: string, category: string) {
+    try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!user) {
+            throw new Error('Not authenticated');
+        }
+
+        const { error } = await supabase
+            .from('user_feedback' as any)
+            .insert({
+                user_id: user.id,
+                user_name: user.email || 'Anonymous',
+                feedback_text: content,
+                category: category,
+                page_url: typeof window !== 'undefined' ? window.location.href : null,
+                user_agent: typeof window !== 'undefined' ? window.navigator.userAgent : null,
+            });
+
+        if (error) throw error;
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to submit feedback:', error);
+        return { success: false, error };
+    }
+}
+
+export async function getUserFeedback(userId: string) {
+    try {
+        const supabase = await createClient();
+
+        const { data: feedback, error } = await supabase
+            .from('user_feedback' as any)
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return feedback || [];
+    } catch (error) {
+        console.error('Failed to fetch user feedback:', error);
+        return [];
+    }
+}

@@ -25,6 +25,7 @@ import { MyMomentIcon } from '@/components/icons/MyMomentIcon';
 import { parseChapters, getCurrentChapter, Chapter } from '@/lib/chapters';
 import { usePlaybackGuard } from '@/hooks/usePlaybackGuard';
 import GroupingPromptModal from '@/components/GroupingPromptModal';
+import Footer from '@/components/layout/Footer';
 
 type CaptureState = 'idle' | 'start-captured' | 'end-captured';
 
@@ -131,6 +132,8 @@ export default function Room({ params }: { params: { id: string } }) {
 
     // Smart Capture State
     const [captureState, setCaptureState] = useState<CaptureState>('idle');
+    const [isSidebarEditorOpen, setIsSidebarEditorOpen] = useState(false);
+    const [focusTrigger, setFocusTrigger] = useState(0);
     const [youtubePlayer, setYoutubePlayer] = useState<any>(null);
     const [spotifyPlayer, setSpotifyPlayer] = useState<SpotifyController | null>(null);
     const [error, setError] = useState('');
@@ -722,6 +725,7 @@ export default function Room({ params }: { params: { id: string } }) {
             setStartSec(null);
             setEndSec(null);
             setNote('');
+            setIsSidebarEditorOpen(false);
             setSaved(true);
             toast.success("Moment captured!");
 
@@ -1424,6 +1428,7 @@ export default function Room({ params }: { params: { id: string } }) {
                                         setCaptureState('idle');
                                         setError('');
                                         setNote('');
+                                        setIsSidebarEditorOpen(false);
                                     }}
                                     onCancelDraft={() => {
                                         setStartSec(null);
@@ -1431,6 +1436,7 @@ export default function Room({ params }: { params: { id: string } }) {
                                         setCaptureState('idle');
                                         setError('');
                                         setNote('');
+                                        setIsSidebarEditorOpen(false);
                                     }}
                                     onPreviewCapture={handlePreviewCapture}
                                     onCaptureStart={(time) => {
@@ -1438,6 +1444,8 @@ export default function Room({ params }: { params: { id: string } }) {
                                         setCaptureState('start-captured');
                                         setError('');
                                     }}
+                                    onEditorOpenChange={setIsSidebarEditorOpen}
+                                    onFocusRequest={() => setFocusTrigger(prev => prev + 1)}
                                     onCaptureEnd={(time) => {
                                         setEndSec(time);
                                         setCaptureState('end-captured');
@@ -1558,16 +1566,20 @@ export default function Room({ params }: { params: { id: string } }) {
                                     )}
                                 </div>
                             </div>
+                            <div className="pb-8">
+                                <Footer />
+                            </div>
                         </div>
                     </div>
 
                     {/* Right: Sidebar (35% on desktop, hidden on mobile) */}
                     <div className="hidden lg:block lg:w-[35%] shrink-0">
-                        {/* Render MomentEditor in sidebar when active */}
-                        {(startSec !== null || endSec !== null) ? (
+                        {/* Render MomentEditor in sidebar when active AND explicitly opened */}
+                        {((startSec !== null || endSec !== null) && isSidebarEditorOpen) ? (
                             <div className="sticky top-4">
                                 <MomentEditor
                                     isOpen={true}
+                                    focusTrigger={focusTrigger}
                                     note={note}
                                     startSec={startSec}
                                     endSec={endSec}
@@ -1580,6 +1592,8 @@ export default function Room({ params }: { params: { id: string } }) {
                                         setEndSec(null);
                                         setCaptureState('idle');
                                         setError('');
+                                        setNote('');
+                                        setIsSidebarEditorOpen(false);
                                     }}
                                     onPreview={() => {
                                         if (startSec === null || endSec === null) return;

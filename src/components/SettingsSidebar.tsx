@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Lock, LogOut, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { X, Lock, LogOut, Check, AlertCircle, Loader2, Music } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
+import { useFilter } from '@/context/FilterContext';
 
 interface SettingsSidebarProps {
     isOpen: boolean;
@@ -18,6 +19,7 @@ export default function SettingsSidebar({ isOpen, onClose, userEmail }: Settings
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
     const router = useRouter();
     const supabase = createClient();
+    const { showSpotify, toggleSpotify } = useFilter();
 
     const handlePasswordChange = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -84,6 +86,30 @@ export default function SettingsSidebar({ isOpen, onClose, userEmail }: Settings
                         <label className="text-xs font-semibold text-white/40 uppercase tracking-wider">Account</label>
                         <div className="bg-white/5 rounded-lg p-3 text-sm text-white/80 border border-white/5">
                             {userEmail}
+                        </div>
+                    </div>
+
+                    {/* Preferences */}
+                    <div className="space-y-3">
+                        <label className="text-xs font-semibold text-white/40 uppercase tracking-wider">Preferences</label>
+
+                        <div className="flex items-center justify-between bg-white/5 p-3 rounded-lg border border-white/5">
+                            <div className="flex items-center gap-3">
+                                <div className={`p-2 rounded-lg ${showSpotify ? 'bg-green-500/20 text-green-400' : 'bg-white/10 text-white/40'}`}>
+                                    <Music size={18} />
+                                </div>
+                                <div className="text-sm">
+                                    <div className="font-medium text-white">Spotify Moments</div>
+                                    <div className="text-xs text-white/40">{showSpotify ? 'Visible' : 'Hidden'}</div>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={toggleSpotify}
+                                className={`w-12 h-6 rounded-full relative transition-colors ${showSpotify ? 'bg-green-600' : 'bg-white/10'}`}
+                            >
+                                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${showSpotify ? 'left-7' : 'left-1'}`} />
+                            </button>
                         </div>
                     </div>
 

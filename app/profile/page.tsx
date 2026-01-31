@@ -9,8 +9,10 @@ import Link from 'next/link';
 import { Play, Music, Calendar, Youtube, Settings } from 'lucide-react';
 import { Moment } from '@/types';
 import MomentCard from '@/components/MomentCard';
-import { getUserMoments, getLikedMoments } from '../explore/actions';
+// ... imports
+import { getUserMoments, getLikedMoments, getUserFeedback } from '../explore/actions';
 import SettingsSidebar from '@/components/SettingsSidebar';
+import FeedbackDetailModal from '@/components/FeedbackDetailModal';
 
 export default function Profile() {
     const { user, isLoading } = useAuth();
@@ -18,28 +20,34 @@ export default function Profile() {
     const router = useRouter();
     const [moments, setMoments] = useState<Moment[]>([]);
     const [likedMoments, setLikedMoments] = useState<Moment[]>([]);
+    const [feedbackList, setFeedbackList] = useState<any[]>([]); // Using any for now or define Feedback type
     const [loading, setLoading] = useState(true);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+    // Feedback Detail State
+    const [selectedFeedback, setSelectedFeedback] = useState<any | null>(null);
 
     useEffect(() => {
         if (!isLoading && !user) {
             router.push('/login');
         } else if (user?.id && !filterLoading) {
-            fetchMoments(user.id);
+            fetchData(user.id);
         }
     }, [user, isLoading, router, showSpotify, filterLoading]);
 
-    const fetchMoments = async (userId: string) => {
+    const fetchData = async (userId: string) => {
         setLoading(true);
         try {
-            const [userData, likedData] = await Promise.all([
+            const [userData, likedData, feedbackData] = await Promise.all([
                 getUserMoments(userId, !showSpotify),
-                getLikedMoments(userId, !showSpotify)
+                getLikedMoments(userId, !showSpotify),
+                getUserFeedback(userId)
             ]);
             setMoments(userData);
             setLikedMoments(likedData);
+            setFeedbackList(feedbackData);
         } catch (error) {
-            console.error('Failed to fetch user moments:', error);
+            console.error('Failed to fetch user data:', error);
         } finally {
             setLoading(false);
         }
@@ -95,6 +103,12 @@ export default function Profile() {
                 isOpen={isSettingsOpen}
                 onClose={() => setIsSettingsOpen(false)}
                 userEmail={user?.email}
+            />
+
+            <FeedbackDetailModal
+                isOpen={!!selectedFeedback}
+                onClose={() => setSelectedFeedback(null)}
+                feedback={selectedFeedback}
             />
 
             <div className="max-w-7xl mx-auto space-y-12">
@@ -170,6 +184,35 @@ export default function Profile() {
                                     onPlayFull={(m) => router.push(`/room/view?url=${encodeURIComponent(m.sourceUrl)}`)}
                                     onPlayMoment={(m) => router.push(`/room/view?url=${encodeURIComponent(m.sourceUrl)}&start=${m.startSec}&end=${m.endSec}`)}
                                 />
+                            ))}
+                        </div>
+                    </section>
+                )}
+
+                {/* User Feedback History */}
+                {feedbackList.length > 0 && (
+                    <section className="space-y-6 animate-in slide-in-from-bottom-4 fade-in duration-500 delay-200">
+                        <h2 className="text-2xl font-bold border-b border-white/10 pb-4 text-purple-400">My Feedback</h2>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {feedbackList.map((item) => (
+                                <button
+                                    key={item.id}
+                                    onClick={() => setSelectedFeedback(item)}
+                                    className="bg-zinc-900/50 hover:bg-zinc-900 border border-white/5 hover:border-purple-500/30 rounded-xl p-4 text-left transition-all hover:scale-[1.02] group"
+                                >
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-xs font-bold text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
+                                            {item.category || 'Feedback'}
+                                        </span>
+                                        <span className="text-xs text-white/30">
+                                            {new Date(item.created_at).toLocaleDateString()}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-white/80 line-clamp-2">
+                                        {item.content}
+                                    </p>
+                                </button>
                             ))}
                         </div>
                     </section>
