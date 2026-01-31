@@ -13,6 +13,7 @@ export default function Login() {
     const [view, setView] = useState<'sign-in' | 'sign-up'>('sign-in');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
 
     // UI State for UX improvements (from existing UI)
@@ -28,6 +29,13 @@ export default function Login() {
 
         try {
             if (view === 'sign-up') {
+                // Validate password confirmation
+                if (password !== confirmPassword) {
+                    setError('Passwords do not match');
+                    setLoading(false);
+                    return;
+                }
+
                 // Simplified Sign Up (No Metadata) as requested
                 const { error } = await supabase.auth.signUp({
                     email,
@@ -46,6 +54,7 @@ export default function Login() {
                     setView('sign-in'); // Switch back to login view automatically
                     setEmail('');
                     setPassword('');
+                    setConfirmPassword('');
                 }
             } else {
                 // Standard Sign In
@@ -57,8 +66,12 @@ export default function Login() {
                 if (error) {
                     setError('Invalid email or password');
                 } else {
-                    router.refresh();
-                    router.push('/');
+                    // Get redirect parameter from URL
+                    const searchParams = new URLSearchParams(window.location.search);
+                    const redirectTo = searchParams.get('redirect') || '/';
+
+                    // Use window.location for hard redirect to ensure auth state updates
+                    window.location.href = redirectTo;
                 }
             }
         } catch (err) {
@@ -122,6 +135,22 @@ export default function Login() {
                                 </button>
                             </div>
                         </div>
+
+                        {/* Confirm Password Field - Only for Sign Up */}
+                        {view === 'sign-up' && (
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-white/80">Confirm Password</label>
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    className="input-field w-full"
+                                    placeholder="••••••••"
+                                    required
+                                    minLength={6}
+                                />
+                            </div>
+                        )}
 
                         {/* Error Banner - Preserved */}
                         {error && (

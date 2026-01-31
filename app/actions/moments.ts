@@ -4,66 +4,72 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 
 export async function toggleLike(momentId: string, path: string) {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
 
-    if (!user) {
-        throw new Error('Unauthorized');
-    }
+        if (!user) {
+            return { success: false, error: 'Unauthorized' };
+        }
 
-    // Check if like exists
-    const { data: existingLike } = await supabase
-        .from('likes')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('moment_id', momentId)
-        .single();
-
-    if (existingLike) {
-        // Unlike - delete the like
-        await supabase
+        // Check if like exists
+        const { data: existingLike } = await supabase
             .from('likes')
-            .delete()
-            .eq('id', existingLike.id);
-
-        // Decrement like count
-        const { data: moment } = await supabase
-            .from('moments')
-            .select('like_count')
-            .eq('id', momentId)
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('moment_id', momentId)
             .single();
 
-        if (moment) {
+        if (existingLike) {
+            // Unlike - delete the like
             await supabase
+                .from('likes')
+                .delete()
+                .eq('id', existingLike.id);
+
+            // Decrement like count
+            const { data: moment } = await supabase
                 .from('moments')
-                .update({ like_count: Math.max(0, (moment.like_count || 0) - 1) })
-                .eq('id', momentId);
-        }
-    } else {
-        // Like - create new like
-        await supabase
-            .from('likes')
-            .insert({
-                user_id: user.id,
-                moment_id: momentId
-            });
+                .select('like_count')
+                .eq('id', momentId)
+                .single();
 
-        // Increment like count
-        const { data: moment } = await supabase
-            .from('moments')
-            .select('like_count')
-            .eq('id', momentId)
-            .single();
-
-        if (moment) {
+            if (moment) {
+                await supabase
+                    .from('moments')
+                    .update({ like_count: Math.max(0, (moment.like_count || 0) - 1) })
+                    .eq('id', momentId);
+            }
+        } else {
+            // Like - create new like
             await supabase
+                .from('likes')
+                .insert({
+                    user_id: user.id,
+                    moment_id: momentId
+                });
+
+            // Increment like count
+            const { data: moment } = await supabase
                 .from('moments')
-                .update({ like_count: (moment.like_count || 0) + 1 })
-                .eq('id', momentId);
+                .select('like_count')
+                .eq('id', momentId)
+                .single();
+
+            if (moment) {
+                await supabase
+                    .from('moments')
+                    .update({ like_count: (moment.like_count || 0) + 1 })
+                    .eq('id', momentId);
+            }
         }
+
+        revalidatePath(path);
+        return { success: true };
+    } catch (error) {
+        console.error('Error toggling like:', error);
+        return { success: false, error: 'Failed to toggle like' };
     }
-
-    revalidatePath(path);
 }
 
 export async function createComment(

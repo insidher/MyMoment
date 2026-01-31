@@ -27,13 +27,31 @@ export default function Profile() {
     // Feedback Detail State
     const [selectedFeedback, setSelectedFeedback] = useState<any | null>(null);
 
+    const [viewedProfileId, setViewedProfileId] = useState<string | null>(null);
+
     useEffect(() => {
-        if (!isLoading && !user) {
+        const params = new URLSearchParams(window.location.search);
+        const urlId = params.get('id');
+        const targetId = urlId || user?.id;
+
+        if (targetId && !filterLoading) {
+            setViewedProfileId(targetId);
+            fetchData(targetId);
+        } else if (!isLoading && !user && !urlId) {
+            // Only redirect to login if trying to view OWN profile while logged out
             router.push('/login');
-        } else if (user?.id && !filterLoading) {
-            fetchData(user.id);
         }
-    }, [user, isLoading, router, showSpotify, filterLoading]);
+    }, [user, isLoading, router, showSpotify, filterLoading, window.location.search]);
+
+    // Auto-open settings if query parameter is present (Only for own profile)
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        // Only allow settings if it's MY profile
+        if (params.get('settings') === 'true' && user && (!params.get('id') || params.get('id') === user.id)) {
+            setIsSettingsOpen(true);
+            window.history.replaceState({}, '', '/profile');
+        }
+    }, [user]);
 
     const fetchData = async (userId: string) => {
         setLoading(true);
@@ -41,7 +59,8 @@ export default function Profile() {
             const [userData, likedData, feedbackData] = await Promise.all([
                 getUserMoments(userId, !showSpotify),
                 getLikedMoments(userId, !showSpotify),
-                getUserFeedback(userId)
+                // Only fetch feedback if viewing OWN profile
+                (user && user.id === userId) ? getUserFeedback(userId) : Promise.resolve([])
             ]);
             setMoments(userData);
             setLikedMoments(likedData);
@@ -113,35 +132,13 @@ export default function Profile() {
 
             <div className="max-w-7xl mx-auto space-y-12">
 
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-6">
-                        <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-4xl font-bold">
-                            {user?.user_metadata?.avatar_url ? (
-                                <img src={user.user_metadata.avatar_url} alt={user.email || 'User'} className="w-full h-full rounded-full" />
-                            ) : (
-                                (user?.email?.[0]?.toUpperCase() || 'U')
-                            )}
-                        </div>
-                        <div>
-                            <h1 className="text-4xl font-bold">{user?.email?.split('@')[0] || 'User'}</h1>
-                            <p className="text-white/60">{user?.email}</p>
-                            <p className="text-white/40 text-sm mt-1">Joined {new Date().toLocaleDateString()}</p>
-                        </div>
-                    </div>
 
-                    <button
-                        onClick={() => setIsSettingsOpen(true)}
-                        className="p-3 bg-white/5 hover:bg-white/10 rounded-full transition-colors text-white/60 hover:text-white"
-                        title="Settings"
-                    >
-                        <Settings size={24} />
-                    </button>
-                </div>
-
-                {/* My Moments */}
+                {/* Moments Section */}
                 <section className="space-y-6">
-                    <h2 className="text-2xl font-bold border-b border-white/10 pb-4">My Moments</h2>
+                    <h2 className="text-2xl font-bold border-b border-white/10 pb-4">
+                        {(user && user.id === viewedProfileId) ? 'My Moments' :
+                            (moments.length > 0 && moments[0].user?.name) ? `${moments[0].user.name}'s Moments` : 'Moments'}
+                    </h2>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {moments.length === 0 ? (
@@ -171,7 +168,9 @@ export default function Profile() {
                 {/* Liked Moments */}
                 {likedMoments.length > 0 && (
                     <section className="space-y-6 animate-in slide-in-from-bottom-4 fade-in duration-500 delay-100">
-                        <h2 className="text-2xl font-bold border-b border-white/10 pb-4 text-pink-400">Liked Moments</h2>
+                        <h2 className="text-2xl font-bold border-b border-white/10 pb-4 text-pink-400">
+                            {(user && user.id === viewedProfileId) ? 'Liked Moments' : 'Liked by User'}
+                        </h2>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {likedMoments.map((moment) => (

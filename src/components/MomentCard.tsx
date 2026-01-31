@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Moment } from '@/types';
 import { X, Heart, MessageSquare, Play, Users, Send, ChevronDown, ChevronUp } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { toggleLike, createComment } from '../../app/actions/moments';
 
 interface MomentCardProps {
-    moment: Moment & { likes?: { user: { name: string; image?: string | null } }[] };
+    moment: Moment;
     onDelete?: (id: string) => void;
     showDelete?: boolean;
     showCommentButton?: boolean;
@@ -98,6 +99,8 @@ export default function MomentCard({
         e.stopPropagation();
         if (isLiking) return;
 
+        console.log('[MomentCard] Like clicked for moment:', moment.id);
+
         // Optimistic update
         const newLiked = !liked;
         setLiked(newLiked);
@@ -105,18 +108,25 @@ export default function MomentCard({
         setIsLiking(true);
 
         try {
+            console.log('[MomentCard] Sending API request...');
             const res = await fetch(`/api/moments/${moment.id}/like`, { method: 'POST' });
+
+            console.log('[MomentCard] API Response status:', res.status);
             const data = await res.json();
+            console.log('[MomentCard] API Response body:', data);
+
             if (data.success) {
+                console.log('[MomentCard] Like success. Count:', data.likeCount, 'Liked:', data.liked);
                 setLikeCount(data.likeCount);
                 setLiked(data.liked);
             } else {
+                console.error('[MomentCard] Like API returned failure:', data.error);
                 // Revert
                 setLiked(!newLiked);
                 setLikeCount(prev => newLiked ? prev - 1 : prev + 1);
             }
         } catch (error) {
-            console.error('Like failed', error);
+            console.error('[MomentCard] Like failed with exception:', error);
             setLiked(!newLiked);
             setLikeCount(prev => newLiked ? prev - 1 : prev + 1);
         } finally {
@@ -154,6 +164,22 @@ export default function MomentCard({
             setIsPostingComment(false);
         }
     };
+
+    // Click outside handler for Likes Dropdown
+    const likesDropdownRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (likesDropdownRef.current && !likesDropdownRef.current.contains(event.target as Node)) {
+                setShowLikesList(false);
+            }
+        }
+        if (showLikesList) {
+            document.addEventListener("mousedown", handleClickOutside);
+        }
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [showLikesList]);
 
     const formatTime = (seconds: number) => {
         const h = Math.floor(seconds / 3600);
@@ -325,6 +351,7 @@ export default function MomentCard({
                             {/* Likes Dropdown */}
                             {showLikesList && likeCount > 0 && (
                                 <div
+                                    ref={likesDropdownRef}
                                     className="absolute top-full right-0 mt-2 w-48 bg-black/95 backdrop-blur-md border border-white/10 rounded-lg shadow-xl z-50"
                                     onClick={(e) => e.stopPropagation()}
                                 >
@@ -334,16 +361,21 @@ export default function MomentCard({
                                     <div className="max-h-48 overflow-y-auto">
                                         {moment.likes && moment.likes.length > 0 ? (
                                             moment.likes.map((like, idx) => (
-                                                <div key={idx} className="flex items-center gap-2 px-3 py-2 hover:bg-white/5 transition-colors">
+                                                <Link
+                                                    key={idx}
+                                                    href={`/profile?id=${like.user_id}`}
+                                                    className="flex items-center gap-2 px-3 py-2 hover:bg-white/5 transition-colors group/user"
+                                                    onClick={() => setShowLikesList(false)}
+                                                >
                                                     <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-[10px] font-bold shrink-0">
                                                         {like.user.image ? (
-                                                            <img src={like.user.image} alt={like.user.name} className="w-full h-full rounded-full object-cover" />
+                                                            <img src={like.user.image} alt={like.user.name || 'User'} className="w-full h-full rounded-full object-cover" />
                                                         ) : (
-                                                            like.user.name[0]?.toUpperCase() || 'U'
+                                                            (like.user.name || 'User')[0]?.toUpperCase()
                                                         )}
                                                     </div>
-                                                    <span className="text-xs text-white/90">{like.user.name}</span>
-                                                </div>
+                                                    <span className="text-xs text-white/90 group-hover/user:text-purple-300 transition-colors">{like.user.name || 'User'}</span>
+                                                </Link>
                                             ))
                                         ) : (
                                             <div className="px-3 py-4 text-center">

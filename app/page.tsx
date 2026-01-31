@@ -131,7 +131,7 @@ export default function Home() {
                                 disabled={!url.trim()}
                                 className="absolute right-2 px-6 py-2 bg-[#7c2a0c] hover:bg-[#9a3412] text-white font-medium rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Search
+                                Go
                             </button>
                         </form>
                     </div>
@@ -146,8 +146,8 @@ export default function Home() {
                         className="group flex flex-col items-center text-center gap-4 cursor-pointer"
                     >
                         <div className="h-32 flex items-center justify-center">
-                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-green-500/20 to-emerald-500/20 flex items-center justify-center text-green-400 group-hover:scale-110 transition-transform shadow-[0_0_30px_rgba(34,197,94,0.2)]">
-                                <Search size={28} strokeWidth={2.5} />
+                            <div className="w-16 h-16 flex items-center justify-center text-gray-400 group-hover:scale-110 transition-transform">
+                                <Search size={48} strokeWidth={1.5} />
                             </div>
                         </div>
                         <div className="space-y-1">
@@ -184,7 +184,10 @@ export default function Home() {
                             </div>
                         </div>
                         <div className="space-y-1">
-                            <h3 className="font-bold text-xl text-blue-100">Share It</h3>
+                            <h3 className="font-bold text-xl text-blue-100 flex items-center gap-2">
+                                Share It
+                                <span className="text-[9px] uppercase tracking-widest bg-blue-500/20 text-blue-200 px-2 py-0.5 rounded-full border border-blue-500/30">Coming Soon</span>
+                            </h3>
                             <p className="text-sm text-white/40 leading-snug max-w-[200px] mx-auto">
                                 Save to profile & share.
                             </p>

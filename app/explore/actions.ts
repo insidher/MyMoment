@@ -237,7 +237,11 @@ export async function getRecentMoments(limit = 50, excludeSpotify = false): Prom
                     image
                 ),
                 likes (
-                    user_id
+                    user_id,
+                    user:profiles!user_id (
+                        name,
+                        image
+                    )
                 ),
                 track_sources!track_source_id (
                     title,
@@ -294,6 +298,13 @@ export async function getRecentMoments(limit = 50, excludeSpotify = false): Prom
                 image: m.profiles?.image || null
             },
             isLiked: user ? m.likes?.some((like: any) => like.user_id === user.id) : false,
+            likes: m.likes ? m.likes.map((like: any) => ({
+                user_id: like.user_id,
+                user: {
+                    name: like.user?.name || 'User',
+                    image: like.user?.image || null
+                }
+            })) : [],
             trackSource: m.track_sources ? {
                 id: m.track_source_id,
                 service: m.platform as any,

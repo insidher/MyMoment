@@ -40,6 +40,13 @@ export interface Moment {
   likeCount?: number;
   isLiked?: boolean; // Add this
   savedByCount?: number;
+  likes?: {
+    user_id: string;
+    user: {
+      name?: string | null;
+      image?: string | null;
+    };
+  }[];
   replies?: Moment[];
   replyCount?: number;
 
