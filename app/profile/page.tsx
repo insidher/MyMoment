@@ -41,7 +41,7 @@ export default function Profile() {
             // Only redirect to login if trying to view OWN profile while logged out
             router.push('/login');
         }
-    }, [user, isLoading, router, showSpotify, filterLoading, window.location.search]);
+    }, [user, isLoading, router, showSpotify, filterLoading]);
 
     // Auto-open settings if query parameter is present (Only for own profile)
     useEffect(() => {
