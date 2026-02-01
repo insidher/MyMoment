@@ -799,644 +799,589 @@ export default function PlayerTimeline({
                                 </div>
                             )}
 
-                            {/* Start Marker Component */}
-                            <div
-                                className={`absolute top-1/2 h-8 w-8 cursor-ew-resize z-20 group/marker transition-transform duration-200 
-                                    ${(isHoveringRange || draggingMarker) ? 'scale-110' : 'hover:scale-110'}
+
+
+
+
+
+                            {/* Moments Overlays (Existing) */}
+                            {rootMoments.map((moment) => {
+                                const startPercent = (moment.startSec / safeDuration) * 100;
+                                const endPercent = (moment.endSec / safeDuration) * 100;
+                                const widthPercent = Math.max(0.5, endPercent - startPercent);
+
+                                return (
+                                    <div
+                                        key={moment.id}
+                                        className={`absolute top-1/2 -translate-y-1/2 h-4 z-0 bg-orange-500/30 hover:bg-orange-400/50 rounded-sm pointer-events-none transition-opacity duration-300
+                                    ${startSec !== null ? 'opacity-30' : 'opacity-100'} 
                                 `}
-                                style={{
-                                    left: `${(startSec / safeDuration) * 100}%`,
-                                    transform: 'translateX(-50%) translateY(-50%)', // Center the wrapper
-                                    transformOrigin: 'center'
-                                }}
-                                onMouseDown={(e) => {
-                                    e.stopPropagation();
-                                    setDraggingMarker('start');
-                                }}
-                            >
-                                {/* Circle Handle (Offset Left) */}
-                                <div
-                                    className="absolute right-[calc(50%+4px)] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-orange-500 border-2 border-black shadow-md flex items-center justify-center"
-                                >
-                                    {/* Tiny Play/Pause inside handle (Preserving Functionality) */}
-                                    <button
+                                        // User said "moments overlays" exist. But we are replacing the "Range Selection" tool logic on top.
+                                        // Actually, moments allow "click to play". Keep interaction but lower Z-index than markers?
+                                        style={{
+                                            left: `${startPercent}%`,
+                                            width: `${widthPercent}%`,
+                                        }}
+                                    />
+                                );
+                            })}
+
+
+                            {/* DRAFT MOMENT VISUALIZATION */}
+                            {draftMoment && (
+                                <>
+                                    {/* Draft Background Fill (Dark Pill) */}
+                                    <div
+                                        className="absolute top-0 bottom-0 z-30 bg-[#1a2332]/90 flex items-center justify-center cursor-pointer group/draft"
+                                        style={{
+                                            left: `${(draftMoment.start / safeDuration) * 100}%`,
+                                            width: `${((draftMoment.end - draftMoment.start) / safeDuration) * 100}%`
+                                        }}
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            onPreviewCapture?.();
+                                            // Confirm Draft -> Open Editor
+                                            onCaptureStart?.(draftMoment.start);
+                                            onCaptureEnd?.(draftMoment.end);
+                                            setDraftMoment(null);
+                                            setIsEditorOpen(true);
                                         }}
-                                        className="flex items-center justify-center w-full h-full text-black hover:text-white transition-colors"
                                     >
-                                        {isPlaying && currentTime >= startSec && (endSec === null || currentTime <= endSec) ?
-                                            <Pause size={8} className="fill-current" /> :
-                                            <Play size={8} className="fill-current" />
-                                        }
+                                        {/* VISUALS: +Create Text & Vertical Borders */}
+                                        {/* VISUALS: +Create Text & Vertical Borders */}
+                                        <button
+                                            className="text-[10px] font-bold text-white tracking-widest uppercase select-none drop-shadow-md hover:scale-110 transition-transform cursor-pointer pointer-events-auto"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onCaptureStart?.(draftMoment.start);
+                                                onCaptureEnd?.(draftMoment.end);
+                                                setDraftMoment(null);
+                                                setIsEditorOpen(true);
+                                            }}
+                                        >
+                                            +Create
+                                        </button>
+
+                                        {/* Left Border (Extended) */}
+                                        <div className="absolute left-0 top-1/2 -translate-y-1/2 h-[140%] w-[3px] bg-orange-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.3)]" />
+
+                                        {/* Right Border (Extended) */}
+                                        <div className="absolute right-0 top-1/2 -translate-y-1/2 h-[140%] w-[3px] bg-orange-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.3)]" />
+
+                                        {/* Drag Handle (Start Time) - Offset Left */}
+                                        <div
+                                            className="absolute right-full mr-1 top-1/2 -translate-y-1/2 z-50 cursor-ew-resize group/handle-start"
+                                            onMouseDown={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                const handleDrag = (moveEvent: MouseEvent) => {
+                                                    const time = getTimeFromX(moveEvent.clientX);
+                                                    const newStart = Math.max(0, Math.min(time, (draftMoment?.end || safeDuration) - 1));
+                                                    setDraftMoment(prev => prev ? { ...prev, start: newStart } : null);
+                                                    onSeek(newStart);
+                                                };
+                                                const handleRelease = () => {
+                                                    document.removeEventListener('mousemove', handleDrag);
+                                                    document.removeEventListener('mouseup', handleRelease);
+                                                    setIsDraggingDraft(false);
+                                                    justDraggedRef.current = true;
+                                                    setTimeout(() => { justDraggedRef.current = false; }, 100);
+                                                };
+                                                document.addEventListener('mousemove', handleDrag);
+                                                document.addEventListener('mouseup', handleRelease);
+                                                setIsDraggingDraft('start');
+                                            }}
+                                            onTouchStart={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                const handleDrag = (moveEvent: TouchEvent) => {
+                                                    const touch = moveEvent.touches[0];
+                                                    if (touch) {
+                                                        const time = getTimeFromX(touch.clientX);
+                                                        const newStart = Math.max(0, Math.min(time, (draftMoment?.end || safeDuration) - 1));
+                                                        setDraftMoment(prev => prev ? { ...prev, start: newStart } : null);
+                                                        onSeek(newStart);
+                                                    }
+                                                };
+                                                const handleRelease = () => {
+                                                    document.removeEventListener('touchmove', handleDrag);
+                                                    document.removeEventListener('touchend', handleRelease);
+                                                    setIsDraggingDraft(false);
+                                                    justDraggedRef.current = true;
+                                                    setTimeout(() => { justDraggedRef.current = false; }, 100);
+                                                };
+                                                document.addEventListener('touchmove', handleDrag);
+                                                document.addEventListener('touchend', handleRelease);
+                                                setIsDraggingDraft('start');
+                                            }}
+                                        >
+                                            {/* Orange Circle Visual */}
+                                            <div className="w-4 h-4 rounded-full bg-orange-500 border-2 border-black shadow-md hover:scale-110 transition-transform" />
+                                        </div>
+
+                                        {/* Drag Handle (End Time) - Offset Right */}
+                                        <div
+                                            className="absolute left-full ml-1 top-1/2 -translate-y-1/2 z-50 cursor-ew-resize group/handle-end"
+                                            onMouseDown={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                const handleDrag = (moveEvent: MouseEvent) => {
+                                                    const time = getTimeFromX(moveEvent.clientX);
+                                                    const newEnd = Math.max((draftMoment?.start || 0) + 1, Math.min(time, safeDuration));
+                                                    setDraftMoment(prev => prev ? { ...prev, end: newEnd } : null);
+                                                    onSeek(newEnd);
+                                                };
+                                                const handleRelease = () => {
+                                                    document.removeEventListener('mousemove', handleDrag);
+                                                    document.removeEventListener('mouseup', handleRelease);
+                                                    setIsDraggingDraft(false);
+                                                    justDraggedRef.current = true;
+                                                    setTimeout(() => { justDraggedRef.current = false; }, 100);
+                                                };
+                                                document.addEventListener('mousemove', handleDrag);
+                                                document.addEventListener('mouseup', handleRelease);
+                                                setIsDraggingDraft('end');
+                                            }}
+                                            onTouchStart={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                const handleDrag = (moveEvent: TouchEvent) => {
+                                                    const touch = moveEvent.touches[0];
+                                                    if (touch) {
+                                                        const time = getTimeFromX(touch.clientX);
+                                                        const newEnd = Math.max((draftMoment?.start || 0) + 1, Math.min(time, safeDuration));
+                                                        setDraftMoment(prev => prev ? { ...prev, end: newEnd } : null);
+                                                        onSeek(newEnd);
+                                                    }
+                                                };
+                                                const handleRelease = () => {
+                                                    document.removeEventListener('touchmove', handleDrag);
+                                                    document.removeEventListener('touchend', handleRelease);
+                                                    setIsDraggingDraft(false);
+                                                    justDraggedRef.current = true;
+                                                    setTimeout(() => { justDraggedRef.current = false; }, 100);
+                                                };
+                                                document.addEventListener('touchmove', handleDrag);
+                                                document.addEventListener('touchend', handleRelease);
+                                                setIsDraggingDraft('end');
+                                            }}
+                                        >
+                                            {/* Orange Circle Visual */}
+                                            <div className="w-4 h-4 rounded-full bg-orange-500 border-2 border-black shadow-md hover:scale-110 transition-transform" />
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                    <span className="text-xs font-mono text-white/60 w-10">
+                        {formatTime(duration)}
+                    </span>
+                </div>
+
+                {/* Note Editor Popover - Only on Mobile (hidden on desktop where it's in sidebar) */}
+                {
+                    isEditorOpen && (
+                        <div className="lg:hidden absolute top-full left-1/2 -translate-x-1/2 mt-4 p-4 bg-zinc-900/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl animate-in fade-in slide-in-from-top-2 z-50 min-w-[340px]">
+                            <div className="flex flex-col gap-3">
+                                {/* Header: User & Context */}
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        {/* User Avatar */}
+                                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-[10px] text-white font-bold overflow-hidden border border-white/20">
+                                            {currentUser?.image ? (
+                                                <img src={currentUser.image} alt="Me" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <span>{currentUser?.name?.[0] || 'Me'}</span>
+                                            )}
+                                        </div>
+                                        <span className="text-xs font-medium text-white/80">{editingMomentId ? 'Editing Moment' : 'New Moment Note'}</span>
+                                    </div>
+
+                                    {/* Inactive Share Button Placeholder */}
+                                    <button disabled className="p-1.5 rounded-full bg-white/5 opacity-50 cursor-not-allowed text-white/40">
+                                        <Send size={12} />
                                     </button>
                                 </div>
 
-                                {/* Vertical Orange Line (Extended) */}
-                                <div className="absolute left-1/2 top-1/2 -translate-y-1/2 h-[140%] w-[3px] bg-orange-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.3)]" />
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex items-center justify-between text-xs text-white/40 font-mono">
+                                        <span>{formatTime(startSec || 0)} - {formatTime(endSec || 0)}</span>
+                                    </div>
+                                    <textarea
+                                        ref={textareaRef}
+                                        autoFocus
+                                        value={note}
+                                        onChange={(e) => onNoteChange?.(e.target.value)}
+                                        onKeyDown={async (e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                if (note.trim()) {
+                                                    if (editingMomentId) {
+                                                        if (onUpdateMoment) {
+                                                            const success = await onUpdateMoment(editingMomentId, note);
+                                                            if (success) {
+                                                                setIsEditorOpen(false);
+                                                                setEditingMomentId(null);
+                                                                onCancelCapture?.();
+                                                            }
+                                                        }
+                                                    } else {
+                                                        onSaveMoment?.();
+                                                        setIsEditorOpen(false);
+                                                    }
+                                                }
+                                            }
+                                        }}
+                                        placeholder="What's happening in this moment?"
+                                        className="w-full h-24 bg-white/5 border border-white/10 rounded-lg p-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-orange-500/50 resize-none scrollbar-thin scrollbar-thumb-white/20 font-serif leading-relaxed"
+                                    />
 
-                                {/* Timestamp Popover */}
-                                {(isHovering || draggingMarker === 'start') && (
-                                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 flex items-center gap-1 text-[10px] font-mono font-bold bg-orange-500 text-black px-1 rounded opacity-0 group-hover/marker:opacity-100 transition-opacity whitespace-nowrap">
-                                        {formatTime(startSec)}
+                                    <div className="flex items-center justify-between gap-2 mt-2">
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => {
+                                                    setIsEditorOpen(false);
+                                                    setEditingMomentId(null);
+                                                    onCancelCapture?.();
+                                                }}
+                                                className="p-1.5 rounded-md hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                                                title="Cancel"
+                                            >
+                                                <X size={16} />
+                                            </button>
+
+                                            {/* Preview Play Button */}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    // Construct mock moment to play
+                                                    if (!onMomentClick) return;
+
+                                                    // Determine service fallback if not provided
+                                                    const effectiveService = service || (moments.length > 0 ? moments[0].service : 'youtube');
+
+                                                    // Create a temporary moment object
+                                                    const previewId = 'preview-draft';
+                                                    const mockMoment: any = {
+                                                        id: previewId,
+                                                        userId: currentUser?.id || 'me',
+                                                        startSec: startSec || 0,
+                                                        endSec: endSec || 0,
+                                                        note: note,
+                                                        createdAt: new Date().toISOString(),
+                                                        service: effectiveService
+                                                    };
+
+                                                    onMomentClick(mockMoment);
+                                                }}
+                                                className={`p-1.5 rounded-md hover:bg-white/10 transition-colors ${activeMomentId === 'preview-draft' ? 'text-orange-400' : 'text-white/60 hover:text-white'}`}
+                                                title={activeMomentId === 'preview-draft' ? "Stop Preview" : "Play Preview"}
+                                            >
+                                                {activeMomentId === 'preview-draft' ? (
+                                                    <Square size={16} className="fill-current" />
+                                                ) : (
+                                                    <Play size={16} className="fill-current" />
+                                                )}
+                                            </button>
+                                        </div>
+
+                                        {/* Save/Update Button */}
                                         <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onCaptureUpdate?.(null, endSec || null);
-                                                setIsEditorOpen(false); // Close editor if marker removed
-                                            }}
-                                            className="hover:bg-black/20 rounded-full p-0.5"
-                                        >
-                                            <X size={8} />
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        </>
-                    )}
-
-
-
-
-                    {/* Moments Overlays (Existing) */}
-                    {rootMoments.map((moment) => {
-                        const startPercent = (moment.startSec / safeDuration) * 100;
-                        const endPercent = (moment.endSec / safeDuration) * 100;
-                        const widthPercent = Math.max(0.5, endPercent - startPercent);
-
-                        return (
-                            <div
-                                key={moment.id}
-                                className={`absolute top-1/2 -translate-y-1/2 h-4 z-0 bg-orange-500/30 hover:bg-orange-400/50 rounded-sm pointer-events-none transition-opacity duration-300
-                                    ${startSec !== null ? 'opacity-30' : 'opacity-100'} 
-                                `}
-                                // User said "moments overlays" exist. But we are replacing the "Range Selection" tool logic on top.
-                                // Actually, moments allow "click to play". Keep interaction but lower Z-index than markers?
-                                style={{
-                                    left: `${startPercent}%`,
-                                    width: `${widthPercent}%`,
-                                }}
-                            />
-                        );
-                    })}
-
-
-                    {/* DRAFT MOMENT VISUALIZATION */}
-                    {draftMoment && (
-                        <>
-                            {/* Draft Background Fill (Dark Pill) */}
-                            <div
-                                className="absolute top-0 bottom-0 z-30 bg-[#1a2332]/90 flex items-center justify-center cursor-pointer group/draft"
-                                style={{
-                                    left: `${(draftMoment.start / safeDuration) * 100}%`,
-                                    width: `${((draftMoment.end - draftMoment.start) / safeDuration) * 100}%`
-                                }}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    // Confirm Draft -> Open Editor
-                                    onCaptureStart?.(draftMoment.start);
-                                    onCaptureEnd?.(draftMoment.end);
-                                    setDraftMoment(null);
-                                    setIsEditorOpen(true);
-                                }}
-                            >
-                                {/* VISUALS: +Create Text & Vertical Borders */}
-                                {/* VISUALS: +Create Text & Vertical Borders */}
-                                <button
-                                    className="text-[10px] font-bold text-white tracking-widest uppercase select-none drop-shadow-md hover:scale-110 transition-transform cursor-pointer pointer-events-auto"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onCaptureStart?.(draftMoment.start);
-                                        onCaptureEnd?.(draftMoment.end);
-                                        setDraftMoment(null);
-                                        setIsEditorOpen(true);
-                                    }}
-                                >
-                                    +Create
-                                </button>
-
-                                {/* Left Border (Extended) */}
-                                <div className="absolute left-0 top-1/2 -translate-y-1/2 h-[140%] w-[3px] bg-orange-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.3)]" />
-
-                                {/* Right Border (Extended) */}
-                                <div className="absolute right-0 top-1/2 -translate-y-1/2 h-[140%] w-[3px] bg-orange-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.3)]" />
-
-                                {/* Drag Handle (Start Time) - Offset Left */}
-                                <div
-                                    className="absolute right-full mr-1 top-1/2 -translate-y-1/2 z-50 cursor-ew-resize group/handle-start"
-                                    onMouseDown={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        const handleDrag = (moveEvent: MouseEvent) => {
-                                            const time = getTimeFromX(moveEvent.clientX);
-                                            const newStart = Math.max(0, Math.min(time, (draftMoment?.end || safeDuration) - 1));
-                                            setDraftMoment(prev => prev ? { ...prev, start: newStart } : null);
-                                            onSeek(newStart);
-                                        };
-                                        const handleRelease = () => {
-                                            document.removeEventListener('mousemove', handleDrag);
-                                            document.removeEventListener('mouseup', handleRelease);
-                                            setIsDraggingDraft(false);
-                                            justDraggedRef.current = true;
-                                            setTimeout(() => { justDraggedRef.current = false; }, 100);
-                                        };
-                                        document.addEventListener('mousemove', handleDrag);
-                                        document.addEventListener('mouseup', handleRelease);
-                                        setIsDraggingDraft('start');
-                                    }}
-                                    onTouchStart={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        const handleDrag = (moveEvent: TouchEvent) => {
-                                            const touch = moveEvent.touches[0];
-                                            if (touch) {
-                                                const time = getTimeFromX(touch.clientX);
-                                                const newStart = Math.max(0, Math.min(time, (draftMoment?.end || safeDuration) - 1));
-                                                setDraftMoment(prev => prev ? { ...prev, start: newStart } : null);
-                                                onSeek(newStart);
-                                            }
-                                        };
-                                        const handleRelease = () => {
-                                            document.removeEventListener('touchmove', handleDrag);
-                                            document.removeEventListener('touchend', handleRelease);
-                                            setIsDraggingDraft(false);
-                                            justDraggedRef.current = true;
-                                            setTimeout(() => { justDraggedRef.current = false; }, 100);
-                                        };
-                                        document.addEventListener('touchmove', handleDrag);
-                                        document.addEventListener('touchend', handleRelease);
-                                        setIsDraggingDraft('start');
-                                    }}
-                                >
-                                    {/* Orange Circle Visual */}
-                                    <div className="w-4 h-4 rounded-full bg-orange-500 border-2 border-black shadow-md hover:scale-110 transition-transform" />
-                                </div>
-
-                                {/* Drag Handle (End Time) - Offset Right */}
-                                <div
-                                    className="absolute left-full ml-1 top-1/2 -translate-y-1/2 z-50 cursor-ew-resize group/handle-end"
-                                    onMouseDown={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        const handleDrag = (moveEvent: MouseEvent) => {
-                                            const time = getTimeFromX(moveEvent.clientX);
-                                            const newEnd = Math.max((draftMoment?.start || 0) + 1, Math.min(time, safeDuration));
-                                            setDraftMoment(prev => prev ? { ...prev, end: newEnd } : null);
-                                            onSeek(newEnd);
-                                        };
-                                        const handleRelease = () => {
-                                            document.removeEventListener('mousemove', handleDrag);
-                                            document.removeEventListener('mouseup', handleRelease);
-                                            setIsDraggingDraft(false);
-                                            justDraggedRef.current = true;
-                                            setTimeout(() => { justDraggedRef.current = false; }, 100);
-                                        };
-                                        document.addEventListener('mousemove', handleDrag);
-                                        document.addEventListener('mouseup', handleRelease);
-                                        setIsDraggingDraft('end');
-                                    }}
-                                    onTouchStart={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        const handleDrag = (moveEvent: TouchEvent) => {
-                                            const touch = moveEvent.touches[0];
-                                            if (touch) {
-                                                const time = getTimeFromX(touch.clientX);
-                                                const newEnd = Math.max((draftMoment?.start || 0) + 1, Math.min(time, safeDuration));
-                                                setDraftMoment(prev => prev ? { ...prev, end: newEnd } : null);
-                                                onSeek(newEnd);
-                                            }
-                                        };
-                                        const handleRelease = () => {
-                                            document.removeEventListener('touchmove', handleDrag);
-                                            document.removeEventListener('touchend', handleRelease);
-                                            setIsDraggingDraft(false);
-                                            justDraggedRef.current = true;
-                                            setTimeout(() => { justDraggedRef.current = false; }, 100);
-                                        };
-                                        document.addEventListener('touchmove', handleDrag);
-                                        document.addEventListener('touchend', handleRelease);
-                                        setIsDraggingDraft('end');
-                                    }}
-                                >
-                                    {/* Orange Circle Visual */}
-                                    <div className="w-4 h-4 rounded-full bg-orange-500 border-2 border-black shadow-md hover:scale-110 transition-transform" />
-                                </div>
-                            </div>
-                        </>
-                    )}
-                </div>
-
-                <span className="text-xs font-mono text-white/60 w-10">
-                    {formatTime(duration)}
-                </span>
-            </div>
-
-            {/* Note Editor Popover - Only on Mobile (hidden on desktop where it's in sidebar) */}
-            {
-                isEditorOpen && (
-                    <div className="lg:hidden absolute top-full left-1/2 -translate-x-1/2 mt-4 p-4 bg-zinc-900/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl animate-in fade-in slide-in-from-top-2 z-50 min-w-[340px]">
-                        <div className="flex flex-col gap-3">
-                            {/* Header: User & Context */}
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    {/* User Avatar */}
-                                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-[10px] text-white font-bold overflow-hidden border border-white/20">
-                                        {currentUser?.image ? (
-                                            <img src={currentUser.image} alt="Me" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <span>{currentUser?.name?.[0] || 'Me'}</span>
-                                        )}
-                                    </div>
-                                    <span className="text-xs font-medium text-white/80">{editingMomentId ? 'Editing Moment' : 'New Moment Note'}</span>
-                                </div>
-
-                                {/* Inactive Share Button Placeholder */}
-                                <button disabled className="p-1.5 rounded-full bg-white/5 opacity-50 cursor-not-allowed text-white/40">
-                                    <Send size={12} />
-                                </button>
-                            </div>
-
-                            <div className="flex flex-col gap-2">
-                                <div className="flex items-center justify-between text-xs text-white/40 font-mono">
-                                    <span>{formatTime(startSec || 0)} - {formatTime(endSec || 0)}</span>
-                                </div>
-                                <textarea
-                                    ref={textareaRef}
-                                    autoFocus
-                                    value={note}
-                                    onChange={(e) => onNoteChange?.(e.target.value)}
-                                    onKeyDown={async (e) => {
-                                        if (e.key === 'Enter' && !e.shiftKey) {
-                                            e.preventDefault();
-                                            if (note.trim()) {
+                                            onClick={async () => {
                                                 if (editingMomentId) {
+                                                    // Update Mode
                                                     if (onUpdateMoment) {
                                                         const success = await onUpdateMoment(editingMomentId, note);
                                                         if (success) {
                                                             setIsEditorOpen(false);
                                                             setEditingMomentId(null);
-                                                            onCancelCapture?.();
+                                                            onCancelCapture?.(); // Clear selection
                                                         }
                                                     }
                                                 } else {
+                                                    // Create Mode
                                                     onSaveMoment?.();
                                                     setIsEditorOpen(false);
                                                 }
-                                            }
-                                        }
-                                    }}
-                                    placeholder="What's happening in this moment?"
-                                    className="w-full h-24 bg-white/5 border border-white/10 rounded-lg p-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-orange-500/50 resize-none scrollbar-thin scrollbar-thumb-white/20 font-serif leading-relaxed"
-                                />
-
-                                <div className="flex items-center justify-between gap-2 mt-2">
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => {
-                                                setIsEditorOpen(false);
-                                                setEditingMomentId(null);
-                                                onCancelCapture?.();
                                             }}
-                                            className="p-1.5 rounded-md hover:bg-white/10 text-white/60 hover:text-white transition-colors"
-                                            title="Cancel"
+                                            disabled={!note.trim()}
+                                            className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed text-black text-xs font-bold rounded-lg shadow-lg shadow-orange-500/20 flex items-center gap-1.5 animate-in slide-in-from-left-2 transition-colors"
                                         >
-                                            <X size={16} />
-                                        </button>
-
-                                        {/* Preview Play Button */}
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                // Construct mock moment to play
-                                                if (!onMomentClick) return;
-
-                                                // Determine service fallback if not provided
-                                                const effectiveService = service || (moments.length > 0 ? moments[0].service : 'youtube');
-
-                                                // Create a temporary moment object
-                                                const previewId = 'preview-draft';
-                                                const mockMoment: any = {
-                                                    id: previewId,
-                                                    userId: currentUser?.id || 'me',
-                                                    startSec: startSec || 0,
-                                                    endSec: endSec || 0,
-                                                    note: note,
-                                                    createdAt: new Date().toISOString(),
-                                                    service: effectiveService
-                                                };
-
-                                                onMomentClick(mockMoment);
-                                            }}
-                                            className={`p-1.5 rounded-md hover:bg-white/10 transition-colors ${activeMomentId === 'preview-draft' ? 'text-orange-400' : 'text-white/60 hover:text-white'}`}
-                                            title={activeMomentId === 'preview-draft' ? "Stop Preview" : "Play Preview"}
-                                        >
-                                            {activeMomentId === 'preview-draft' ? (
-                                                <Square size={16} className="fill-current" />
-                                            ) : (
-                                                <Play size={16} className="fill-current" />
-                                            )}
+                                            <Star size={12} className={!note.trim() ? "fill-gray-400" : "fill-black"} />
+                                            {editingMomentId ? 'Update Moment' : 'Save Moment'}
                                         </button>
                                     </div>
-
-                                    {/* Save/Update Button */}
-                                    <button
-                                        onClick={async () => {
-                                            if (editingMomentId) {
-                                                // Update Mode
-                                                if (onUpdateMoment) {
-                                                    const success = await onUpdateMoment(editingMomentId, note);
-                                                    if (success) {
-                                                        setIsEditorOpen(false);
-                                                        setEditingMomentId(null);
-                                                        onCancelCapture?.(); // Clear selection
-                                                    }
-                                                }
-                                            } else {
-                                                // Create Mode
-                                                onSaveMoment?.();
-                                                setIsEditorOpen(false);
-                                            }
-                                        }}
-                                        disabled={!note.trim()}
-                                        className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed text-black text-xs font-bold rounded-lg shadow-lg shadow-orange-500/20 flex items-center gap-1.5 animate-in slide-in-from-left-2 transition-colors"
-                                    >
-                                        <Star size={12} className={!note.trim() ? "fill-gray-400" : "fill-black"} />
-                                        {editingMomentId ? 'Update Moment' : 'Save Moment'}
-                                    </button>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                )
-            }
+                    )
+                }
 
-            {/* Confirmation Modal (Click-to-Draft Flow) */}
-            {
-                showConfirmation && draftMoment && createPortal(
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] animate-in fade-in duration-200">
-                        <div className="bg-zinc-900 border border-white/10 rounded-xl p-6 max-w-sm mx-4 animate-in zoom-in-95 duration-200">
-                            <h3 className="text-lg font-bold mb-2">Complete Capture?</h3>
-                            <p className="text-sm text-white/60 mb-4">
-                                {formatTime(draftMoment.start)} - {formatTime(draftMoment.end)}
-                                <span className="block text-xs text-white/40 mt-1">
-                                    Duration: {formatTime(draftMoment.end - draftMoment.start)}
-                                </span>
-                            </p>
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => {
-                                        setShowConfirmation(false);
-                                        // Keep draft active for further adjustment
-                                    }}
-                                    className="flex-1 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-sm font-medium"
-                                >
-                                    Keep Editing
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        // Trigger save flow
-                                        onCaptureStart?.(draftMoment.start);
-                                        onCaptureEnd?.(draftMoment.end);
-                                        setShowConfirmation(false);
-                                        setDraftMoment(null);
-                                        setIsEditorOpen(true);
-                                    }}
-                                    className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg font-bold transition-colors text-sm"
-                                >
-                                    Continue
-                                </button>
-                            </div>
-                        </div>
-                    </div>,
-                    document.body
-                )
-            }
-
-            {/* Unified Labels (Chapters & Moments) */}
-            {
-                (() => {
-                    // Smart Packing Logic (Greedy)
-                    let row1End = -10;
-                    const LABEL_BUFFER = 12;
-
-                    const packedClusters = derivedClusters.map(cluster => {
-                        const isRow1 = ((cluster.time / safeDuration) * 100) > (row1End + 1);
-                        if (isRow1) {
-                            row1End = ((cluster.time / safeDuration) * 100) + LABEL_BUFFER;
-                        }
-                        return { ...cluster, assignedRow: isRow1 ? 1 : 2 };
-                    });
-
-                    return (
-                        <div className="relative h-10 w-full">
-                            {packedClusters.map((cluster, i) => {
-                                if (cluster.time === 0) return null;
-                                const left = (cluster.totalRange.start / safeDuration) * 100;
-                                if (left > 100) return null;
-
-                                const primaryMoment = cluster.moments[0];
-                                const isChapter = !!cluster.chapter;
-
-                                let isActiveGroup = false;
-                                if (!isChapter) {
-                                    isActiveGroup = (
-                                        activeMomentId === primaryMoment?.id ||
-                                        (currentTime >= cluster.totalRange.start && currentTime <= cluster.totalRange.end)
-                                    );
-                                }
-
-                                const row = isActiveGroup ? 0 : cluster.assignedRow;
-                                const topPos = row === 0 ? 'top-1' : row === 1 ? 'top-3.5' : 'top-9';
-
-                                // Z-Index: Expanded > Active > Row
-                                const zIndex = (expandedMomentId === primaryMoment?.id) ? 100 : (isActiveGroup ? 50 : 30 - row);
-
-                                // Width Calculations
-                                const totalWidthPercent = Math.max(0.5, ((cluster.totalRange.end - cluster.totalRange.start) / safeDuration) * 100);
-
-                                // Core (Hotspot) Relative Calculation
-                                const totalDuration = cluster.totalRange.end - cluster.totalRange.start;
-                                const safeTotalDuration = totalDuration > 0 ? totalDuration : 1;
-
-                                const coreStartDelta = cluster.coreRange.start - cluster.totalRange.start;
-                                const coreDuration = cluster.coreRange.end - cluster.coreRange.start;
-
-                                const coreLeftPercent = (coreStartDelta / safeTotalDuration) * 100;
-                                const coreWidthPercent = (coreDuration / safeTotalDuration) * 100;
-
-                                // Calculate Max Width for Label (avoid collision)
-                                let nextGroupTime = safeDuration;
-                                for (let j = i + 1; j < packedClusters.length; j++) {
-                                    if (packedClusters[j].assignedRow === cluster.assignedRow) {
-                                        nextGroupTime = packedClusters[j].time;
-                                        break;
-                                    }
-                                }
-
-                                const widthToNext = ((nextGroupTime - cluster.time) / safeDuration) * 100;
-                                // We need to constrain the label width relative to the Timeline, NOT the container.
-                                // The container width is totalWidthPercent.
-                                // So we set maxWidth style on the label div.
-
-                                // ---------------------------------------------------------
-                                // ---------------------------------------------------------
-                                // RENDER: Group Container
-                                // ---------------------------------------------------------
-                                return (
-                                    <div
-                                        key={cluster.id}
-                                        className={`absolute transition-all duration-300 ${topPos} ${isActiveGroup ? 'scale-100 z-[60]' : 'z-[40]'}`}
-                                        style={{
-                                            left: `${left}%`,
-                                            width: `${totalWidthPercent}%`,
-                                            zIndex,
+                {/* Confirmation Modal (Click-to-Draft Flow) */}
+                {
+                    showConfirmation && draftMoment && createPortal(
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] animate-in fade-in duration-200">
+                            <div className="bg-zinc-900 border border-white/10 rounded-xl p-6 max-w-sm mx-4 animate-in zoom-in-95 duration-200">
+                                <h3 className="text-lg font-bold mb-2">Complete Capture?</h3>
+                                <p className="text-sm text-white/60 mb-4">
+                                    {formatTime(draftMoment.start)} - {formatTime(draftMoment.end)}
+                                    <span className="block text-xs text-white/40 mt-1">
+                                        Duration: {formatTime(draftMoment.end - draftMoment.start)}
+                                    </span>
+                                </p>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => {
+                                            setShowConfirmation(false);
+                                            // Keep draft active for further adjustment
                                         }}
+                                        className="flex-1 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-sm font-medium"
                                     >
-                                        {/* FLOATING LABEL */}
-                                        <div // Wrapper to position the label relative to the group start
-                                            className={`absolute top-[8px] pointer-events-none ${
-                                                // Smart edge clamping
-                                                left < 10
-                                                    ? 'left-0' // Early moments: left-align
-                                                    : left + totalWidthPercent > 90
-                                                        ? 'right-0' // Late moments: right-align
-                                                        : 'left-1/2 -translate-x-1/2' // Middle: center
-                                                }`}
-                                            style={{ width: 'auto' }}
+                                        Keep Editing
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            // Trigger save flow
+                                            onCaptureStart?.(draftMoment.start);
+                                            onCaptureEnd?.(draftMoment.end);
+                                            setShowConfirmation(false);
+                                            setDraftMoment(null);
+                                            setIsEditorOpen(true);
+                                        }}
+                                        className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg font-bold transition-colors text-sm"
+                                    >
+                                        Continue
+                                    </button>
+                                </div>
+                            </div>
+                        </div>,
+                        document.body
+                    )
+                }
+
+                {/* Unified Labels (Chapters & Moments) */}
+                {
+                    (() => {
+                        // Smart Packing Logic (Greedy)
+                        let row1End = -10;
+                        const LABEL_BUFFER = 12;
+
+                        const packedClusters = derivedClusters.map(cluster => {
+                            const isRow1 = ((cluster.time / safeDuration) * 100) > (row1End + 1);
+                            if (isRow1) {
+                                row1End = ((cluster.time / safeDuration) * 100) + LABEL_BUFFER;
+                            }
+                            return { ...cluster, assignedRow: isRow1 ? 1 : 2 };
+                        });
+
+                        return (
+                            <div className="relative h-10 w-full">
+                                {packedClusters.map((cluster, i) => {
+                                    if (cluster.time === 0) return null;
+                                    const left = (cluster.totalRange.start / safeDuration) * 100;
+                                    if (left > 100) return null;
+
+                                    const primaryMoment = cluster.moments[0];
+                                    const isChapter = !!cluster.chapter;
+
+                                    let isActiveGroup = false;
+                                    if (!isChapter) {
+                                        isActiveGroup = (
+                                            activeMomentId === primaryMoment?.id ||
+                                            (currentTime >= cluster.totalRange.start && currentTime <= cluster.totalRange.end)
+                                        );
+                                    }
+
+                                    const row = isActiveGroup ? 0 : cluster.assignedRow;
+                                    const topPos = row === 0 ? 'top-1' : row === 1 ? 'top-3.5' : 'top-9';
+
+                                    // Z-Index: Expanded > Active > Row
+                                    const zIndex = (expandedMomentId === primaryMoment?.id) ? 100 : (isActiveGroup ? 50 : 30 - row);
+
+                                    // Width Calculations
+                                    const totalWidthPercent = Math.max(0.5, ((cluster.totalRange.end - cluster.totalRange.start) / safeDuration) * 100);
+
+                                    // Core (Hotspot) Relative Calculation
+                                    const totalDuration = cluster.totalRange.end - cluster.totalRange.start;
+                                    const safeTotalDuration = totalDuration > 0 ? totalDuration : 1;
+
+                                    const coreStartDelta = cluster.coreRange.start - cluster.totalRange.start;
+                                    const coreDuration = cluster.coreRange.end - cluster.coreRange.start;
+
+                                    const coreLeftPercent = (coreStartDelta / safeTotalDuration) * 100;
+                                    const coreWidthPercent = (coreDuration / safeTotalDuration) * 100;
+
+                                    // Calculate Max Width for Label (avoid collision)
+                                    let nextGroupTime = safeDuration;
+                                    for (let j = i + 1; j < packedClusters.length; j++) {
+                                        if (packedClusters[j].assignedRow === cluster.assignedRow) {
+                                            nextGroupTime = packedClusters[j].time;
+                                            break;
+                                        }
+                                    }
+
+                                    const widthToNext = ((nextGroupTime - cluster.time) / safeDuration) * 100;
+                                    // We need to constrain the label width relative to the Timeline, NOT the container.
+                                    // The container width is totalWidthPercent.
+                                    // So we set maxWidth style on the label div.
+
+                                    // ---------------------------------------------------------
+                                    // ---------------------------------------------------------
+                                    // RENDER: Group Container
+                                    // ---------------------------------------------------------
+                                    return (
+                                        <div
+                                            key={cluster.id}
+                                            className={`absolute transition-all duration-300 ${topPos} ${isActiveGroup ? 'scale-100 z-[60]' : 'z-[40]'}`}
+                                            style={{
+                                                left: `${left}%`,
+                                                width: `${totalWidthPercent}%`,
+                                                zIndex,
+                                            }}
                                         >
-                                            <div
-                                                // Interactive Label Card
-                                                className={`pointer-events-auto flex items-center gap-1 transition-all cursor-pointer border px-1.5 py-0.5 rounded-sm relative
+                                            {/* FLOATING LABEL */}
+                                            <div // Wrapper to position the label relative to the group start
+                                                className={`absolute top-[8px] pointer-events-none ${
+                                                    // Smart edge clamping
+                                                    left < 10
+                                                        ? 'left-0' // Early moments: left-align
+                                                        : left + totalWidthPercent > 90
+                                                            ? 'right-0' // Late moments: right-align
+                                                            : 'left-1/2 -translate-x-1/2' // Middle: center
+                                                    }`}
+                                                style={{ width: 'auto' }}
+                                            >
+                                                <div
+                                                    // Interactive Label Card
+                                                    className={`pointer-events-auto flex items-center gap-1 transition-all cursor-pointer border px-1.5 py-0.5 rounded-sm relative
                                                 bg-black
                                                 ${isActiveGroup
-                                                        ? 'text-orange-300 font-bold border-orange-500/50 shadow-lg shadow-orange-900/20 scale-105'
-                                                        : 'text-orange-400/70 border-orange-900/30 hover:text-orange-300 hover:border-orange-400/50'
-                                                    }`}
-                                                style={{
-                                                    maxWidth: '90vw', // Use VW/Fixed constraint to prevent infinite grow
-                                                    minWidth: 'max-content'
-                                                }}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onMomentClick && onMomentClick(primaryMoment);
-                                                }}
-                                            >
-                                                {/* Chapter Variant */}
-                                                {isChapter && cluster.chapter ? (
-                                                    <span className={`${isActiveGroup ? 'text-green-300' : 'text-green-400/70'}`}>
-                                                        {cluster.chapter.title}
-                                                    </span>
-                                                ) : (
-                                                    // Moment Variant
-                                                    <>
-                                                        {isActiveGroup && <Volume2 size={8} className="text-orange-300 shrink-0" />}
-
-                                                        <span className={`text-[10px] whitespace-nowrap block truncate max-w-[120px] ${currentUser?.id === primaryMoment.userId ? 'font-bold' : ''}`}>
-                                                            {currentUser?.id === primaryMoment.userId && <Wrench size={8} className="inline mr-1" />}
-                                                            {(() => {
-                                                                // Dynamic Ticker Logic
-                                                                const activeMoments = cluster.moments.filter(m =>
-                                                                    currentTime >= m.startSec && currentTime <= m.endSec
-                                                                );
-
-                                                                if (activeMoments.length === 0) {
-                                                                    // Gap: Show count
-                                                                    return cluster.moments.length > 1 ? `${cluster.moments.length} Moments` : (primaryMoment.note || 'Moment');
-                                                                } else if (activeMoments.length === 1) {
-                                                                    // Single active: Show its note
-                                                                    return activeMoments[0].note || 'Moment';
-                                                                } else {
-                                                                    // Multiple active: Cycle through them
-                                                                    const currentIndex = cycleIndex[cluster.id] || 0;
-                                                                    const displayMoment = activeMoments[currentIndex % activeMoments.length];
-                                                                    return displayMoment.note || 'Moment';
-                                                                }
-                                                            })()}
+                                                            ? 'text-orange-300 font-bold border-orange-500/50 shadow-lg shadow-orange-900/20 scale-105'
+                                                            : 'text-orange-400/70 border-orange-900/30 hover:text-orange-300 hover:border-orange-400/50'
+                                                        }`}
+                                                    style={{
+                                                        maxWidth: '90vw', // Use VW/Fixed constraint to prevent infinite grow
+                                                        minWidth: 'max-content'
+                                                    }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onMomentClick && onMomentClick(primaryMoment);
+                                                    }}
+                                                >
+                                                    {/* Chapter Variant */}
+                                                    {isChapter && cluster.chapter ? (
+                                                        <span className={`${isActiveGroup ? 'text-green-300' : 'text-green-400/70'}`}>
+                                                            {cluster.chapter.title}
                                                         </span>
+                                                    ) : (
+                                                        // Moment Variant
+                                                        <>
+                                                            {isActiveGroup && <Volume2 size={8} className="text-orange-300 shrink-0" />}
 
-                                                        {/* CLUSTER BADGE */}
-                                                        {cluster.moments.length > 1 && (
-                                                            <span className="ml-1.5 flex items-center justify-center h-3 min-w-[12px] px-0.5 rounded-xs bg-orange-500/20 text-orange-300 text-[8px] font-mono font-bold border border-orange-500/20 shrink-0">
-                                                                {cluster.moments.length}
+                                                            <span className={`text-[10px] whitespace-nowrap block truncate max-w-[120px] ${currentUser?.id === primaryMoment.userId ? 'font-bold' : ''}`}>
+                                                                {currentUser?.id === primaryMoment.userId && <Wrench size={8} className="inline mr-1" />}
+                                                                {(() => {
+                                                                    // Dynamic Ticker Logic
+                                                                    const activeMoments = cluster.moments.filter(m =>
+                                                                        currentTime >= m.startSec && currentTime <= m.endSec
+                                                                    );
+
+                                                                    if (activeMoments.length === 0) {
+                                                                        // Gap: Show count
+                                                                        return cluster.moments.length > 1 ? `${cluster.moments.length} Moments` : (primaryMoment.note || 'Moment');
+                                                                    } else if (activeMoments.length === 1) {
+                                                                        // Single active: Show its note
+                                                                        return activeMoments[0].note || 'Moment';
+                                                                    } else {
+                                                                        // Multiple active: Cycle through them
+                                                                        const currentIndex = cycleIndex[cluster.id] || 0;
+                                                                        const displayMoment = activeMoments[currentIndex % activeMoments.length];
+                                                                        return displayMoment.note || 'Moment';
+                                                                    }
+                                                                })()}
                                                             </span>
-                                                        )}
 
-                                                        {/* Expand Toggle */}
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setExpandedMomentId(prev => prev === primaryMoment.id ? null : primaryMoment.id);
-                                                            }}
-                                                            className="ml-1 p-0.5 hover:bg-white/10 rounded-full transition-colors shrink-0"
-                                                        >
-                                                            {expandedMomentId === primaryMoment.id ? <ChevronUp size={8} /> : <ChevronDown size={8} />}
-                                                        </button>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
+                                                            {/* CLUSTER BADGE */}
+                                                            {cluster.moments.length > 1 && (
+                                                                <span className="ml-1.5 flex items-center justify-center h-3 min-w-[12px] px-0.5 rounded-xs bg-orange-500/20 text-orange-300 text-[8px] font-mono font-bold border border-orange-500/20 shrink-0">
+                                                                    {cluster.moments.length}
+                                                                </span>
+                                                            )}
 
-                                        {/* 3. EXPANDED VIEW (Context Menu) */}
-                                        {/* Needs to be OUTSIDE the transform scale context or handled carefully? 
-                                        Actually, being inside is fine if z-index is high. */}
-                                        {expandedMomentId === primaryMoment.id && (
-                                            <div
-                                                data-moment-dropdown
-                                                className="absolute top-[32px] left-0 w-[300px] p-4 bg-zinc-950 border border-orange-500/50 shadow-2xl shadow-black rounded-xl animate-in fade-in slide-in-from-top-1 z-[999]"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                <div className="max-h-[320px] overflow-y-auto scrollbar-thin scrollbar-thumb-orange-500/20 pr-1 flex flex-col gap-3">
-                                                    {(() => {
-                                                        // Live Sort: Active moment first
-                                                        const sortedMoments = [...cluster.moments].sort((a, b) => {
-                                                            const aIsActive = currentTime >= a.startSec && currentTime <= a.endSec;
-                                                            const bIsActive = currentTime >= b.startSec && currentTime <= b.endSec;
-
-                                                            if (aIsActive && !bIsActive) return -1;
-                                                            if (!aIsActive && bIsActive) return 1;
-                                                            return a.startSec - b.startSec; // Secondary sort by time
-                                                        });
-
-                                                        return sortedMoments.map((m, idx) => (
-                                                            <div key={m.id} className={`relative group/stack-item ${idx !== cluster.moments.length - 1 ? 'border-b border-white/5 pb-3' : ''}`}>
-                                                                <div className="flex items-center justify-between mb-1.5">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-[9px] font-bold text-white border border-white/10">
-                                                                            {m.user?.image ? <img src={m.user.image} className="w-full h-full rounded-full object-cover" /> : (m.user?.name?.[0] || 'U')}
-                                                                        </div>
-                                                                        <span className="text-[10px] text-white/60 font-medium">{m.user?.name || 'Unknown'}</span>
-                                                                    </div>
-                                                                    <button onClick={(e) => { e.stopPropagation(); onSeek(m.startSec); onMomentClick(m); }} className="hover:bg-white/10 p-1 rounded-full text-green-400 transition-colors">
-                                                                        <Play size={10} className="fill-current" />
-                                                                    </button>
-                                                                </div>
-                                                                <p className="text-xs text-white/90 font-serif">{m.note}</p>
-                                                            </div>
-                                                        ));
-                                                    })()}
+                                                            {/* Expand Toggle */}
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setExpandedMomentId(prev => prev === primaryMoment.id ? null : primaryMoment.id);
+                                                                }}
+                                                                className="ml-1 p-0.5 hover:bg-white/10 rounded-full transition-colors shrink-0"
+                                                            >
+                                                                {expandedMomentId === primaryMoment.id ? <ChevronUp size={8} /> : <ChevronDown size={8} />}
+                                                            </button>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
-                                        )}
 
-                                    </div>
-                                );
-                            })}
+                                            {/* 3. EXPANDED VIEW (Context Menu) */}
+                                            {/* Needs to be OUTSIDE the transform scale context or handled carefully? 
+                                        Actually, being inside is fine if z-index is high. */}
+                                            {expandedMomentId === primaryMoment.id && (
+                                                <div
+                                                    data-moment-dropdown
+                                                    className="absolute top-[32px] left-0 w-[300px] p-4 bg-zinc-950 border border-orange-500/50 shadow-2xl shadow-black rounded-xl animate-in fade-in slide-in-from-top-1 z-[999]"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <div className="max-h-[320px] overflow-y-auto scrollbar-thin scrollbar-thumb-orange-500/20 pr-1 flex flex-col gap-3">
+                                                        {(() => {
+                                                            // Live Sort: Active moment first
+                                                            const sortedMoments = [...cluster.moments].sort((a, b) => {
+                                                                const aIsActive = currentTime >= a.startSec && currentTime <= a.endSec;
+                                                                const bIsActive = currentTime >= b.startSec && currentTime <= b.endSec;
+
+                                                                if (aIsActive && !bIsActive) return -1;
+                                                                if (!aIsActive && bIsActive) return 1;
+                                                                return a.startSec - b.startSec; // Secondary sort by time
+                                                            });
+
+                                                            return sortedMoments.map((m, idx) => (
+                                                                <div key={m.id} className={`relative group/stack-item ${idx !== cluster.moments.length - 1 ? 'border-b border-white/5 pb-3' : ''}`}>
+                                                                    <div className="flex items-center justify-between mb-1.5">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-[9px] font-bold text-white border border-white/10">
+                                                                                {m.user?.image ? <img src={m.user.image} className="w-full h-full rounded-full object-cover" /> : (m.user?.name?.[0] || 'U')}
+                                                                            </div>
+                                                                            <span className="text-[10px] text-white/60 font-medium">{m.user?.name || 'Unknown'}</span>
+                                                                        </div>
+                                                                        <button onClick={(e) => { e.stopPropagation(); onSeek(m.startSec); onMomentClick(m); }} className="hover:bg-white/10 p-1 rounded-full text-green-400 transition-colors">
+                                                                            <Play size={10} className="fill-current" />
+                                                                        </button>
+                                                                    </div>
+                                                                    <p className="text-xs text-white/90 font-serif">{m.note}</p>
+                                                                </div>
+                                                            ));
+                                                        })()}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })()
+                }
+                {
+                    disabled && (
+                        <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-[1px] rounded-lg flex items-center justify-center cursor-not-allowed">
+                            <div className="flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg animate-pulse">
+                                <span>⚠️</span>
+                                <span>Ad Playing - Timeline Locked</span>
+                            </div>
                         </div>
-                    );
-                })()
-            }
-            {
-                disabled && (
-                    <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-[1px] rounded-lg flex items-center justify-center cursor-not-allowed">
-                        <div className="flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg animate-pulse">
-                            <span>⚠️</span>
-                            <span>Ad Playing - Timeline Locked</span>
-                        </div>
-                    </div>
-                )
-            }
-        </div >
-    );
+                    )
+                }
+            </div >
+            );
 }
