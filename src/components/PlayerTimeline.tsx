@@ -657,8 +657,10 @@ export default function PlayerTimeline({
                             onCaptureEnd(endTime);
                             setIsEditorOpen(true);
                         } else {
+                            setDraftMoment({ start: time, end: endTime });
                             setIsEditorOpen(true);
                         }
+
                     }}
                 >
                     {/* Onboarding Overlay */}
@@ -795,15 +797,105 @@ export default function PlayerTimeline({
                                     </button>
 
                                     {/* Left Border (Extended) */}
+                                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-[140%] w-[3px] bg-orange-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.3)]" />
+
+                                    {/* Right Border (Extended) */}
+                                    <div className="absolute right-0 top-1/2 -translate-y-1/2 h-[140%] w-[3px] bg-orange-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.3)]" />
 
                                 </div>
                             )}
+
+                            {/* Start Marker Component */}
+                            <div
+                                className={`absolute top-1/2 h-8 w-8 cursor-ew-resize z-20 group/marker transition-transform duration-200 
+                                    ${(isHoveringRange || draggingMarker) ? 'scale-110' : 'hover:scale-110'}
+                                `}
+                                style={{
+                                    left: `${(startSec / safeDuration) * 100}%`,
+                                    transform: 'translateX(-50%) translateY(-50%)', // Center the wrapper
+                                    transformOrigin: 'center'
+                                }}
+                                onMouseDown={(e) => {
+                                    e.stopPropagation();
+                                    setDraggingMarker('start');
+                                }}
+                            >
+                                {/* Circle Handle (Offset Left) */}
+                                <div
+                                    className="absolute right-[calc(50%+4px)] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-orange-500 border-2 border-black shadow-md flex items-center justify-center"
+                                >
+                                    {/* Tiny Play/Pause inside handle (Preserving Functionality) */}
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onPreviewCapture?.();
+                                        }}
+                                        className="flex items-center justify-center w-full h-full text-black hover:text-white transition-colors"
+                                    >
+                                        {isPlaying && currentTime >= startSec && (endSec === null || currentTime <= endSec) ?
+                                            <Pause size={8} className="fill-current" /> :
+                                            <Play size={8} className="fill-current" />
+                                        }
+                                    </button>
+                                </div>
+
+                                {/* Vertical Orange Line (Extended) */}
+                                <div className="absolute left-1/2 top-1/2 -translate-y-1/2 h-[140%] w-[3px] bg-orange-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.3)]" />
+
+                                {/* Timestamp Popover */}
+                                {(isHovering || draggingMarker === 'start') && (
+                                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 flex items-center gap-1 text-[10px] font-mono font-bold bg-orange-500 text-black px-1 rounded opacity-0 group-hover/marker:opacity-100 transition-opacity whitespace-nowrap">
+                                        {formatTime(startSec)}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onCaptureUpdate?.(null, endSec || null);
+                                                setIsEditorOpen(false); // Close editor if marker removed
+                                            }}
+                                            className="hover:bg-black/20 rounded-full p-0.5"
+                                        >
+                                            <X size={8} />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </>
                     )}
 
+                    {/* Sticky End Bracket Removed */}
 
+                    {/* End Marker } */}
+                    {endSec !== null && (
+                        <div
+                            className={`absolute top-1/2 h-8 w-8 cursor-ew-resize z-20 group/marker transition-transform duration-200 
+                                ${(isHoveringRange || draggingMarker) ? 'scale-110' : 'hover:scale-110'}
+                            `}
+                            style={{ left: `${(endSec / safeDuration) * 100}%`, transform: 'translateX(-50%) translateY(-50%)' }}
+                            onMouseDown={(e) => {
+                                e.stopPropagation();
+                                setDraggingMarker('end');
+                            }}
+                        >
+                            {/* Circle Handle (Offset Right) */}
+                            <div className="absolute left-[calc(50%+4px)] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-orange-500 border-2 border-black shadow-md" />
 
-
+                            {(isHovering || draggingMarker !== null) && (
+                                <div className="absolute -top-6 left-1/2 -translate-x-1/2 flex items-center gap-1 text-[10px] font-mono font-bold bg-orange-500 text-black px-1 rounded opacity-0 group-hover/marker:opacity-100 transition-opacity whitespace-nowrap">
+                                    {formatTime(endSec)}
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onCaptureUpdate?.(startSec || null, null);
+                                            setIsEditorOpen(false); // Close editor if marker removed
+                                        }}
+                                        className="hover:bg-black/20 rounded-full p-0.5"
+                                    >
+                                        <X size={8} />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
 
                     {/* Moments Overlays (Existing) */}
@@ -829,7 +921,150 @@ export default function PlayerTimeline({
                     })}
 
 
+                    {/* DRAFT MOMENT VISUALIZATION */}
+                    {draftMoment && (
+                        <>
+                            {/* Draft Background Fill (Dark Pill) */}
+                            <div
+                                className="absolute top-0 bottom-0 z-30 bg-[#1a2332]/90 flex items-center justify-center cursor-pointer group/draft"
+                                style={{
+                                    left: `${(draftMoment.start / safeDuration) * 100}%`,
+                                    width: `${((draftMoment.end - draftMoment.start) / safeDuration) * 100}%`
+                                }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    // Confirm Draft -> Open Editor
+                                    onCaptureStart?.(draftMoment.start);
+                                    onCaptureEnd?.(draftMoment.end);
+                                    setDraftMoment(null);
+                                    setIsEditorOpen(true);
+                                }}
+                            >
+                                {/* VISUALS: +Create Text & Vertical Borders */}
+                                {/* VISUALS: +Create Text & Vertical Borders */}
+                                <button
+                                    className="text-[10px] font-bold text-white tracking-widest uppercase select-none drop-shadow-md hover:scale-110 transition-transform cursor-pointer pointer-events-auto"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onCaptureStart?.(draftMoment.start);
+                                        onCaptureEnd?.(draftMoment.end);
+                                        setDraftMoment(null);
+                                        setIsEditorOpen(true);
+                                    }}
+                                >
+                                    +Create
+                                </button>
 
+                                {/* Left Border (Extended) */}
+                                <div className="absolute left-0 top-1/2 -translate-y-1/2 h-[140%] w-[3px] bg-orange-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.3)]" />
+
+                                {/* Right Border (Extended) */}
+                                <div className="absolute right-0 top-1/2 -translate-y-1/2 h-[140%] w-[3px] bg-orange-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.3)]" />
+
+                                {/* Drag Handle (Start Time) - Offset Left */}
+                                <div
+                                    className="absolute right-full mr-1 top-1/2 -translate-y-1/2 z-50 cursor-ew-resize group/handle-start"
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        const handleDrag = (moveEvent: MouseEvent) => {
+                                            const time = getTimeFromX(moveEvent.clientX);
+                                            const newStart = Math.max(0, Math.min(time, (draftMoment?.end || safeDuration) - 1));
+                                            setDraftMoment(prev => prev ? { ...prev, start: newStart } : null);
+                                            onSeek(newStart);
+                                        };
+                                        const handleRelease = () => {
+                                            document.removeEventListener('mousemove', handleDrag);
+                                            document.removeEventListener('mouseup', handleRelease);
+                                            setIsDraggingDraft(false);
+                                            justDraggedRef.current = true;
+                                            setTimeout(() => { justDraggedRef.current = false; }, 100);
+                                        };
+                                        document.addEventListener('mousemove', handleDrag);
+                                        document.addEventListener('mouseup', handleRelease);
+                                        setIsDraggingDraft('start');
+                                    }}
+                                    onTouchStart={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        const handleDrag = (moveEvent: TouchEvent) => {
+                                            const touch = moveEvent.touches[0];
+                                            if (touch) {
+                                                const time = getTimeFromX(touch.clientX);
+                                                const newStart = Math.max(0, Math.min(time, (draftMoment?.end || safeDuration) - 1));
+                                                setDraftMoment(prev => prev ? { ...prev, start: newStart } : null);
+                                                onSeek(newStart);
+                                            }
+                                        };
+                                        const handleRelease = () => {
+                                            document.removeEventListener('touchmove', handleDrag);
+                                            document.removeEventListener('touchend', handleRelease);
+                                            setIsDraggingDraft(false);
+                                            justDraggedRef.current = true;
+                                            setTimeout(() => { justDraggedRef.current = false; }, 100);
+                                        };
+                                        document.addEventListener('touchmove', handleDrag);
+                                        document.addEventListener('touchend', handleRelease);
+                                        setIsDraggingDraft('start');
+                                    }}
+                                >
+                                    {/* Orange Circle Visual */}
+                                    <div className="w-4 h-4 rounded-full bg-orange-500 border-2 border-black shadow-md hover:scale-110 transition-transform" />
+                                </div>
+
+                                {/* Drag Handle (End Time) - Offset Right */}
+                                <div
+                                    className="absolute left-full ml-1 top-1/2 -translate-y-1/2 z-50 cursor-ew-resize group/handle-end"
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        const handleDrag = (moveEvent: MouseEvent) => {
+                                            const time = getTimeFromX(moveEvent.clientX);
+                                            const newEnd = Math.max((draftMoment?.start || 0) + 1, Math.min(time, safeDuration));
+                                            setDraftMoment(prev => prev ? { ...prev, end: newEnd } : null);
+                                            onSeek(newEnd);
+                                        };
+                                        const handleRelease = () => {
+                                            document.removeEventListener('mousemove', handleDrag);
+                                            document.removeEventListener('mouseup', handleRelease);
+                                            setIsDraggingDraft(false);
+                                            justDraggedRef.current = true;
+                                            setTimeout(() => { justDraggedRef.current = false; }, 100);
+                                        };
+                                        document.addEventListener('mousemove', handleDrag);
+                                        document.addEventListener('mouseup', handleRelease);
+                                        setIsDraggingDraft('end');
+                                    }}
+                                    onTouchStart={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        const handleDrag = (moveEvent: TouchEvent) => {
+                                            const touch = moveEvent.touches[0];
+                                            if (touch) {
+                                                const time = getTimeFromX(touch.clientX);
+                                                const newEnd = Math.max((draftMoment?.start || 0) + 1, Math.min(time, safeDuration));
+                                                setDraftMoment(prev => prev ? { ...prev, end: newEnd } : null);
+                                                onSeek(newEnd);
+                                            }
+                                        };
+                                        const handleRelease = () => {
+                                            document.removeEventListener('touchmove', handleDrag);
+                                            document.removeEventListener('touchend', handleRelease);
+                                            setIsDraggingDraft(false);
+                                            justDraggedRef.current = true;
+                                            setTimeout(() => { justDraggedRef.current = false; }, 100);
+                                        };
+                                        document.addEventListener('touchmove', handleDrag);
+                                        document.addEventListener('touchend', handleRelease);
+                                        setIsDraggingDraft('end');
+                                    }}
+                                >
+                                    {/* Orange Circle Visual */}
+                                    <div className="w-4 h-4 rounded-full bg-orange-500 border-2 border-black shadow-md hover:scale-110 transition-transform" />
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </div>
 
                 <span className="text-xs font-mono text-white/60 w-10">
