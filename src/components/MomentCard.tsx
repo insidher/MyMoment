@@ -256,8 +256,8 @@ export default function MomentCard({
                     if (onPlayFull) {
                         onPlayFull(moment);
                     } else {
-                        // Default: Play full track (navigate to room)
-                        router.push(`/room/view?url=${encodeURIComponent(moment.sourceUrl)}`);
+                        // FIX: Open external source directly to avoid "White Page" on internal route
+                        window.open(moment.sourceUrl, '_blank');
                     }
                 }}
             >
@@ -623,6 +623,6 @@ export default function MomentCard({
 
                 </div>
             </div>
-        </div>
+        </div >
     );
 }

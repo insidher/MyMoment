@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
     // Define protected routes that require authentication
-    const protectedPaths = ['/profile', '/room']
+    const protectedPaths = ['/profile']
 
     // Check if the current path is protected
     const isProtectedPath = protectedPaths.some(path =>
@@ -64,6 +64,6 @@ export const config = {
          * This prevents unnecessary checks on public pages
          */
         '/profile/:path*',
-        '/room/:path*',
+        '/profile/:path*',
     ],
 }

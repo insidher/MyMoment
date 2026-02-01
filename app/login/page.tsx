@@ -110,6 +110,7 @@ export default function Login() {
                                 className="input-field w-full"
                                 placeholder="hello@example.com"
                                 required
+                                suppressHydrationWarning
                             />
                         </div>
 
@@ -125,11 +126,13 @@ export default function Login() {
                                     placeholder="••••••••"
                                     required
                                     minLength={6}
+                                    suppressHydrationWarning
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/80 transition-colors"
+                                    suppressHydrationWarning
                                 >
                                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
@@ -148,6 +151,7 @@ export default function Login() {
                                     placeholder="••••••••"
                                     required
                                     minLength={6}
+                                    suppressHydrationWarning
                                 />
                             </div>
                         )}

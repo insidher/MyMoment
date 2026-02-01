@@ -11,6 +11,7 @@ import YouTube, { YouTubeEvent } from 'react-youtube';
 import { toast } from 'sonner';
 import { Moment } from '@/types';
 import { useAuth } from '@/context/AuthContext';
+import SignupPromptModal from '@/components/SignupPromptModal';
 
 
 import MomentTimeline from '@/components/MomentTimeline';
@@ -132,6 +133,7 @@ export default function Room({ params }: { params: { id: string } }) {
 
     // Smart Capture State
     const [captureState, setCaptureState] = useState<CaptureState>('idle');
+    const [showSignupModal, setShowSignupModal] = useState(false);
     const [isSidebarEditorOpen, setIsSidebarEditorOpen] = useState(false);
     const [focusTrigger, setFocusTrigger] = useState(0);
     const [youtubePlayer, setYoutubePlayer] = useState<any>(null);
@@ -820,6 +822,13 @@ export default function Room({ params }: { params: { id: string } }) {
         // 🛑 ADD THESE LOGS AT THE VERY START
         console.log("🚦 [Gatekeeper] handleSave triggered!");
 
+        // 🔒 GUEST GATEKEEPER
+        if (!user) {
+            console.log("🔒 [Gatekeeper] Guest detected. Showing signup prompt.");
+            setShowSignupModal(true);
+            return;
+        }
+
         if (!note?.trim()) {
             console.log("🛑 [Gatekeeper] BLOCKED: Content is empty");
             return;
@@ -1238,6 +1247,10 @@ export default function Room({ params }: { params: { id: string } }) {
 
     return (
         <main className="flex flex-col min-h-screen bg-black text-white">
+            <SignupPromptModal
+                isOpen={showSignupModal}
+                onClose={() => setShowSignupModal(false)}
+            />
             {/* RIGID ZONE: Fixed Video Player + Timeline */}
             <section className="shrink-0 w-full relative z-10 bg-black">
                 {/* Desktop: 65/35 Split | Mobile: Full Width */}
@@ -1314,8 +1327,8 @@ export default function Room({ params }: { params: { id: string } }) {
                             )}
                         </div>
 
-                        {/* Sticky Header: Controls + Timeline */}
-                        <div className="sticky top-14 z-40 bg-black/95 backdrop-blur-md pb-2 -mx-4 px-4 lg:mx-0 lg:px-0 lg:bg-black lg:border-b lg:border-white/10 lg:rounded-b-xl lg:mb-4 lg:pt-2">
+                        {/* Sticky Header: Controls + Timeline - LOWERED Z-INDEX to fix menu conflict */}
+                        <div className="sticky top-14 z-[30] bg-black/95 backdrop-blur-md pb-2 -mx-4 px-4 lg:mx-0 lg:px-0 lg:bg-black lg:border-b lg:border-white/10 lg:rounded-b-xl lg:mb-4 lg:pt-2">
 
                             {/* Compact Playback Controls */}
                             {(isYouTube || isSpotify) && (
@@ -1543,7 +1556,7 @@ export default function Room({ params }: { params: { id: string } }) {
                                                                 console.error(e);
                                                             }
                                                         }}
-                                                        showDelete={user?.id === group.main.userId}
+                                                        showDelete={false}
                                                         onPlayFull={() => {
                                                             router.push(`/room/view?url=${encodeURIComponent(group.main.sourceUrl)}`);
                                                         }}

@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Sparkles, Compass, User, LogOut, Search, Music, Home, Menu, ArrowRight, X, Info, MessageSquare, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useFilter } from '@/context/FilterContext';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { checkIsAdmin } from '../../app/admin/feedback/actions';
 import FeedbackModal from './FeedbackModal';
 
@@ -18,8 +18,35 @@ export default function Navbar() {
     const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
 
+    const menuRef = useRef<HTMLDivElement>(null);
+    const buttonRef = useRef<HTMLButtonElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (
+                showMenu &&
+                menuRef.current &&
+                !menuRef.current.contains(event.target as Node) &&
+                buttonRef.current &&
+                !buttonRef.current.contains(event.target as Node)
+            ) {
+                setShowMenu(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showMenu]);
+
     useEffect(() => {
         const checkAdmin = async () => {
+            // ... existing admin check (preserved implicitly by not replacing it, but wait, I am replacing a large chunk?)
+            // Ah, I should be careful not to overwrite the admin check logic if I replace the whole top.
+            // I will replace only the top part up to the state definitions, and then insert the useEffect separately?
+            // Or I can replace the whole block if I include the existing code.
+            // The existing admin check is lines 21-31.
             if (!user) {
                 setIsAdmin(false);
                 return;
@@ -47,11 +74,12 @@ export default function Navbar() {
 
     return (
         <>
-            <nav className="fixed top-0 left-0 right-0 h-16 bg-black/50 backdrop-blur-xl border-b border-white/5 z-50 flex items-center px-4 justify-between gap-4">
+            <nav className="fixed top-0 left-0 right-0 h-16 bg-black/50 backdrop-blur-xl border-b border-white/5 z-[50] flex items-center px-4 justify-between gap-4">
 
                 {/* Left: Mobile Menu & Logo */}
                 <div className="flex items-center gap-4 shrink-0">
                     <button
+                        ref={buttonRef}
                         onClick={() => setShowMenu(!showMenu)}
                         className="p-2 -ml-2 text-white/70 hover:text-white transition-colors"
                     >
@@ -157,7 +185,7 @@ export default function Navbar() {
 
             {/* Mobile Menu Dropdown */}
             {showMenu && (
-                <div className="fixed top-16 left-0 w-64 h-[calc(100vh-4rem)] bg-black/95 backdrop-blur-xl border-r border-white/10 z-40 p-4 space-y-2 animate-in slide-in-from-left duration-200">
+                <div ref={menuRef} className="fixed top-16 left-0 w-64 h-[calc(100vh-4rem)] bg-black/95 backdrop-blur-xl border-r border-white/10 z-[60] p-4 space-y-2 animate-in slide-in-from-left duration-200">
                     <Link
                         href="/"
                         onClick={() => setShowMenu(false)}
