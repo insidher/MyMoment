@@ -8,8 +8,7 @@ import {
     Menu,
     Pin,
 } from 'lucide-react';
-import { Moment } from '@/types/moment';
-import { User } from '@/types/user';
+import { Moment } from '@/types';
 
 // ============================================
 // TYPES & HELPER FUNCTIONS
@@ -39,7 +38,6 @@ interface PlayerTimelineProps {
     activeMomentId?: string | null;
     expandedMomentId?: string | null;
     setExpandedMomentId?: (id: string | null) => void;
-    currentUser?: User | null;
     onMomentClick?: (moment: Moment) => void;
     // State
     isPlaying: boolean;
