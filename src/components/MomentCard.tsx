@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Moment } from '@/types';
-import { X, Heart, MessageSquare, Play, Users, Send, ChevronDown, ChevronUp } from 'lucide-react';
+import { Moment, TrackSource } from '@/types';
+import { X, Heart, MessageSquare, Play, Send, ChevronDown, ChevronUp } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { toggleLike, createComment } from '../../app/actions/moments';
@@ -23,7 +23,7 @@ interface MomentCardProps {
     isRepliesExpanded?: boolean;
     replyCount?: number;
     onReplyClick?: () => void;
-    onNewReply?: (parentId: string, reply: any) => void;
+    onNewReply?: (parentId: string, reply: Moment) => void;
 }
 
 export default function MomentCard({
@@ -67,14 +67,14 @@ export default function MomentCard({
     const pathname = usePathname();
 
     // Derive display data from TrackSource or Moment
-    const track = moment.trackSource || {
+    const track = (moment.trackSource || {
         title: moment.title,
         artist: moment.artist,
         artwork: moment.artwork,
         service: moment.service,
         sourceUrl: moment.sourceUrl,
         durationSec: 0,
-    } as any;
+    }) as TrackSource;
 
 
 
@@ -155,7 +155,7 @@ export default function MomentCard({
 
                 // Notify parent to update state
                 if (onNewReply) {
-                    onNewReply(moment.id, newComment);
+                    onNewReply(moment.id, newComment as unknown as Moment);
                 }
             }
         } catch (error) {
@@ -436,7 +436,7 @@ export default function MomentCard({
                     {moment.note && (
                         <div className="mb-2 p-2 bg-black/20 rounded-lg border border-white/5">
                             <div className="relative">
-                                <span className="absolute -top-2 -left-1 text-3xl text-white/10 font-serif leading-none">"</span>
+                                <span className="absolute -top-2 -left-1 text-3xl text-white/10 font-serif leading-none">&quot;</span>
                                 <div className="pl-3">
                                     <p className="text-sm font-medium text-white/90 leading-relaxed font-serif italic">
                                         {isExpanded || moment.note.length <= MAX_NOTE_LENGTH

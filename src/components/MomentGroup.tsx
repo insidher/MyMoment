@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Moment } from '@/types';
 import MomentCard from '@/components/MomentCard';
-import { ChevronDown, ChevronUp, MessageCircle, Loader2, Send, X } from 'lucide-react';
+import { ChevronUp, MessageCircle, Loader2, Send, X } from 'lucide-react';
 import ThreadComment from './ThreadComment';
 import { createComment } from '../../app/actions/moments';
 import { sanitizeMoment } from '@/lib/sanitize';
@@ -24,7 +24,7 @@ interface MomentGroupProps {
     currentUser?: { id: string; name?: string | null; image?: string | null };
     onReply?: (momentId: string, username: string) => void;
     onRefresh?: () => void;
-    onNewReply?: (parentId: string, reply: any) => void;
+    onNewReply?: (parentId: string, reply: Moment) => void;
 }
 
 export default function MomentGroup({
@@ -62,8 +62,8 @@ export default function MomentGroup({
     // If 'profiles' is undefined, grab the data from 'user' so the UI doesn't crash.
     const normalizedReplies = replies.map(r => ({
         ...r,
-        profiles: (r as any).profiles || (r as any).user
-    }));
+        profiles: (r as unknown as { profiles?: unknown; user?: unknown }).profiles || (r as unknown as { profiles?: unknown; user?: unknown }).user
+    })) as unknown as Moment[];
 
     // Combine normalized props + effective optimistic, sort by Date DESC
     // FILTER: Ensure we ONLY show direct replies to this moment (Level 2), excluding nested ones (Level 3+)
@@ -79,16 +79,11 @@ export default function MomentGroup({
 
     // Auto-Expand Logic: Track reply count and auto-open drawer when new Level 2 comments arrive
     // Initialize with current length so it doesn't auto-open on initial page load
-    const prevReplyCount = useRef(allReplies.length);
-
-    useEffect(() => {
-        // If the reply count has increased, auto-expand the drawer
-        if (allReplies.length > prevReplyCount.current) {
-            setIsExpanded(true);
-        }
-        // Update the ref to the current count for next comparison
-        prevReplyCount.current = allReplies.length;
-    }, [allReplies.length]);
+    const [lastReplyCount, setLastReplyCount] = useState(allReplies.length);
+    if (allReplies.length > lastReplyCount) {
+        setLastReplyCount(allReplies.length);
+        setIsExpanded(true);
+    }
 
     const handleMainReplySubmit = async () => {
         if (!replyText.trim()) return;
@@ -228,7 +223,6 @@ export default function MomentGroup({
                             <ThreadComment
                                 key={reply.id}
                                 comment={reply}
-                                currentUserId={currentUserId}
                                 onReply={(id, username) => onReply && onReply(id, username)}
                                 onRefresh={onRefresh}
                             />

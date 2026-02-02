@@ -9,6 +9,7 @@ import {
     Pin,
 } from 'lucide-react';
 import { Moment } from '@/types';
+import { Chapter } from '@/lib/chapters';
 
 // ============================================
 // TYPES & HELPER FUNCTIONS
@@ -51,10 +52,10 @@ interface PlayerTimelineProps {
     onEditorOpenChange?: (isOpen: boolean) => void;
     // Legacy / Extra Props from Parent
     disabled?: boolean;
-    onChapterClick?: (chapter: any) => void;
+    onChapterClick?: (chapter: Chapter) => void;
     onPause?: () => void;
     onPreviewCapture?: () => void;
-    chapters?: any[];
+    chapters?: Chapter[];
 }
 
 const formatTime = (seconds: number) => {
@@ -106,8 +107,6 @@ export default function PlayerTimeline({
     // Visual State
     const [heartbeat, setHeartbeat] = useState(false);
 
-    // Boundary Detection State for Action Bar
-    const [alignLeft, setAlignLeft] = useState(false);
 
     // Onboarding State
     const [showOnboarding, setShowOnboarding] = useState(false);
@@ -118,10 +117,11 @@ export default function PlayerTimeline({
     const [pinnedMomentIds, setPinnedMomentIds] = useState<string[]>([]);
     const [dismissedMomentId, setDismissedMomentId] = useState<string | null>(null);
 
-    // Reset dismissed moment when active ID changes
-    useEffect(() => {
+    const [lastActiveId, setLastActiveId] = useState(activeMomentId);
+    if (activeMomentId !== lastActiveId) {
+        setLastActiveId(activeMomentId);
         setDismissedMomentId(null);
-    }, [activeMomentId]);
+    }
 
     // Derived State
     const activeMoment = useMemo(() =>
@@ -182,15 +182,10 @@ export default function PlayerTimeline({
         }
     }, []);
 
-    // Smart Alignment Logic for Action Bar
-    useEffect(() => {
-        if (startSec !== null && endSec !== null) {
-            // If the draft end is in the first 25% of the timeline, flip buttons to Left Align
-            // to prevent them from falling off the left edge.
-            const endPercent = (endSec / safeDuration);
-            setAlignLeft(endPercent < 0.25);
-        }
-    }, [endSec, safeDuration]);
+    // Smart Alignment Logic for Action Bar (Derived during render)
+    const alignLeft = (startSec !== null && endSec !== null)
+        ? (endSec / safeDuration) < 0.25
+        : false;
 
     // Scroll Locking
     useEffect(() => {

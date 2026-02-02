@@ -21,12 +21,11 @@ function getRelativeTime(dateString: string | Date): string {
 
 interface ThreadCommentProps {
     comment: Moment;
-    currentUserId: string;
     onReply: (momentId: string, username: string) => void;
     onRefresh?: () => void;
 }
 
-export default function ThreadComment({ comment, currentUserId, onReply, onRefresh }: ThreadCommentProps) {
+export default function ThreadComment({ comment, onReply, onRefresh }: ThreadCommentProps) {
     const pathname = usePathname();
     const [showReplies, setShowReplies] = useState(false);
 
@@ -80,7 +79,7 @@ export default function ThreadComment({ comment, currentUserId, onReply, onRefre
                         image: newReply.profiles?.image || null
                     },
                     // Defaults for TS satisfaction
-                    service: (newReply.platform as any) || 'unknown', // Cast to any to avoid strict type mismatch if needed, or map correctly
+                    service: (newReply.platform as 'youtube' | 'spotify' | 'unknown') || 'unknown', // Cast to valid MusicService type
                     sourceUrl: '', // DB might not return source_url directly if not selected/computed
                     startSec: newReply.start_time || 0,
                     endSec: newReply.end_time || 0,
