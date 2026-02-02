@@ -19,6 +19,7 @@ import MomentCard from '@/components/MomentCard';
 import MomentGroup from '@/components/MomentGroup';
 import PlayerTimeline from '@/components/PlayerTimeline';
 import MomentEditor from '@/components/MomentEditor';
+import CreatorStudio from '@/components/CreatorStudio';
 import { getTrackMoments, healTrackSource, fetchYoutubeMetadata } from '../../explore/actions';
 import { sanitizeMoment } from '@/lib/sanitize';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
@@ -137,6 +138,7 @@ export default function Room({ params }: { params: { id: string } }) {
 
     // Creator Mode State (Lifted from PlayerTimeline)
     const [isCreatorMode, setIsCreatorMode] = useState(false);
+    const [editingMomentId, setEditingMomentId] = useState<string | null>(null);
 
     // Handler to toggle Creator Mode and lock body scroll
     const handleCreatorModeChange = (isOpen: boolean) => {
@@ -144,8 +146,10 @@ export default function Room({ params }: { params: { id: string } }) {
         if (typeof document !== 'undefined') {
             if (isOpen) {
                 document.body.classList.add('overflow-hidden');
+                document.body.classList.add('is-creator-mode');
             } else {
                 document.body.classList.remove('overflow-hidden');
+                document.body.classList.remove('is-creator-mode');
             }
         }
     };
@@ -1271,8 +1275,8 @@ export default function Room({ params }: { params: { id: string } }) {
                 {/* Desktop: 65/35 Split | Mobile: Full Width */}
                 <div className="flex flex-col lg:flex-row lg:gap-4 lg:px-4">
                     {/* Left: Video Player + Timeline (65% on desktop) */}
-                    <div className="w-full lg:w-[65%] px-4 lg:px-0">
-                        <div className="glass-panel p-1 overflow-hidden aspect-video relative bg-black">
+                    <div className={`w-full lg:w-[65%] px-4 lg:px-0 ${isCreatorMode ? 'fixed top-16 left-0 right-0 bottom-0 z-50 bg-black !p-0 flex flex-col' : ''}`}>
+                        <div className={`glass-panel p-1 overflow-hidden relative bg-black ${isCreatorMode ? 'shrink-0 h-[40%] rounded-none !border-0' : 'aspect-video'}`}>
                             {isYouTube && youtubeId ? (
                                 <>
                                     <YouTube
@@ -1343,7 +1347,7 @@ export default function Room({ params }: { params: { id: string } }) {
                         </div>
 
                         {/* Sticky Header: Controls + Timeline - LOWERED Z-INDEX to fix menu conflict */}
-                        <div className="sticky top-14 z-[30] bg-black/95 backdrop-blur-md pb-2 -mx-4 px-4 lg:mx-0 lg:px-0 lg:bg-black lg:border-b lg:border-white/10 lg:rounded-b-xl lg:mb-4 lg:pt-2">
+                        <div className={`sticky top-14 z-[30] bg-black/95 backdrop-blur-md pb-2 -mx-4 px-4 lg:mx-0 lg:px-0 lg:bg-black lg:border-b lg:border-white/10 lg:rounded-b-xl lg:mb-4 lg:pt-2 ${isCreatorMode ? 'border-t border-white/10' : ''}`}>
 
                             {/* Compact Playback Controls */}
                             {(isYouTube || isSpotify) && (
@@ -1445,6 +1449,9 @@ export default function Room({ params }: { params: { id: string } }) {
                                         }
                                         setIsPlaying(false);
                                     }}
+                                    editingMomentId={editingMomentId}
+                                    setEditingMomentId={setEditingMomentId}
+                                    activeMomentId={activeMoment?.id || null}
                                     startSec={startSec}
                                     endSec={endSec}
                                     note={note}
@@ -1501,105 +1508,124 @@ export default function Room({ params }: { params: { id: string } }) {
                                             }
                                         }
                                     }}
-                                    activeMomentId={activeMoment?.id}
                                     chapters={chapters}
                                 />
                             )}
+
                         </div>
+
+                        {/* CREATOR STUDIO (Visible only in Creator Mode) */}
+                        {isCreatorMode && (
+                            <div className="flex-1 min-h-0 bg-neutral-900 animate-in slide-in-from-bottom duration-300">
+                                <CreatorStudio
+                                    note={note}
+                                    onNoteChange={setNote}
+                                    onSave={handleSave}
+                                    onCancel={() => {
+                                        handleCreatorModeChange(false);
+                                        setCaptureState('end-captured');
+                                        // PERSIST DRAFT: Don't null out startSec/endSec!
+                                    }}
+                                />
+                            </div>
+                        )}
 
                         {/* SCROLLABLE MOMENTS FEED (Moved here for Sticky Behavior) */}
-                        <div className="w-full space-y-3 pb-16">
-                            {/* Moments List */}
-                            <div className="glass-panel p-3 space-y-3">
-                                <div className="flex items-center gap-3 border-b border-white/10 pb-3">
-                                    {metadata.artwork ? (
-                                        <img
-                                            src={metadata.artwork}
-                                            alt="Album Art"
-                                            className="w-12 h-12 rounded-md object-cover shadow-lg shrink-0"
-                                        />
-                                    ) : (
-                                        <div className="w-12 h-12 rounded-md bg-white/10 animate-pulse shrink-0" />
-                                    )}
-                                    <div className="min-w-0">
-                                        <h3 className="text-base font-semibold text-white truncate">
-                                            Saved Moments
-                                        </h3>
-                                        <p className="text-xs text-white/60 truncate">
-                                            for <span className="text-white/90 font-medium">{metadata.title || 'Unknown Video'}</span>
-                                        </p>
-                                    </div>
-                                    <div className="ml-auto text-xs text-white/40 font-mono bg-white/5 px-2 py-1 rounded-full">
-                                        {groupMoments(moments).length}
-                                    </div>
-                                </div>
-
-                                <div className="grid gap-2">
-                                    {moments.length === 0 ? (
-                                        <div className="text-center py-8 text-white/30 italic">
-                                            No moments saved yet. Be the first!
+                        {!isCreatorMode && (
+                            <div className="w-full space-y-3 pb-16">
+                                {/* Moments List */}
+                                <div className="glass-panel p-3 space-y-3">
+                                    <div className="flex items-center gap-3 border-b border-white/10 pb-3">
+                                        {metadata.artwork ? (
+                                            <img
+                                                src={metadata.artwork}
+                                                alt="Album Art"
+                                                className="w-12 h-12 rounded-md object-cover shadow-lg shrink-0"
+                                            />
+                                        ) : (
+                                            <div className="w-12 h-12 rounded-md bg-white/10 animate-pulse shrink-0" />
+                                        )}
+                                        <div className="min-w-0">
+                                            <h3 className="text-base font-semibold text-white truncate">
+                                                Saved Moments
+                                            </h3>
+                                            <p className="text-xs text-white/60 truncate">
+                                                for <span className="text-white/90 font-medium">{metadata.title || 'Unknown Video'}</span>
+                                            </p>
                                         </div>
-                                    ) : (
-                                        groupMoments(moments)
-                                            .sort((a, b) => (activeMoment?.id === a.main.id ? -1 : activeMoment?.id === b.main.id ? 1 : 0))
-                                            .map((group) => {
-                                                if (group.main.id.toString().includes('temp')) {
-                                                    console.log("👀 [Render Loop] Found Optimistic Moment in JSX:", group.main.id);
-                                                }
-                                                return (
-                                                    <MomentGroup
-                                                        key={group.main.id}
-                                                        mainMoment={group.main}
-                                                        replies={group.replies}
-                                                        trackDuration={(isSpotify ? spotifyProgress.duration : playbackState.duration) || metadata.duration_sec || group.main.trackSource?.durationSec}
-                                                        onDelete={async (id) => {
-                                                            try {
-                                                                const res = await fetch(`/api/moments/${id}`, { method: 'DELETE' });
-                                                                if (res.ok) {
-                                                                    setMoments(prev => {
-                                                                        const target = prev.find(m => m.id === id);
-                                                                        if (!target) return prev.filter(m => m.id !== id);
+                                        <div className="ml-auto text-xs text-white/40 font-mono bg-white/5 px-2 py-1 rounded-full">
+                                            {groupMoments(moments).length}
+                                        </div>
+                                    </div>
 
-                                                                        return prev.filter(m =>
-                                                                            !(m.id === id || (
-                                                                                m.sourceUrl === target.sourceUrl &&
-                                                                                m.startSec === target.startSec &&
-                                                                                m.endSec === target.endSec
-                                                                            ))
-                                                                        );
-                                                                    });
+                                    <div className="grid gap-2">
+                                        {moments.length === 0 ? (
+                                            <div className="text-center py-8 text-white/30 italic">
+                                                No moments saved yet. Be the first!
+                                            </div>
+                                        ) : (
+                                            groupMoments(moments)
+                                                .sort((a, b) => (activeMoment?.id === a.main.id ? -1 : activeMoment?.id === b.main.id ? 1 : 0))
+                                                .map((group) => {
+                                                    if (group.main.id.toString().includes('temp')) {
+                                                        console.log("👀 [Render Loop] Found Optimistic Moment in JSX:", group.main.id);
+                                                    }
+                                                    return (
+                                                        <MomentGroup
+                                                            key={group.main.id}
+                                                            mainMoment={group.main}
+                                                            replies={group.replies}
+                                                            trackDuration={(isSpotify ? spotifyProgress.duration : playbackState.duration) || metadata.duration_sec || group.main.trackSource?.durationSec}
+                                                            onDelete={async (id) => {
+                                                                try {
+                                                                    const res = await fetch(`/api/moments/${id}`, { method: 'DELETE' });
+                                                                    if (res.ok) {
+                                                                        setMoments(prev => {
+                                                                            const target = prev.find(m => m.id === id);
+                                                                            if (!target) return prev.filter(m => m.id !== id);
+
+                                                                            return prev.filter(m =>
+                                                                                !(m.id === id || (
+                                                                                    m.sourceUrl === target.sourceUrl &&
+                                                                                    m.startSec === target.startSec &&
+                                                                                    m.endSec === target.endSec
+                                                                                ))
+                                                                            );
+                                                                        });
+                                                                    }
+                                                                } catch (e) {
+                                                                    console.error(e);
                                                                 }
-                                                            } catch (e) {
-                                                                console.error(e);
-                                                            }
-                                                        }}
-                                                        showDelete={false}
-                                                        onPlayFull={() => {
-                                                            router.push(`/room/view?url=${encodeURIComponent(group.main.sourceUrl)}`);
-                                                        }}
-                                                        onPlayMoment={playMoment}
-                                                        onPauseMoment={handlePauseMoment}
-                                                        currentTime={isSpotify ? spotifyProgress.current : playbackState.current}
-                                                        activeMomentId={activeMoment?.id}
-                                                        isPlaying={isPlaying}
-                                                        currentUserId={user?.id || ''}
-                                                        currentUser={user ? { id: user.id, name: user.email, image: null } : undefined}
-                                                        onReply={(momentId, username) => {
-                                                            setReplyingTo({ id: momentId, username });
-                                                            noteInputRef.current?.focus();
-                                                        }}
-                                                        onRefresh={fetchMoments}
-                                                        onNewReply={handleNewReply}
-                                                    />
-                                                );
-                                            })
-                                    )}
+                                                            }}
+                                                            showDelete={false}
+                                                            onPlayFull={() => {
+                                                                router.push(`/room/view?url=${encodeURIComponent(group.main.sourceUrl)}`);
+                                                            }}
+                                                            onPlayMoment={playMoment}
+                                                            onPauseMoment={handlePauseMoment}
+                                                            currentTime={isSpotify ? spotifyProgress.current : playbackState.current}
+                                                            activeMomentId={activeMoment?.id}
+                                                            isPlaying={isPlaying}
+                                                            currentUserId={user?.id || ''}
+                                                            currentUser={user ? { id: user.id, name: user.email, image: null } : undefined}
+                                                            onReply={(momentId, username) => {
+                                                                setReplyingTo({ id: momentId, username });
+                                                                noteInputRef.current?.focus();
+                                                            }}
+                                                            onRefresh={fetchMoments}
+                                                            onNewReply={handleNewReply}
+                                                        />
+                                                    );
+                                                })
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="pb-8">
+                                    <Footer />
                                 </div>
                             </div>
-                            <div className="pb-8">
-                                <Footer />
-                            </div>
-                        </div>
+
+                        )}
                     </div>
 
                     {/* Right: Sidebar (35% on desktop, hidden on mobile) */}
@@ -1684,6 +1710,6 @@ export default function Room({ params }: { params: { id: string } }) {
                     }
                 }}
             />
-        </main>
+        </main >
     );
 }

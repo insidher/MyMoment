@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 import {
     GripHorizontal,
     X,
     RotateCcw,
-    MessageCircle,
+    Menu,
+    Pin,
 } from 'lucide-react';
 import { Moment } from '@/types/moment';
 import { User } from '@/types/user';
@@ -56,6 +56,7 @@ interface PlayerTimelineProps {
     onChapterClick?: (chapter: any) => void;
     onPause?: () => void;
     onPreviewCapture?: () => void;
+    chapters?: any[];
 }
 
 const formatTime = (seconds: number) => {
@@ -86,12 +87,13 @@ export default function PlayerTimeline({
     setEditingMomentId,
     onUpdateMoment,
     moments = [],
+    activeMomentId,
+    onMomentClick,
     isPlaying,
     isEditorOpen = false,
     onEditorOpenChange = () => { },
 }: PlayerTimelineProps) {
     const timelineRef = useRef<HTMLDivElement>(null);
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const actionsRef = useRef<HTMLDivElement>(null);
 
     // Timeline Calculation Safety
@@ -113,8 +115,40 @@ export default function PlayerTimeline({
     const [showOnboarding, setShowOnboarding] = useState(false);
 
     // UI State
-    // UI State
-    // const [isEditorOpen, setIsEditorOpen] = useState(false); // REMOVED: Lifted to parent
+    const [isMenuExpanded, setIsMenuExpanded] = useState(false);
+    const [expandedHighlightId, setExpandedHighlightId] = useState<string | null>(null);
+    const [pinnedMomentIds, setPinnedMomentIds] = useState<string[]>([]);
+    const [dismissedMomentId, setDismissedMomentId] = useState<string | null>(null);
+
+    // Reset dismissed moment when active ID changes
+    useEffect(() => {
+        setDismissedMomentId(null);
+    }, [activeMomentId]);
+
+    // Derived State
+    const activeMoment = useMemo(() =>
+        moments.find(m => m.id === activeMomentId),
+        [moments, activeMomentId]
+    );
+
+    const pinnedMoments = useMemo(() =>
+        moments.filter(m => pinnedMomentIds.includes(m.id)),
+        [moments, pinnedMomentIds]
+    );
+
+    const allMomentHighlights = useMemo(() => {
+        const unique = new Map<string, Moment>();
+        if (activeMoment && activeMoment.id !== dismissedMomentId) {
+            const isPinned = pinnedMomentIds.includes(activeMoment.id);
+            const isWithinRange = currentTime >= activeMoment.startSec - 1 && currentTime <= activeMoment.endSec + 1;
+
+            if (isPinned || isWithinRange) {
+                unique.set(activeMoment.id, activeMoment);
+            }
+        }
+        pinnedMoments.forEach(m => unique.set(m.id, m));
+        return Array.from(unique.values());
+    }, [activeMoment, pinnedMoments, dismissedMomentId, currentTime, pinnedMomentIds]);
 
     // Refs for Drag Logic
     const stateRef = useRef({
@@ -160,6 +194,17 @@ export default function PlayerTimeline({
         }
     }, [endSec, safeDuration]);
 
+    // Scroll Locking
+    useEffect(() => {
+        if (draggingMarker) {
+            const originalStyle = window.getComputedStyle(document.body).overflow;
+            document.body.style.overflow = 'hidden';
+            return () => {
+                document.body.style.overflow = originalStyle;
+            };
+        }
+    }, [draggingMarker]);
+
 
     // Helper to get time from X coordinate
     const getTimeFromX = (clientX: number) => {
@@ -176,14 +221,14 @@ export default function PlayerTimeline({
     // ============================================
 
     useEffect(() => {
-        const handleMouseMove = (e: MouseEvent) => {
+        const handleMove = (clientX: number) => {
             const { startSec, endSec, draggingMarker, safeDuration } = stateRef.current;
             if (!draggingMarker) return;
 
             const rect = timelineRef.current?.getBoundingClientRect();
             if (!rect) return;
 
-            const x = e.clientX - rect.left;
+            const x = clientX - rect.left;
             const width = rect.width;
 
             // Standard calc
@@ -200,7 +245,7 @@ export default function PlayerTimeline({
                 if (startSec !== null && time <= startSec) return;
                 onCaptureUpdate(startSec, time);
             } else if (draggingMarker === 'range' && dragStartTimeRef.current && startSec !== null && endSec !== null) {
-                const deltaX = e.clientX - dragStartXRef.current;
+                const deltaX = clientX - dragStartXRef.current;
                 const deltaTime = (deltaX / width) * safeDuration;
 
                 let newStart = dragStartTimeRef.current.start + deltaTime;
@@ -222,7 +267,16 @@ export default function PlayerTimeline({
             }
         };
 
-        const handleMouseUp = (e: MouseEvent) => {
+        const handleMouseMove = (e: MouseEvent) => handleMove(e.clientX);
+        const handleTouchMove = (e: TouchEvent) => {
+            if (e.touches.length > 0) {
+                // Prevent scrolling while dragging
+                if (e.cancelable) e.preventDefault();
+                handleMove(e.touches[0].clientX);
+            }
+        };
+
+        const handleUp = () => {
             const { draggingMarker, endSec } = stateRef.current;
             if (draggingMarker) {
                 if (draggingMarker === 'end' && endSec !== null) {
@@ -235,11 +289,15 @@ export default function PlayerTimeline({
         };
 
         window.addEventListener('mousemove', handleMouseMove);
-        window.addEventListener('mouseup', handleMouseUp);
+        window.addEventListener('mouseup', handleUp);
+        window.addEventListener('touchmove', handleTouchMove, { passive: false });
+        window.addEventListener('touchend', handleUp);
 
         return () => {
             window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
+            window.removeEventListener('mouseup', handleUp);
+            window.removeEventListener('touchmove', handleTouchMove);
+            window.removeEventListener('touchend', handleUp);
         };
     }, [safeDuration, onCaptureUpdate, onSeek]);
 
@@ -338,7 +396,7 @@ export default function PlayerTimeline({
 
                     {startSec !== null && endSec !== null && (
                         <div
-                            className={`absolute top-0 bottom-0 z-30 transition-transform duration-100 ${heartbeat ? 'scale-y-125 scale-x-105' : 'scale-100'}`}
+                            className={`absolute top-0 bottom-0 z-40 transition-transform duration-100 touch-none ${heartbeat ? 'scale-y-125 scale-x-105' : 'scale-100'}`}
                             style={{
                                 left: `${(startSec / safeDuration) * 100}%`,
                                 width: `${((endSec - startSec) / safeDuration) * 100}%`
@@ -347,56 +405,61 @@ export default function PlayerTimeline({
 
                             {/* 
                                 ZONE A - MOBILE ACTION BAR (Smart Alignment)
-                                - If alignLeft is true, we anchor to LEFT of range (Start Handle).
-                                - Else, we anchor to RIGHT of range (End Handle).
-                                - This prevents it falling off the left edge. 
-                                - Max-width and right-align prevents right edge overflow.
                             */}
                             <div
-                                className={`absolute bottom-full mb-3 z-50 flex flex-col ${alignLeft ? 'items-start left-0 origin-bottom-left' : 'items-end right-0 origin-bottom-right'}`}
+                                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-10 flex flex-col items-center origin-bottom"
                                 ref={actionsRef}
                             >
-                                <div className="flex items-center bg-black/90 backdrop-blur-md border border-white/20 rounded-lg overflow-hidden shadow-xl">
-                                    {/* Action Content */}
+                                {isMenuExpanded ? (
+                                    <div className="flex items-center bg-black/90 backdrop-blur-md border border-white/20 rounded-lg overflow-hidden shadow-xl animate-in zoom-in-95 duration-200">
+                                        {/* Action Content */}
 
-                                    {/* Replay */}
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); onSeek(startSec); }}
-                                        className="h-9 px-3 flex items-center justify-center hover:bg-white/10 text-white/70 hover:text-white transition-colors border-r border-white/10"
-                                        title="Replay"
-                                    >
-                                        <RotateCcw size={16} />
-                                    </button>
+                                        {/* Replay */}
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); if (startSec !== null) onSeek(startSec); }}
+                                            className="h-8 px-2 flex items-center justify-center hover:bg-white/10 text-white/70 hover:text-white transition-colors border-r border-white/10"
+                                            title="Replay"
+                                        >
+                                            <RotateCcw size={14} />
+                                        </button>
 
-                                    {/* Edit / Create */}
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (isEditorOpen) triggerHeartbeat();
-                                            else {
-                                                onEditorOpenChange(true);
-                                                textareaRef.current?.focus();
+                                        {/* Edit / Create */}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onEditorOpenChange?.(true);
                                                 triggerHeartbeat();
-                                            }
-                                        }}
-                                        className="h-9 px-4 flex items-center justify-center text-white text-xs font-bold uppercase hover:bg-white/10 transition-colors whitespace-nowrap border-r border-white/10"
-                                    >
-                                        {isEditorOpen ? 'EDIT' : '+ CREATE'}
-                                    </button>
+                                            }}
+                                            className="h-8 px-3 flex items-center justify-center text-white text-[10px] font-bold uppercase hover:bg-white/10 transition-colors whitespace-nowrap border-r border-white/10"
+                                        >
+                                            {isEditorOpen ? 'EDIT' : '+ CREATE'}
+                                        </button>
 
-                                    {/* Close */}
+                                        {/* Close */}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onCancelCapture();
+                                                onEditorOpenChange?.(false);
+                                            }}
+                                            className="h-8 px-2 flex items-center justify-center hover:bg-red-500/20 text-white/50 hover:text-white transition-colors"
+                                            title="Close"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                ) : (
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            onCancelCapture();
-                                            onEditorOpenChange(false);
+                                            setIsMenuExpanded(true);
                                         }}
-                                        className="h-9 px-3 flex items-center justify-center hover:bg-red-500/20 text-white/50 hover:text-white transition-colors"
-                                        title="Close"
+                                        className="w-8 h-8 flex items-center justify-center bg-black/40 backdrop-blur-sm border border-white/10 rounded-full text-white/40 hover:text-white/80 hover:bg-black/60 transition-all hover:scale-110 active:scale-95 shadow-lg"
+                                        title="Expand Menu"
                                     >
-                                        <X size={16} />
+                                        <Menu size={14} />
                                     </button>
-                                </div>
+                                )}
                             </div>
 
 
@@ -405,32 +468,18 @@ export default function PlayerTimeline({
                                 {/* Active Red Track */}
                                 <div className="absolute top-1/2 -translate-y-1/2 inset-x-0 h-1 bg-red-500 rounded-full" />
 
-                                {/* 
-                                    Start Handle (Triangle) 
-                                    - Centered on the line (left-0, translateX -50%)
-                                    - Downward pointing triangle
-                                */}
+                                {/* Start Handle */}
                                 <div
                                     className="absolute top-1/2 left-0 -translate-y-1/2 -translate-x-1/2 z-40 touch-action-none cursor-ew-resize flex items-center justify-center pointer-events-auto"
-                                    style={{ marginTop: '-6px' }} // Lift slightly so point touches line
+                                    style={{ marginTop: '-6px' }}
                                     onMouseDown={(e) => { e.stopPropagation(); setDraggingMarker('start'); }}
                                     onTouchStart={(e) => { e.stopPropagation(); setDraggingMarker('start'); }}
                                 >
-                                    <div className="absolute inset-[-15px]" /> {/* Large Touch Target */}
-
-                                    {/* CSS Triangle: Downward, Orange */}
-                                    <div
-                                        style={{
-                                            width: 0,
-                                            height: 0,
-                                            borderLeft: '5px solid transparent',
-                                            borderRight: '5px solid transparent',
-                                            borderTop: '7px solid #f97316' // Orange-500
-                                        }}
-                                    />
+                                    <div className="absolute inset-[-15px]" />
+                                    <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '7px solid #f97316' }} />
                                 </div>
 
-                                {/* End Handle (Triangle) */}
+                                {/* End Handle */}
                                 <div
                                     className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 z-40 touch-action-none cursor-ew-resize flex items-center justify-center pointer-events-auto"
                                     style={{ marginTop: '-6px' }}
@@ -438,33 +487,36 @@ export default function PlayerTimeline({
                                     onTouchStart={(e) => { e.stopPropagation(); setDraggingMarker('end'); }}
                                 >
                                     <div className="absolute inset-[-15px]" />
-
-                                    <div
-                                        style={{
-                                            width: 0,
-                                            height: 0,
-                                            borderLeft: '5px solid transparent',
-                                            borderRight: '5px solid transparent',
-                                            borderTop: '7px solid #f97316'
-                                        }}
-                                    />
+                                    <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '7px solid #f97316' }} />
                                 </div>
                             </div>
 
 
-                            {/* ZONE C: BOTTOM GRIP (Full Width) */}
+                            {/* ZONE C: BOTTOM GRIP */}
                             <div
                                 className="absolute top-full left-0 w-full z-40 cursor-grab active:cursor-grabbing group/grip"
                                 onMouseDown={(e) => {
                                     e.stopPropagation();
                                     setDraggingMarker('range');
+                                    setIsMenuExpanded(true);
                                     setDragStartMouseX(e.clientX);
                                     dragStartXRef.current = e.clientX;
-                                    dragStartTimeRef.current = { start: startSec, end: endSec };
+                                    if (startSec !== null && endSec !== null) {
+                                        dragStartTimeRef.current = { start: startSec, end: endSec };
+                                    }
                                 }}
                                 onTouchStart={(e) => {
                                     e.stopPropagation();
-                                    setDraggingMarker('range');
+                                    if (e.touches.length > 0) {
+                                        setDraggingMarker('range');
+                                        setIsMenuExpanded(true);
+                                        const touch = e.touches[0];
+                                        setDragStartMouseX(touch.clientX);
+                                        dragStartXRef.current = touch.clientX;
+                                        if (startSec !== null && endSec !== null) {
+                                            dragStartTimeRef.current = { start: startSec, end: endSec };
+                                        }
+                                    }
                                 }}
                             >
                                 <div className="w-full h-6 bg-neutral-800 border-x border-b border-white/20 rounded-b-lg flex items-center justify-center shadow-lg hover:bg-neutral-700 transition-colors">
@@ -475,45 +527,93 @@ export default function PlayerTimeline({
                         </div>
                     )}
 
+                    {/* ======================================================== */}
+                    {/* ACTIVE/PINNED MOMENTS HIGHLIGHT (Orange) */}
+                    {/* ======================================================== */}
+                    {allMomentHighlights.map((m) => (
+                        <div
+                            key={`highlight-${m.id}`}
+                            className="absolute top-0 bottom-0 z-20 pointer-events-none"
+                            style={{
+                                left: `${(m.startSec / safeDuration) * 100}%`,
+                                width: `${((m.endSec - m.startSec) / safeDuration) * 100}%`
+                            }}
+                        >
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-10 flex flex-col items-center origin-bottom pointer-events-auto">
+                                {expandedHighlightId === m.id ? (
+                                    <div className="flex items-center bg-black/90 backdrop-blur-md border border-orange-500/50 rounded-lg overflow-hidden shadow-xl animate-in zoom-in-95 duration-200">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); onSeek(m.startSec); }}
+                                            className="h-8 px-2 flex items-center justify-center hover:bg-white/10 text-white/70 hover:text-white transition-colors border-r border-white/10"
+                                            title="Replay"
+                                        >
+                                            <RotateCcw size={14} />
+                                        </button>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); onMomentClick?.(m); }}
+                                            className="h-8 px-3 flex items-center justify-center text-orange-400 text-[10px] font-bold uppercase hover:bg-orange-400/10 transition-colors whitespace-nowrap border-r border-white/10"
+                                        >
+                                            VIEW
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setPinnedMomentIds(prev =>
+                                                    prev.includes(m.id) ? prev.filter(id => id !== m.id) : [...prev, m.id]
+                                                );
+                                            }}
+                                            className={`h-8 px-2 flex items-center justify-center transition-colors ${pinnedMomentIds.includes(m.id) ? 'bg-orange-500 text-black' : 'hover:bg-orange-400/20 text-orange-400'}`}
+                                            title={pinnedMomentIds.includes(m.id) ? "Unpin" : "Pin"}
+                                        >
+                                            <Pin size={12} className={pinnedMomentIds.includes(m.id) ? "fill-black" : ""} />
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (pinnedMomentIds.includes(m.id)) {
+                                                    setPinnedMomentIds(prev => prev.filter(id => id !== m.id));
+                                                }
+                                                setDismissedMomentId(m.id);
+                                            }}
+                                            className="h-8 px-2 flex items-center justify-center hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+                                            title="Close"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setExpandedHighlightId(m.id); }}
+                                        className="w-8 h-8 flex items-center justify-center bg-orange-500/40 backdrop-blur-sm border border-orange-500/20 rounded-full text-white/50 hover:text-white hover:bg-orange-500/60 transition-all shadow-lg"
+                                        title="Expand Menu"
+                                    >
+                                        <Menu size={14} />
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1 bg-orange-500/20 rounded-full border-x-2 border-orange-500">
+                                <div className="absolute inset-0 bg-orange-500 rounded-full" />
+                                <div className="absolute top-1/2 left-0 -translate-y-1/2 -translate-x-1/2" style={{ marginTop: '-6px' }}>
+                                    <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '7px solid #f97316' }} />
+                                </div>
+                                <div className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2" style={{ marginTop: '-6px' }}>
+                                    <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '7px solid #f97316' }} />
+                                </div>
+                            </div>
+
+                            <div className="absolute top-full left-0 w-full">
+                                <div className="w-full h-4 bg-orange-500/10 border-x border-b border-orange-500/30 rounded-b-lg flex items-center justify-center">
+                                    <GripHorizontal size={10} className="text-orange-500/50" />
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+
                 </div>
             </div>
 
-            {/* Note Editor Modal */}
-            {isEditorOpen && createPortal(
-                <div className="fixed inset-0 z-[999] bg-black/60 flex items-end sm:items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="w-full max-w-sm bg-zinc-900 border border-white/10 rounded-2xl p-4 shadow-2xl animate-in slide-in-from-bottom-5">
-                        <div className="flex justify-between items-center mb-4">
-                            <span className="text-sm font-bold text-white flex items-center gap-2">
-                                <MessageCircle size={16} className="text-orange-500" />
-                                Add Note
-                            </span>
-                            <button onClick={() => onEditorOpenChange(false)} className="p-1 hover:bg-white/10 rounded-full transition-colors">
-                                <X size={18} className="text-white/60" />
-                            </button>
-                        </div>
-
-                        <textarea
-                            ref={textareaRef}
-                            value={note}
-                            onChange={(e) => onNoteChange?.(e.target.value)}
-                            className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-orange-500/50 h-32 mb-4 resize-none"
-                            placeholder="What's happening in this moment?"
-                        />
-
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => {
-                                    onSaveMoment?.();
-                                    onEditorOpenChange(false);
-                                }}
-                                className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 text-white font-bold py-2.5 rounded-xl shadow-lg shadow-orange-500/20 transition-all active:scale-95"
-                            >
-                                Save Moment
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                , document.body)}
+            {/* Note Editor removed. Handled by Parent (CreatorStudio). */}
 
         </div>
     );

@@ -17,6 +17,7 @@ export default function Navbar() {
     const [showMenu, setShowMenu] = useState(false);
     const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [isCreatorMode, setIsCreatorMode] = useState(false);
 
     const menuRef = useRef<HTMLDivElement>(null);
     const buttonRef = useRef<HTMLButtonElement>(null);
@@ -42,11 +43,6 @@ export default function Navbar() {
 
     useEffect(() => {
         const checkAdmin = async () => {
-            // ... existing admin check (preserved implicitly by not replacing it, but wait, I am replacing a large chunk?)
-            // Ah, I should be careful not to overwrite the admin check logic if I replace the whole top.
-            // I will replace only the top part up to the state definitions, and then insert the useEffect separately?
-            // Or I can replace the whole block if I include the existing code.
-            // The existing admin check is lines 21-31.
             if (!user) {
                 setIsAdmin(false);
                 return;
@@ -56,6 +52,24 @@ export default function Navbar() {
         };
         checkAdmin();
     }, [user]);
+
+    // Sync Creator Mode from body class
+    useEffect(() => {
+        const checkMode = () => {
+            const hasClass = document.body.classList.contains('is-creator-mode');
+            if (hasClass !== isCreatorMode) {
+                setIsCreatorMode(hasClass);
+            }
+        };
+
+        const observer = new MutationObserver(checkMode);
+        observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+
+        // Initial check
+        checkMode();
+
+        return () => observer.disconnect();
+    }, [isCreatorMode]);
 
 
     const isActive = (path: string) => pathname === path;
@@ -95,10 +109,23 @@ export default function Navbar() {
                         </span>
                         <span className="text-green-500">nt</span>
                     </Link>
+
+                    {isCreatorMode && (
+                        <div className="flex items-center ml-2 border-l border-white/10 pl-4 h-6 animate-in fade-in slide-in-from-left-2 duration-500">
+                            <h1 className="text-[11px] font-black tracking-[0.2em] uppercase text-[#E5D3B3] flex items-center gap-2"
+                                style={{
+                                    textShadow: '0px 0px 10px rgba(229, 211, 179, 0.2)'
+                                }}
+                            >
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#E5D3B3] animate-pulse" />
+                                Capture Studio
+                            </h1>
+                        </div>
+                    )}
                 </div>
 
-                {/* Center: Search Bar (Hidden on Home Page) */}
-                {pathname !== '/' && (
+                {/* Center: Search Bar (Hidden in Studio Mode) */}
+                {!isCreatorMode && pathname !== '/' && (
                     <form onSubmit={handleSearch} className="flex-1 max-w-2xl flex items-center group">
                         <div className="flex-1 flex items-center bg-white/5 border border-white/5 border-r-0 rounded-l-full px-4 h-10 transition-colors focus-within:bg-white/10 focus-within:border-white/10">
                             <Search size={16} className="text-white/40 mr-3 shrink-0" />
