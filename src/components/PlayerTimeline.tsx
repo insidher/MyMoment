@@ -3,22 +3,10 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
-    Play,
-    Pause,
     GripHorizontal,
     X,
     RotateCcw,
-    RotateCw,
-    Send,
     MessageCircle,
-    Copy,
-    Check,
-    Volume2,
-    ChevronDown,
-    ChevronUp,
-    Wrench,
-    Square,
-    Star
 } from 'lucide-react';
 import { Moment } from '@/types/moment';
 import { User } from '@/types/user';
@@ -90,18 +78,11 @@ export default function PlayerTimeline({
     setEditingMomentId,
     onUpdateMoment,
     moments = [],
-    activeMomentId = null,
-    expandedMomentId = null,
-    setExpandedMomentId = () => { },
-    currentUser = null,
-    onMomentClick,
     isPlaying,
-    service,
-    onCancelDraft,
-    onFocusRequest
 }: PlayerTimelineProps) {
     const timelineRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const actionsRef = useRef<HTMLDivElement>(null);
 
     // Timeline Calculation Safety
     const safeDuration = duration > 0 ? duration : 180;
@@ -109,11 +90,13 @@ export default function PlayerTimeline({
     // Interaction State
     const [draggingMarker, setDraggingMarker] = useState<'start' | 'end' | 'range' | null>(null);
     const [hoverTime, setHoverTime] = useState<number | null>(null);
-    const [dragStartMouseX, setDragStartMouseX] = useState<number | null>(null);
     const [isHovering, setIsHovering] = useState(false);
 
     // Visual State
     const [heartbeat, setHeartbeat] = useState(false);
+
+    // Boundary Detection State for Action Bar
+    const [alignLeft, setAlignLeft] = useState(false);
 
     // Onboarding State
     const [showOnboarding, setShowOnboarding] = useState(false);
@@ -128,7 +111,6 @@ export default function PlayerTimeline({
         draggingMarker,
         duration,
         safeDuration,
-        timelineRect: null as DOMRect | null
     });
 
     const dragStartXRef = useRef<number>(0);
@@ -143,7 +125,6 @@ export default function PlayerTimeline({
             draggingMarker,
             duration,
             safeDuration,
-            timelineRect: timelineRef.current?.getBoundingClientRect() || null
         };
     }, [startSec, endSec, draggingMarker, duration, safeDuration]);
 
@@ -156,6 +137,17 @@ export default function PlayerTimeline({
             }
         }
     }, []);
+
+    // Smart Alignment Logic for Action Bar
+    useEffect(() => {
+        if (startSec !== null && endSec !== null) {
+            // If the draft end is in the first 25% of the timeline, flip buttons to Left Align
+            // to prevent them from falling off the left edge.
+            const endPercent = (endSec / safeDuration);
+            setAlignLeft(endPercent < 0.25);
+        }
+    }, [endSec, safeDuration]);
+
 
     // Helper to get time from X coordinate
     const getTimeFromX = (clientX: number) => {
@@ -181,20 +173,20 @@ export default function PlayerTimeline({
 
             const x = e.clientX - rect.left;
             const width = rect.width;
-            const percent = Math.max(0, Math.min(1, x / width));
+
+            // Standard calc
+            const rawPercent = x / width;
+            const percent = Math.max(0, Math.min(1, rawPercent));
             const time = Math.floor(percent * safeDuration);
 
             // LOGIC FOR DRAGGING
             if (draggingMarker === 'start') {
                 if (endSec !== null && time >= endSec) return;
                 onCaptureUpdate(time, endSec);
-                onSeek(time); // Real-time scrubbing
+                onSeek(time);
             } else if (draggingMarker === 'end') {
                 if (startSec !== null && time <= startSec) return;
                 onCaptureUpdate(startSec, time);
-                // End scrub could ideally happen here too for immediate feedback, 
-                // but user generally prefers scrub-on-release or real-time. 
-                // Let's do real-time visualization, but scrub on release unless critical.
             } else if (draggingMarker === 'range' && dragStartTimeRef.current && startSec !== null && endSec !== null) {
                 const deltaX = e.clientX - dragStartXRef.current;
                 const deltaTime = (deltaX / width) * safeDuration;
@@ -221,11 +213,9 @@ export default function PlayerTimeline({
         const handleMouseUp = (e: MouseEvent) => {
             const { draggingMarker, endSec } = stateRef.current;
             if (draggingMarker) {
-                // Scrub on End Release
                 if (draggingMarker === 'end' && endSec !== null) {
                     onSeek(endSec);
                 }
-
                 justDraggedRef.current = true;
                 setTimeout(() => { justDraggedRef.current = false; }, 100);
                 setDraggingMarker(null);
@@ -268,7 +258,7 @@ export default function PlayerTimeline({
                 {/* Main Track Interactive Area */}
                 <div
                     ref={timelineRef}
-                    className="relative w-full h-8 flex items-center cursor-pointer" // Taller hit area
+                    className="relative w-full h-8 flex items-center cursor-pointer"
                     onMouseMove={(e) => {
                         if (!timelineRef.current) return;
                         const t = getTimeFromX(e.clientX);
@@ -277,30 +267,27 @@ export default function PlayerTimeline({
                     onMouseEnter={() => setIsHovering(true)}
                     onMouseLeave={() => setIsHovering(false)}
                     onClick={(e) => {
-                        // ONBOARDING
                         if (showOnboarding) {
                             setShowOnboarding(false);
                             if (typeof window !== 'undefined') localStorage.setItem('timeline-onboarding-seen', 'true');
-                            return; // Don't trigger draft on dismissal
+                            return;
                         }
 
-                        // PREVENT CLICK IF DRAGGING
                         if (justDraggedRef.current) return;
 
-                        // ONE-TAP SMART DRAFT LOGIC
+                        // SMART CLICK
                         const clickTime = getTimeFromX(e.clientX);
-                        const defaultDuration = 30; // 30s Fixed Default
+                        const defaultDuration = 30;
                         const newEnd = Math.min(clickTime + defaultDuration, safeDuration);
 
                         onCaptureStart(clickTime);
                         onCaptureEnd(newEnd);
-                        // Do not auto-open editor yet, let user refine with handles
-                        // Or requirement says "A full range appears instantly."
+                        // Optional: triggerHeartbeat();
                     }}
                 >
                     {/* Onboarding Overlay */}
                     {showOnboarding && (
-                        <div className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-sm rounded-lg flex items-center justify-center cursor-pointer animate-in fade-in duration-300 pointer-events-auto">
+                        <div className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-sm rounded-lg flex items-center justify-center cursor-pointer">
                             <div className="text-center text-white text-sm font-bold animate-pulse">Tap anywhere to capture</div>
                         </div>
                     )}
@@ -327,44 +314,53 @@ export default function PlayerTimeline({
 
 
                     {/* ======================================================== */}
-                    {/* PRECISION UI (3 ZONES) - Only when startSec is set */}
+                    {/* PRECISION UI (3 ZONES) */}
                     {/* ======================================================== */}
 
                     {startSec !== null && endSec !== null && (
-                        <>
-                            {/* ZONE A: TOP ACTION BAR */}
+                        <div
+                            className={`absolute top-0 bottom-0 z-30 transition-transform duration-100 ${heartbeat ? 'scale-y-125 scale-x-105' : 'scale-100'}`}
+                            style={{
+                                left: `${(startSec / safeDuration) * 100}%`,
+                                width: `${((endSec - startSec) / safeDuration) * 100}%`
+                            }}
+                        >
+
+                            {/* 
+                                ZONE A - MOBILE ACTION BAR (Smart Alignment)
+                                - If alignLeft is true, we anchor to LEFT of range (Start Handle).
+                                - Else, we anchor to RIGHT of range (End Handle).
+                                - This prevents it falling off the left edge. 
+                                - Max-width and right-align prevents right edge overflow.
+                            */}
                             <div
-                                className="absolute -top-12 z-50 flex items-center justify-end gap-1.5 pointer-events-auto min-w-[140px]"
-                                style={{
-                                    left: `auto`, // We want to anchor to the range, but keep it readable
-                                    right: `${100 - ((endSec / safeDuration) * 100)}%`, // Right-align to End Handle
-                                    transform: 'translateX(50%)' // Center the entire block relative to the End Handle? No, request said "Right Justified to End Handle"
-                                    // Let's position LEFT at Start, width to End, then justify-end inside.
-                                }}
+                                className={`absolute bottom-full mb-3 z-50 flex flex-col ${alignLeft ? 'items-start left-0 origin-bottom-left' : 'items-end right-0 origin-bottom-right'}`}
+                                ref={actionsRef}
                             >
-                                <div className="flex items-center gap-1 p-1 bg-black/50 backdrop-blur-md border border-white/20 rounded-md shadow-xl">
+                                <div className="flex items-center bg-black/90 backdrop-blur-md border border-white/20 rounded-lg overflow-hidden shadow-xl">
+                                    {/* Action Content */}
+
                                     {/* Replay */}
                                     <button
                                         onClick={(e) => { e.stopPropagation(); onSeek(startSec); }}
-                                        className="p-1.5 rounded hover:bg-white/10 text-white/70 hover:text-white transition-colors border border-white/10"
+                                        className="h-9 px-3 flex items-center justify-center hover:bg-white/10 text-white/70 hover:text-white transition-colors border-r border-white/10"
                                         title="Replay"
                                     >
-                                        <RotateCcw size={14} />
+                                        <RotateCcw size={16} />
                                     </button>
 
-                                    {/* Action Button */}
+                                    {/* Edit / Create */}
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            if (isEditorOpen) {
-                                                // Trigger Heartbeat to refocus
-                                                triggerHeartbeat();
-                                            } else {
+                                            if (isEditorOpen) triggerHeartbeat();
+                                            else {
                                                 setIsEditorOpen(true);
                                                 textareaRef.current?.focus();
+                                                triggerHeartbeat();
                                             }
                                         }}
-                                        className="px-3 py-1 rounded bg-white/5 border border-white/20 text-white text-[10px] font-bold uppercase hover:bg-white/10 transition-colors whitespace-nowrap min-w-[60px]"
+                                        className="h-9 px-4 flex items-center justify-center text-white text-xs font-bold uppercase hover:bg-white/10 transition-colors whitespace-nowrap border-r border-white/10"
                                     >
                                         {isEditorOpen ? 'EDIT' : '+ CREATE'}
                                     </button>
@@ -376,61 +372,70 @@ export default function PlayerTimeline({
                                             onCancelCapture();
                                             setIsEditorOpen(false);
                                         }}
-                                        className="p-1.5 rounded bg-white/10 hover:bg-red-500/20 text-white/50 hover:text-white transition-colors border border-white/10"
+                                        className="h-9 px-3 flex items-center justify-center hover:bg-red-500/20 text-white/50 hover:text-white transition-colors"
                                         title="Close"
                                     >
-                                        <X size={14} />
+                                        <X size={16} />
                                     </button>
                                 </div>
                             </div>
 
-                            {/* ZONE B: MIDDLE PRECISION RANGE (The Red Track) */}
-                            <div
-                                className={`absolute top-0 bottom-0 z-30 transition-transform duration-100 ${heartbeat ? 'scale-y-125 scale-x-105' : 'scale-100'}`}
-                                style={{
-                                    left: `${(startSec / safeDuration) * 100}%`,
-                                    width: `${((endSec - startSec) / safeDuration) * 100}%`
-                                }}
-                            >
-                                {/* Active Range Line (Red) */}
-                                <div className="absolute top-1/2 -translate-y-1/2 inset-x-0 h-1 bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.6)] rounded-full" />
 
-                                {/* Start Handle */}
+                            {/* ZONE B: MIDDLE FRAME & TRIANGLE HANDLES */}
+                            <div className="absolute inset-0 bg-blue-500/10 border-x-2 border-orange-500">
+                                {/* Active Red Track */}
+                                <div className="absolute top-1/2 -translate-y-1/2 inset-x-0 h-1 bg-red-500 rounded-full" />
+
+                                {/* 
+                                    Start Handle (Triangle) 
+                                    - Centered on the line (left-0, translateX -50%)
+                                    - Downward pointing triangle
+                                */}
                                 <div
-                                    className="absolute top-1/2 -translate-y-1/2 left-0 w-0 h-0 z-40 touch-action-none cursor-ew-resize"
+                                    className="absolute top-1/2 left-0 -translate-y-1/2 -translate-x-1/2 z-40 touch-action-none cursor-ew-resize flex items-center justify-center pointer-events-auto"
+                                    style={{ marginTop: '-6px' }} // Lift slightly so point touches line
                                     onMouseDown={(e) => { e.stopPropagation(); setDraggingMarker('start'); }}
                                     onTouchStart={(e) => { e.stopPropagation(); setDraggingMarker('start'); }}
                                 >
-                                    {/* Touch Target */}
-                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[44px] h-[44px]" />
+                                    <div className="absolute inset-[-15px]" /> {/* Large Touch Target */}
 
-                                    {/* Visuals: Tick Line + Gap + Hollow Circle */}
-                                    <div className="absolute top-1/2 -translate-y-1/2 right-[0px] h-4 w-[2px] bg-white rounded-full translate-x-[-1px]" /> {/* Tick at exact time */}
-                                    <div className="absolute top-1/2 -translate-y-1/2 right-[9px] w-3 h-3 rounded-full border-2 border-orange-500 bg-black" /> {/* Hollow circle offset left */}
+                                    {/* CSS Triangle: Downward, Orange */}
+                                    <div
+                                        style={{
+                                            width: 0,
+                                            height: 0,
+                                            borderLeft: '5px solid transparent',
+                                            borderRight: '5px solid transparent',
+                                            borderTop: '7px solid #f97316' // Orange-500
+                                        }}
+                                    />
                                 </div>
 
-                                {/* End Handle */}
+                                {/* End Handle (Triangle) */}
                                 <div
-                                    className="absolute top-1/2 -translate-y-1/2 right-0 w-0 h-0 z-40 touch-action-none cursor-ew-resize"
+                                    className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 z-40 touch-action-none cursor-ew-resize flex items-center justify-center pointer-events-auto"
+                                    style={{ marginTop: '-6px' }}
                                     onMouseDown={(e) => { e.stopPropagation(); setDraggingMarker('end'); }}
                                     onTouchStart={(e) => { e.stopPropagation(); setDraggingMarker('end'); }}
                                 >
-                                    {/* Touch Target */}
-                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[44px] h-[44px]" />
+                                    <div className="absolute inset-[-15px]" />
 
-                                    {/* Visuals: Tick Line + Gap + Hollow Circle */}
-                                    <div className="absolute top-1/2 -translate-y-1/2 left-[0px] h-4 w-[2px] bg-white rounded-full translate-x-[1px]" />
-                                    <div className="absolute top-1/2 -translate-y-1/2 left-[9px] w-3 h-3 rounded-full border-2 border-orange-500 bg-black" />
+                                    <div
+                                        style={{
+                                            width: 0,
+                                            height: 0,
+                                            borderLeft: '5px solid transparent',
+                                            borderRight: '5px solid transparent',
+                                            borderTop: '7px solid #f97316'
+                                        }}
+                                    />
                                 </div>
                             </div>
 
-                            {/* ZONE C: BOTTOM 3D GRIP */}
+
+                            {/* ZONE C: BOTTOM GRIP (Full Width) */}
                             <div
-                                className="absolute top-1/2 left-0 z-40 cursor-grab active:cursor-grabbing group/grip pt-4" // Push down below track
-                                style={{
-                                    left: `${(startSec / safeDuration) * 100}%`,
-                                    width: `${((endSec - startSec) / safeDuration) * 100}%`
-                                }}
+                                className="absolute top-full left-0 w-full z-40 cursor-grab active:cursor-grabbing group/grip"
                                 onMouseDown={(e) => {
                                     e.stopPropagation();
                                     setDraggingMarker('range');
@@ -443,12 +448,12 @@ export default function PlayerTimeline({
                                     setDraggingMarker('range');
                                 }}
                             >
-                                {/* min-w-[30px] constraint centered */}
-                                <div className="mx-auto min-w-[30px] w-full max-w-[80px] h-5 bg-neutral-800 border-x border-b-2 border-r-2 border-black/50 border-t border-white/10 rounded-b-lg flex items-center justify-center shadow-lg transition-transform active:translate-y-0.5 active:border-b-0 active:border-r-0">
-                                    <GripHorizontal size={12} className="text-white/30" />
+                                <div className="w-full h-6 bg-neutral-800 border-x border-b border-white/20 rounded-b-lg flex items-center justify-center shadow-lg hover:bg-neutral-700 transition-colors">
+                                    <GripHorizontal size={16} className="text-white/30" />
                                 </div>
                             </div>
-                        </>
+
+                        </div>
                     )}
 
                 </div>
