@@ -134,7 +134,22 @@ export default function Room({ params }: { params: { id: string } }) {
     // Smart Capture State
     const [captureState, setCaptureState] = useState<CaptureState>('idle');
     const [showSignupModal, setShowSignupModal] = useState(false);
-    const [isSidebarEditorOpen, setIsSidebarEditorOpen] = useState(false);
+
+    // Creator Mode State (Lifted from PlayerTimeline)
+    const [isCreatorMode, setIsCreatorMode] = useState(false);
+
+    // Handler to toggle Creator Mode and lock body scroll
+    const handleCreatorModeChange = (isOpen: boolean) => {
+        setIsCreatorMode(isOpen);
+        if (typeof document !== 'undefined') {
+            if (isOpen) {
+                document.body.classList.add('overflow-hidden');
+            } else {
+                document.body.classList.remove('overflow-hidden');
+            }
+        }
+    };
+
     const [focusTrigger, setFocusTrigger] = useState(0);
     const [youtubePlayer, setYoutubePlayer] = useState<any>(null);
     const [spotifyPlayer, setSpotifyPlayer] = useState<SpotifyController | null>(null);
@@ -727,7 +742,7 @@ export default function Room({ params }: { params: { id: string } }) {
             setStartSec(null);
             setEndSec(null);
             setNote('');
-            setIsSidebarEditorOpen(false);
+            handleCreatorModeChange(false);
             setSaved(true);
             toast.success("Moment captured!");
 
@@ -1441,7 +1456,7 @@ export default function Room({ params }: { params: { id: string } }) {
                                         setCaptureState('idle');
                                         setError('');
                                         setNote('');
-                                        setIsSidebarEditorOpen(false);
+                                        handleCreatorModeChange(false);
                                     }}
                                     onCancelDraft={() => {
                                         setStartSec(null);
@@ -1449,7 +1464,7 @@ export default function Room({ params }: { params: { id: string } }) {
                                         setCaptureState('idle');
                                         setError('');
                                         setNote('');
-                                        setIsSidebarEditorOpen(false);
+                                        handleCreatorModeChange(false);
                                     }}
                                     onPreviewCapture={handlePreviewCapture}
                                     onCaptureStart={(time) => {
@@ -1457,7 +1472,9 @@ export default function Room({ params }: { params: { id: string } }) {
                                         setCaptureState('start-captured');
                                         setError('');
                                     }}
-                                    onEditorOpenChange={setIsSidebarEditorOpen}
+                                    // Creator Mode Props
+                                    isEditorOpen={isCreatorMode}
+                                    onEditorOpenChange={handleCreatorModeChange}
                                     onFocusRequest={() => setFocusTrigger(prev => prev + 1)}
                                     onCaptureEnd={(time) => {
                                         setEndSec(time);
@@ -1588,7 +1605,7 @@ export default function Room({ params }: { params: { id: string } }) {
                     {/* Right: Sidebar (35% on desktop, hidden on mobile) */}
                     <div className="hidden lg:block lg:w-[35%] shrink-0">
                         {/* Render MomentEditor in sidebar when active AND explicitly opened */}
-                        {((startSec !== null || endSec !== null) && isSidebarEditorOpen) ? (
+                        {((startSec !== null || endSec !== null) && isCreatorMode) ? (
                             <div className="sticky top-4">
                                 <MomentEditor
                                     isOpen={true}
@@ -1606,7 +1623,7 @@ export default function Room({ params }: { params: { id: string } }) {
                                         setCaptureState('idle');
                                         setError('');
                                         setNote('');
-                                        setIsSidebarEditorOpen(false);
+                                        handleCreatorModeChange(false);
                                     }}
                                     onPreview={() => {
                                         if (startSec === null || endSec === null) return;

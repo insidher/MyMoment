@@ -48,6 +48,14 @@ interface PlayerTimelineProps {
     onCancelDraft?: () => void;
     // Focus
     onFocusRequest?: () => void;
+    // Creator Mode (Lifted State)
+    isEditorOpen?: boolean;
+    onEditorOpenChange?: (isOpen: boolean) => void;
+    // Legacy / Extra Props from Parent
+    disabled?: boolean;
+    onChapterClick?: (chapter: any) => void;
+    onPause?: () => void;
+    onPreviewCapture?: () => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -79,6 +87,8 @@ export default function PlayerTimeline({
     onUpdateMoment,
     moments = [],
     isPlaying,
+    isEditorOpen = false,
+    onEditorOpenChange = () => { },
 }: PlayerTimelineProps) {
     const timelineRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -90,6 +100,7 @@ export default function PlayerTimeline({
     // Interaction State
     const [draggingMarker, setDraggingMarker] = useState<'start' | 'end' | 'range' | null>(null);
     const [hoverTime, setHoverTime] = useState<number | null>(null);
+    const [dragStartMouseX, setDragStartMouseX] = useState<number | null>(null);
     const [isHovering, setIsHovering] = useState(false);
 
     // Visual State
@@ -102,7 +113,8 @@ export default function PlayerTimeline({
     const [showOnboarding, setShowOnboarding] = useState(false);
 
     // UI State
-    const [isEditorOpen, setIsEditorOpen] = useState(false);
+    // UI State
+    // const [isEditorOpen, setIsEditorOpen] = useState(false); // REMOVED: Lifted to parent
 
     // Refs for Drag Logic
     const stateRef = useRef({
@@ -275,8 +287,15 @@ export default function PlayerTimeline({
 
                         if (justDraggedRef.current) return;
 
-                        // SMART CLICK
+                        // SMART CLICK LOGIC
                         const clickTime = getTimeFromX(e.clientX);
+
+                        // Modified: If draft exists, just seek. Don't move draft.
+                        if (startSec !== null && endSec !== null) {
+                            onSeek(clickTime);
+                            return;
+                        }
+
                         const defaultDuration = 30;
                         const newEnd = Math.min(clickTime + defaultDuration, safeDuration);
 
@@ -355,7 +374,7 @@ export default function PlayerTimeline({
                                             e.stopPropagation();
                                             if (isEditorOpen) triggerHeartbeat();
                                             else {
-                                                setIsEditorOpen(true);
+                                                onEditorOpenChange(true);
                                                 textareaRef.current?.focus();
                                                 triggerHeartbeat();
                                             }
@@ -370,7 +389,7 @@ export default function PlayerTimeline({
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             onCancelCapture();
-                                            setIsEditorOpen(false);
+                                            onEditorOpenChange(false);
                                         }}
                                         className="h-9 px-3 flex items-center justify-center hover:bg-red-500/20 text-white/50 hover:text-white transition-colors"
                                         title="Close"
@@ -468,7 +487,7 @@ export default function PlayerTimeline({
                                 <MessageCircle size={16} className="text-orange-500" />
                                 Add Note
                             </span>
-                            <button onClick={() => setIsEditorOpen(false)} className="p-1 hover:bg-white/10 rounded-full transition-colors">
+                            <button onClick={() => onEditorOpenChange(false)} className="p-1 hover:bg-white/10 rounded-full transition-colors">
                                 <X size={18} className="text-white/60" />
                             </button>
                         </div>
@@ -485,7 +504,7 @@ export default function PlayerTimeline({
                             <button
                                 onClick={() => {
                                     onSaveMoment?.();
-                                    setIsEditorOpen(false);
+                                    onEditorOpenChange(false);
                                 }}
                                 className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 text-white font-bold py-2.5 rounded-xl shadow-lg shadow-orange-500/20 transition-all active:scale-95"
                             >
