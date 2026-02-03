@@ -103,6 +103,10 @@ export default function PlayerTimeline({
     const [dragStartMouseX, setDragStartMouseX] = useState<number | null>(null);
     const [isHovering, setIsHovering] = useState(false);
 
+    // Touch tracking for directional detection
+    const [touchStartX, setTouchStartX] = useState<number | null>(null);
+    const [touchStartY, setTouchStartY] = useState<number | null>(null);
+
     // Visual State
     const [heartbeat, setHeartbeat] = useState(false);
 
@@ -192,16 +196,6 @@ export default function PlayerTimeline({
         }
     }, [endSec, safeDuration]);
 
-    // Scroll Locking
-    useEffect(() => {
-        if (draggingMarker) {
-            const originalStyle = window.getComputedStyle(document.body).overflow;
-            document.body.style.overflow = 'hidden';
-            return () => {
-                document.body.style.overflow = originalStyle;
-            };
-        }
-    }, [draggingMarker]);
 
 
     // Helper to get time from X coordinate
@@ -268,9 +262,28 @@ export default function PlayerTimeline({
         const handleMouseMove = (e: MouseEvent) => handleMove(e.clientX);
         const handleTouchMove = (e: TouchEvent) => {
             if (e.touches.length > 0) {
-                // Prevent scrolling while dragging
-                if (e.cancelable) e.preventDefault();
-                handleMove(e.touches[0].clientX);
+                const touch = e.touches[0];
+
+                // Directional Gatekeeper Logic
+                if (draggingMarker) {
+                    // If actively dragging a handle, lock ALL scrolling
+                    if (e.cancelable) e.preventDefault();
+                    handleMove(touch.clientX);
+                } else if (touchStartX !== null && touchStartY !== null) {
+                    // Calculate deltas from start position
+                    const deltaX = Math.abs(touch.clientX - touchStartX);
+                    const deltaY = Math.abs(touch.clientY - touchStartY);
+
+                    // If horizontal movement is dominant, prevent scroll (timeline scrubbing)
+                    if (deltaX > deltaY) {
+                        if (e.cancelable) e.preventDefault();
+                        handleMove(touch.clientX);
+                    }
+                    // Otherwise, allow vertical scroll (feed/comments)
+                } else {
+                    // Fallback: if no start position tracked, allow movement
+                    handleMove(touch.clientX);
+                }
             }
         };
 
@@ -334,6 +347,17 @@ export default function PlayerTimeline({
                     }}
                     onMouseEnter={() => setIsHovering(true)}
                     onMouseLeave={() => setIsHovering(false)}
+                    onTouchStart={(e) => {
+                        if (e.touches.length > 0) {
+                            const touch = e.touches[0];
+                            setTouchStartX(touch.clientX);
+                            setTouchStartY(touch.clientY);
+                        }
+                    }}
+                    onTouchEnd={() => {
+                        setTouchStartX(null);
+                        setTouchStartY(null);
+                    }}
                     onClick={(e) => {
                         if (showOnboarding) {
                             setShowOnboarding(false);
@@ -374,6 +398,12 @@ export default function PlayerTimeline({
                             style={{ width: `${(currentTime / safeDuration) * 100}%` }}
                         />
                     </div>
+
+                    {/* PLAYHEAD INDICATOR */}
+                    <div
+                        className="absolute top-0 bottom-0 w-[2px] bg-white z-30 pointer-events-none"
+                        style={{ left: `${(currentTime / safeDuration) * 100}%` }}
+                    />
 
                     {/* EXISTING MOMENTS OVERLAY */}
                     {moments.filter(m => !m.parentId).map((moment) => (

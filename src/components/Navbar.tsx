@@ -18,6 +18,7 @@ export default function Navbar() {
     const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
     const [isCreatorMode, setIsCreatorMode] = useState(false);
+    const [showProfileMenu, setShowProfileMenu] = useState(false);
 
     const menuRef = useRef<HTMLDivElement>(null);
     const buttonRef = useRef<HTMLButtonElement>(null);
@@ -159,7 +160,13 @@ export default function Navbar() {
 
                     {user ? (
                         <div className="relative group">
-                            <button className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-sm font-bold text-white shadow-lg shadow-purple-500/20 transform transition-transform group-hover:scale-105">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowProfileMenu(!showProfileMenu);
+                                }}
+                                className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-sm font-bold text-white shadow-lg shadow-purple-500/20 transform transition-transform active:scale-95 md:group-hover:scale-105"
+                            >
                                 {user.user_metadata?.avatar_url ? (
                                     <img src={user.user_metadata.avatar_url} alt="User" className="w-full h-full rounded-full" />
                                 ) : (
@@ -168,7 +175,7 @@ export default function Navbar() {
                             </button>
 
                             {/* Dropdown Menu */}
-                            <div className="absolute right-0 top-full mt-2 w-64 bg-zinc-900 border border-white/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                            <div className={`absolute right-0 top-full mt-2 w-64 bg-zinc-900 border border-white/10 rounded-xl shadow-2xl transition-all duration-200 z-50 ${showProfileMenu ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible -translate-y-2'}`}>
                                 <div className="p-4 border-b border-white/10">
                                     <p className="font-bold text-white truncate">{user.email?.split('@')[0] || 'User'}</p>
                                     <p className="text-xs text-white/40 truncate">{user.email}</p>
@@ -176,6 +183,7 @@ export default function Navbar() {
                                 <div className="p-2">
                                     <Link
                                         href="/profile"
+                                        onClick={() => setShowProfileMenu(false)}
                                         className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors text-white/80 hover:text-white"
                                     >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -185,6 +193,7 @@ export default function Navbar() {
                                     </Link>
                                     <button
                                         onClick={() => {
+                                            setShowProfileMenu(false);
                                             // Navigate to profile with settings open
                                             window.location.href = '/profile?settings=true';
                                         }}
@@ -209,6 +218,14 @@ export default function Navbar() {
                     )}
                 </div>
             </nav>
+
+            {/* Profile Menu Backdrop */}
+            {showProfileMenu && (
+                <div
+                    className="fixed inset-0 bg-transparent z-40"
+                    onClick={() => setShowProfileMenu(false)}
+                />
+            )}
 
             {/* Mobile Menu Dropdown */}
             {showMenu && (
