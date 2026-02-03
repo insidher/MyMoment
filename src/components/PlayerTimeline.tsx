@@ -196,6 +196,24 @@ export default function PlayerTimeline({
         }
     }, [endSec, safeDuration]);
 
+    // Click-away handler to collapse menu
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (timelineRef.current && !timelineRef.current.contains(e.target as Node)) {
+                setIsMenuExpanded(false);
+            }
+        };
+
+        if (isMenuExpanded) {
+            document.addEventListener('mousedown', handleClickOutside);
+            document.addEventListener('touchstart', handleClickOutside as any);
+            return () => {
+                document.removeEventListener('mousedown', handleClickOutside);
+                document.removeEventListener('touchstart', handleClickOutside as any);
+            };
+        }
+    }, [isMenuExpanded]);
+
 
 
     // Helper to get time from X coordinate
@@ -381,6 +399,7 @@ export default function PlayerTimeline({
 
                         onCaptureStart(clickTime);
                         onCaptureEnd(newEnd);
+                        setIsMenuExpanded(true); // Auto-expand menu for new moments
                         // Optional: triggerHeartbeat();
                     }}
                 >
