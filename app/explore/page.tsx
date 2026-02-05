@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import SongCard from '@/components/SongCard';
 import MomentCard from '@/components/MomentCard';
+import MomentFeedCard from '@/components/MomentFeedCard';
 import ArtistCard from '@/components/ArtistCard';
 import { getGroupedSongs, getUserArtistStats, getArtistSongs, getRecentMoments } from './actions';
 import { useAuth } from '@/context/AuthContext';
@@ -151,10 +152,10 @@ export default function ExplorePage() {
                         )}
                     </div>
                 ) : (
-                    // Plaza View: Show individual MomentCards
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    // Plaza View: Show individual MomentFeedCards in vertical feed
+                    <div className="flex flex-col space-y-12 pb-24">
                         {moments.length === 0 ? (
-                            <div className="col-span-full text-center py-12 text-white/40">
+                            <div className="text-center py-12 text-white/40">
                                 <p>No moments found.</p>
                                 <Link href="/" className="text-purple-400 hover:text-purple-300 mt-2 inline-block">
                                     Be the first to capture one!
@@ -162,12 +163,9 @@ export default function ExplorePage() {
                             </div>
                         ) : (
                             moments.map((moment) => (
-                                <MomentCard
+                                <MomentFeedCard
                                     key={moment.id}
                                     moment={moment}
-                                    trackDuration={moment.trackSource?.durationSec}
-                                    onPlayFull={(m) => router.push(`/room/view?url=${encodeURIComponent(m.sourceUrl)}`)}
-                                    onPlayMoment={(m) => router.push(`/room/view?url=${encodeURIComponent(m.sourceUrl)}&start=${m.startSec}&end=${m.endSec}`)}
                                 />
                             ))
                         )}
