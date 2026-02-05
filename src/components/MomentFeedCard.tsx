@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Moment } from '@/types';
-import { Heart, MessageSquare } from 'lucide-react';
+import { Heart, MessageSquare, Play } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toggleLike } from '../../app/actions/moments';
@@ -18,7 +18,7 @@ export default function MomentFeedCard({ moment, onComment }: MomentFeedCardProp
 
     // State
     const [showPlayer, setShowPlayer] = useState(false);
-    const [isMuted, setIsMuted] = useState(true);
+    const [isMuted, setIsMuted] = useState(false); // Start unmuted
     const [isPlaying, setIsPlaying] = useState(false);
     const [isLiked, setIsLiked] = useState(moment.isLiked || false);
     const [likeCount, setLikeCount] = useState(moment.likeCount || 0);
@@ -56,7 +56,7 @@ export default function MomentFeedCard({ moment, onComment }: MomentFeedCardProp
                 },
                 events: {
                     onReady: (event: any) => {
-                        event.target.mute();
+                        event.target.unMute(); // Start unmuted
                         event.target.playVideo();
                         setIsPlaying(true);
                     },
@@ -71,19 +71,38 @@ export default function MomentFeedCard({ moment, onComment }: MomentFeedCardProp
         };
     }, [showPlayer, videoId, moment.id, moment.startSec, moment.endSec]);
 
-    const handlePillClick = () => {
+    // Monitor playback time and pause at end
+    useEffect(() => {
+        if (!showPlayer || !playerRef.current) return;
+
+        const interval = setInterval(() => {
+            if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
+                const currentTime = playerRef.current.getCurrentTime();
+                if (currentTime >= moment.endSec) {
+                    playerRef.current.pauseVideo();
+                    setIsPlaying(false);
+                }
+            }
+        }, 100); // Check every 100ms for precision
+
+        return () => clearInterval(interval);
+    }, [showPlayer, moment.endSec]);
+
+    const handleThumbnailClick = () => {
         setShowPlayer(true);
     };
 
     const handleVideoClick = () => {
         if (!playerRef.current) return;
 
-        if (isMuted) {
-            playerRef.current.unMute();
-            setIsMuted(false);
+        // Toggle play/pause
+        const playerState = playerRef.current.getPlayerState();
+        if (playerState === (window as any).YT.PlayerState.PLAYING) {
+            playerRef.current.pauseVideo();
+            setIsPlaying(false);
         } else {
-            playerRef.current.mute();
-            setIsMuted(true);
+            playerRef.current.playVideo();
+            setIsPlaying(true);
         }
     };
 
@@ -142,11 +161,22 @@ export default function MomentFeedCard({ moment, onComment }: MomentFeedCardProp
             {/* Video Stage */}
             <div className="relative rounded-xl overflow-hidden bg-black aspect-video">
                 {!showPlayer ? (
-                    <img
-                        src={moment.artwork || '/placeholder-artwork.jpg'}
-                        alt={moment.title || 'Video thumbnail'}
-                        className="w-full h-full object-cover"
-                    />
+                    <div
+                        className="relative w-full h-full cursor-pointer group"
+                        onClick={handleThumbnailClick}
+                    >
+                        <img
+                            src={moment.artwork || '/placeholder-artwork.jpg'}
+                            alt={moment.title || 'Video thumbnail'}
+                            className="w-full h-full object-cover"
+                        />
+                        {/* Play Icon Overlay */}
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors">
+                            <div className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center shadow-2xl transform group-hover:scale-110 transition-transform">
+                                <Play size={32} className="text-black ml-1" fill="currentColor" />
+                            </div>
+                        </div>
+                    </div>
                 ) : (
                     <div
                         id={`player-${moment.id}`}
@@ -164,7 +194,7 @@ export default function MomentFeedCard({ moment, onComment }: MomentFeedCardProp
                         left: `${startPercent}%`,
                         width: `${widthPercent}%`,
                     }}
-                    onClick={handlePillClick}
+                    onClick={handleThumbnailClick}
                 />
             </div>
 
