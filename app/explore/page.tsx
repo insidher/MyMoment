@@ -82,46 +82,9 @@ export default function ExplorePage() {
     return (
         <div className="flex flex-col gap-6 md:gap-8 min-h-[calc(100vh-80px)] p-6 md:p-8 pb-32 relative">
 
-            {/* Header Section */}
-            <div className="space-y-2">
-                {artistFilter ? (
-                    <div className="space-y-4">
-                        <Link href="/explore" className="inline-flex items-center gap-2 text-white/60 hover:text-white transition-colors">
-                            <ArrowLeft size={20} />
-                            Back to Plaza
-                        </Link>
-                        <h1 className="text-4xl font-bold text-white">
-                            {artistFilter}
-                        </h1>
-                        <p className="text-white/60 text-lg">
-                            {songs.length} songs · {songs.reduce((acc, s) => acc + s.momentsCount, 0)} moments
-                        </p>
-                    </div>
-                ) : (
-                    <>
-                        <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60">
-                            The Plaza
-                        </h1>
-                        <p className="text-white/60 text-lg">Discover moments captured by the community.</p>
-                    </>
-                )}
-            </div>
 
             {/* Content Grid */}
             <section className="space-y-6">
-                <div className="flex items-center gap-2 text-xl font-semibold text-white/90">
-                    {artistFilter ? (
-                        <>
-                            <TrendingUp size={24} className="text-purple-400" />
-                            <h2>Songs by {artistFilter}</h2>
-                        </>
-                    ) : (
-                        <>
-                            <Clock size={24} className="text-orange-400" />
-                            <h2>Latest Moments</h2>
-                        </>
-                    )}
-                </div>
 
                 {artistFilter ? (
                     // Artist View: Show grouped SongCards
