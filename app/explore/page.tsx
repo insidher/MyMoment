@@ -107,21 +107,6 @@ export default function ExplorePage() {
                 )}
             </div>
 
-            {/* Browse by Artist (Only on main view and if logged in) */}
-            {!artistFilter && user && artistStats.length > 0 && (
-                <section className="space-y-6">
-                    <div className="flex items-center gap-2 text-xl font-semibold text-white/90">
-                        <User size={24} className="text-blue-400" />
-                        <h2>Your Top Artists</h2>
-                    </div>
-                    <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-                        {artistStats.map((stats) => (
-                            <ArtistCard key={stats.artist} stats={stats} />
-                        ))}
-                    </div>
-                </section>
-            )}
-
             {/* Content Grid */}
             <section className="space-y-6">
                 <div className="flex items-center gap-2 text-xl font-semibold text-white/90">
