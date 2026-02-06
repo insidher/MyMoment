@@ -9,15 +9,17 @@ import { toggleLike } from '../../app/actions/moments';
 
 interface MomentFeedCardProps {
     moment: Moment;
+    isActive?: boolean;
+    onPlay?: () => void;
     onComment?: (momentId: string) => void;
 }
 
-export default function MomentFeedCard({ moment, onComment }: MomentFeedCardProps) {
+export default function MomentFeedCard({ moment, isActive = false, onPlay, onComment }: MomentFeedCardProps) {
     const router = useRouter();
     const playerRef = useRef<any>(null);
 
     // State
-    const [showPlayer, setShowPlayer] = useState(false);
+    // Removed showPlayer - now controlled by isActive prop
     const [isMuted, setIsMuted] = useState(false); // Start unmuted
     const [isPlaying, setIsPlaying] = useState(false);
     const [isLiked, setIsLiked] = useState(moment.isLiked || false);
@@ -37,7 +39,7 @@ export default function MomentFeedCard({ moment, onComment }: MomentFeedCardProp
 
     // Load YouTube IFrame API
     useEffect(() => {
-        if (!showPlayer || !videoId) return;
+        if (!isActive || !videoId) return;
 
         const tag = document.createElement('script');
         tag.src = 'https://www.youtube.com/iframe_api';
@@ -64,17 +66,17 @@ export default function MomentFeedCard({ moment, onComment }: MomentFeedCardProp
                     onStateChange: (event: any) => {
                         if (event.data === (window as any).YT.PlayerState.ENDED) {
                             setIsPlaying(false);
-                            setShowPlayer(false);
+                            // Player will be cleaned up when parent sets another moment as active
                         }
                     },
                 },
             });
         };
-    }, [showPlayer, videoId, moment.id, moment.startSec, moment.endSec]);
+    }, [isActive, videoId, moment.id, moment.startSec, moment.endSec]);
 
     // Monitor playback time and pause at end
     useEffect(() => {
-        if (!showPlayer || !playerRef.current) return;
+        if (!isActive || !playerRef.current) return;
 
         const interval = setInterval(() => {
             if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
@@ -89,10 +91,12 @@ export default function MomentFeedCard({ moment, onComment }: MomentFeedCardProp
         }, 100); // Check every 100ms for precision
 
         return () => clearInterval(interval);
-    }, [showPlayer, moment.endSec]);
+    }, [isActive, moment.endSec]);
 
     const handleThumbnailClick = () => {
-        setShowPlayer(true);
+        if (onPlay) {
+            onPlay(); // Notify parent to set this as active player
+        }
     };
 
     const handleVideoClick = () => {
@@ -163,7 +167,7 @@ export default function MomentFeedCard({ moment, onComment }: MomentFeedCardProp
 
             {/* Video Stage */}
             <div className="relative rounded-xl overflow-hidden bg-black aspect-video">
-                {!showPlayer ? (
+                {!isActive ? (
                     <div
                         className="relative w-full h-full cursor-pointer group"
                         onClick={handleThumbnailClick}
