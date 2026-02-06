@@ -22,6 +22,7 @@ export default function MomentFeedCard({ moment, onComment }: MomentFeedCardProp
     const [isPlaying, setIsPlaying] = useState(false);
     const [isLiked, setIsLiked] = useState(moment.isLiked || false);
     const [likeCount, setLikeCount] = useState(moment.likeCount || 0);
+    const [currentPlaybackTime, setCurrentPlaybackTime] = useState(moment.startSec);
 
     // Extract YouTube video ID
     const getYouTubeId = (url: string) => {
@@ -78,6 +79,8 @@ export default function MomentFeedCard({ moment, onComment }: MomentFeedCardProp
         const interval = setInterval(() => {
             if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
                 const currentTime = playerRef.current.getCurrentTime();
+                setCurrentPlaybackTime(currentTime); // Update progress
+
                 if (currentTime >= moment.endSec) {
                     playerRef.current.pauseVideo();
                     setIsPlaying(false);
@@ -189,13 +192,23 @@ export default function MomentFeedCard({ moment, onComment }: MomentFeedCardProp
             {/* DNA Controller (Orange Pill) */}
             <div className="relative h-8 w-full bg-neutral-900/50 rounded flex items-center">
                 <div
-                    className="absolute h-2 bg-orange-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.5)] cursor-pointer hover:h-3 transition-all"
+                    className="absolute h-2 bg-orange-500/30 rounded-full cursor-pointer hover:h-3 transition-all overflow-hidden"
                     style={{
                         left: `${startPercent}%`,
                         width: `${widthPercent}%`,
                     }}
                     onClick={handleThumbnailClick}
-                />
+                >
+                    {/* Progress Fill */}
+                    <div
+                        className="absolute inset-0 bg-orange-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.5)] transition-all duration-100"
+                        style={{
+                            width: currentPlaybackTime >= moment.startSec
+                                ? `${Math.min(100, ((currentPlaybackTime - moment.startSec) / (moment.endSec - moment.startSec)) * 100)}%`
+                                : '0%',
+                        }}
+                    />
+                </div>
             </div>
 
             {/* Footer */}
