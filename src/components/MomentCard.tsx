@@ -272,7 +272,7 @@ export default function MomentCard({
                             size="w-5 h-5"
                         />
                         <span className="text-[11px] font-medium text-white/80">
-                            {moment.user?.name || 'Music Lover'} <span className="text-purple-400 font-mono ml-1" title="Debug ID">{moment.id.slice(0, 8)}</span>
+                            {moment.user?.name || 'Music Lover'}
                         </span>
                     </div>
 
