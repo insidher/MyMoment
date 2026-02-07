@@ -127,6 +127,13 @@ export default function PlayerTimeline({
         setDismissedMomentId(null);
     }, [activeMomentId]);
 
+    // Auto-expand menu when draft appears
+    useEffect(() => {
+        if (startSec !== null && endSec !== null) {
+            setIsMenuExpanded(true);
+        }
+    }, [startSec !== null, endSec !== null]);
+
     // Derived State
     const activeMoment = useMemo(() =>
         moments.find(m => m.id === activeMomentId),
@@ -522,7 +529,8 @@ export default function PlayerTimeline({
                                     onMouseDown={(e) => { e.stopPropagation(); setDraggingMarker('start'); }}
                                     onTouchStart={(e) => { e.stopPropagation(); setDraggingMarker('start'); }}
                                 >
-                                    <div className="absolute inset-[-15px]" />
+                                    {/* Asymmetrical hit area: extends mostly to the left to prevent blocking the End handle when close */}
+                                    <div className="absolute top-[-20px] bottom-[-20px] -left-[20px] -right-[5px] z-[50]" />
                                     <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '7px solid #f97316' }} />
                                 </div>
 
@@ -533,7 +541,8 @@ export default function PlayerTimeline({
                                     onMouseDown={(e) => { e.stopPropagation(); setDraggingMarker('end'); }}
                                     onTouchStart={(e) => { e.stopPropagation(); setDraggingMarker('end'); }}
                                 >
-                                    <div className="absolute inset-[-15px]" />
+                                    {/* Asymmetrical hit area: extends mostly to the right to prevent blocking the Start handle when close */}
+                                    <div className="absolute top-[-20px] bottom-[-20px] -left-[5px] -right-[20px] z-[50]" />
                                     <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '7px solid #f97316' }} />
                                 </div>
                             </div>

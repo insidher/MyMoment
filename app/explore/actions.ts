@@ -247,7 +247,12 @@ export async function getRecentMoments(limit = 50, excludeSpotify = false): Prom
                     title,
                     artist,
                     artwork,
-                    duration_sec
+                    duration_sec,
+                    moments (
+                        id,
+                        start_time,
+                        end_time
+                    )
                 ),
                 replies: moments!parent_id(count)
             `);

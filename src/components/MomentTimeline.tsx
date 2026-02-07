@@ -47,9 +47,9 @@ export default function MomentTimeline({
                     style={{ width: `${progressPercent}%` }}
                 />
 
-                {/* Playhead (Visible on Hover) */}
+                {/* Playhead - Blue Draggable Circle */}
                 <div
-                    className="absolute top-0 h-full w-0.5 bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)] opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                    className="absolute w-4 h-4 bg-blue-500 rounded-full ring-2 ring-white shadow-lg z-20 top-1/2 -translate-y-1/2 -translate-x-1/2 cursor-grab active:cursor-grabbing transition-transform hover:scale-110"
                     style={{ left: `${progressPercent}%` }}
                 />
 

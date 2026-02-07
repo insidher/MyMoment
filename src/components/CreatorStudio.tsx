@@ -23,7 +23,7 @@ export default function CreatorStudio({
     }, []);
 
     return (
-        <div className="flex flex-col h-full bg-neutral-900 p-4 border-t border-white/10 animate-in slide-in-from-bottom-5 duration-300">
+        <div className="flex flex-col min-h-[60vh] bg-neutral-900 p-4 border-t border-white/10 animate-in slide-in-from-bottom-5 duration-300">
             {/* Header / Title (Optional, keeping it clean for now as requested) */}
 
             {/* Text Area */}

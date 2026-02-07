@@ -228,30 +228,6 @@ export default function Room({ params }: { params: { id: string } }) {
 
         const supabase = createClient();
 
-        // Auto-play if start param exists
-        if (startParam) {
-            const start = parseInt(startParam);
-            const end = endParam ? parseInt(endParam) : null;
-            setStartSec(start);
-            setEndSec(end);
-            setCaptureState('end-captured');
-            if (end) {
-                const tempMoment: Moment = {
-                    id: 'temp-preview',
-                    service: isSpotify ? 'spotify' : 'youtube',
-                    sourceUrl: url,
-                    startSec: start,
-                    endSec: end,
-                    start_time: start, // Add compatibility fields
-                    end_time: end,
-                    platform: isSpotify ? 'spotify' : 'youtube',
-                    createdAt: new Date(),
-                } as Moment;
-                setActiveMoment(tempMoment);
-            }
-        }
-
-
     }, [startParam, endParam, isSpotify, url]);
 
     const fetchMoments = async () => {
@@ -271,6 +247,26 @@ export default function Room({ params }: { params: { id: string } }) {
             }));
 
             setMoments(mappedMoments);
+
+            // If URL has start/end parameters, find and activate the matching moment
+            if (startParam && endParam) {
+                const start = parseFloat(startParam);
+                const end = parseFloat(endParam);
+
+                // Find moment that matches these timestamps (with small tolerance for floating point)
+                const matchingMoment = mappedMoments.find(m =>
+                    Math.abs(m.startSec - start) < 0.5 && Math.abs(m.endSec - end) < 0.5
+                );
+
+                if (matchingMoment) {
+                    // Found existing moment - set it as active
+                    setActiveMoment(matchingMoment);
+                    // Explicitly clear draft state to avoid "stuck" red UI on load
+                    setStartSec(null);
+                    setEndSec(null);
+                    setCaptureState('idle');
+                }
+            }
         } catch (err) {
             console.error('Failed to fetch moments:', err);
         }
@@ -1275,8 +1271,8 @@ export default function Room({ params }: { params: { id: string } }) {
                 {/* Desktop: 65/35 Split | Mobile: Full Width */}
                 <div className="flex flex-col lg:flex-row lg:gap-4 lg:px-4">
                     {/* Left: Video Player + Timeline (65% on desktop) */}
-                    <div className={`w-full lg:w-[65%] px-4 lg:px-0 ${isCreatorMode ? 'fixed top-16 left-0 right-0 bottom-0 z-50 bg-black !p-0 flex flex-col' : ''}`}>
-                        <div className={`glass-panel p-1 overflow-hidden relative bg-black ${isCreatorMode ? 'shrink-0 h-[40%] rounded-none !border-0' : 'aspect-video'}`}>
+                    <div className={`w-full lg:w-[65%] px-4 lg:px-0 ${isCreatorMode ? 'fixed top-16 left-0 right-0 bottom-0 z-50 bg-black !p-0 flex flex-col overflow-y-auto' : ''}`}>
+                        <div className={`glass-panel p-1 overflow-hidden relative bg-black ${isCreatorMode ? 'shrink-0 h-[35vh] rounded-none !border-0' : 'aspect-video'}`}>
                             {isYouTube && youtubeId ? (
                                 <>
                                     <YouTube

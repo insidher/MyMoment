@@ -24,7 +24,6 @@ export default function ExplorePage() {
     const [moments, setMoments] = useState<Moment[]>([]);
     const [artistStats, setArtistStats] = useState<ArtistStats[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activePlayerId, setActivePlayerId] = useState<string | null>(null);
 
     useEffect(() => {
         if (!filterLoading) {
@@ -115,8 +114,6 @@ export default function ExplorePage() {
                                 <MomentFeedCard
                                     key={moment.id}
                                     moment={moment}
-                                    isActive={activePlayerId === moment.id}
-                                    onPlay={() => setActivePlayerId(moment.id)}
                                 />
                             ))
                         )}
