@@ -158,6 +158,7 @@ export default function Room({ params }: { params: { id: string } }) {
     const [youtubePlayer, setYoutubePlayer] = useState<any>(null);
     const [spotifyPlayer, setSpotifyPlayer] = useState<SpotifyController | null>(null);
     const [error, setError] = useState('');
+    const [durationLimitError, setDurationLimitError] = useState(false);
     const [groupingConfirmation, setGroupingConfirmation] = useState<{
         payload: any;
         conflictMoment: Moment;
@@ -183,6 +184,16 @@ export default function Room({ params }: { params: { id: string } }) {
     useEffect(() => {
         hasUpdatedDuration.current = false;
     }, [url]);
+
+    // Cleanup Creator Mode classes on unmount
+    useEffect(() => {
+        return () => {
+            if (typeof document !== 'undefined') {
+                document.body.classList.remove('is-creator-mode');
+                document.body.classList.remove('overflow-hidden');
+            }
+        };
+    }, []);
 
 
     // Real Metadata State
@@ -744,6 +755,7 @@ export default function Room({ params }: { params: { id: string } }) {
             setNote('');
             handleCreatorModeChange(false);
             setSaved(true);
+            console.log("✅ [Capture] Optimistic update successful. Temp ID:", tempId);
             toast.success("Moment captured!");
 
             // Clear confirmation if any
@@ -851,6 +863,13 @@ export default function Room({ params }: { params: { id: string } }) {
 
         if (!replyingTo && (startSec == null || endSec == null)) return;
 
+        // 3rd Minute Limit Check
+        const duration = (endSec || 0) - (startSec || 0);
+        if (!replyingTo && duration > 180) {
+            setDurationLimitError(true);
+            return;
+        }
+
         setIsSaving(true);
 
         // 1. REPLY FLOW
@@ -942,6 +961,7 @@ export default function Room({ params }: { params: { id: string } }) {
         }
 
         // ZONE 3: No Match (Create New)
+        console.log("✨ [Capture] Creating New Root Moment");
         await executeCreateMoment(payload, null);
     };
 
@@ -1271,7 +1291,7 @@ export default function Room({ params }: { params: { id: string } }) {
                 {/* Desktop: 65/35 Split | Mobile: Full Width */}
                 <div className="flex flex-col lg:flex-row lg:gap-4 lg:px-4">
                     {/* Left: Video Player + Timeline (65% on desktop) */}
-                    <div className={`w-full lg:w-[65%] px-4 lg:px-0 ${isCreatorMode ? 'fixed top-16 left-0 right-0 bottom-0 z-50 bg-black !p-0 flex flex-col overflow-y-auto' : ''}`}>
+                    <div className={`w-full lg:w-[65%] px-4 lg:px-0 ${isCreatorMode ? 'fixed top-16 left-0 right-0 bottom-0 z-50 bg-black !p-0 flex flex-col overflow-y-auto overflow-x-hidden' : ''}`}>
                         <div className={`glass-panel p-1 overflow-hidden relative bg-black ${isCreatorMode ? 'shrink-0 h-[35vh] rounded-none !border-0' : 'aspect-video'}`}>
                             {isYouTube && youtubeId ? (
                                 <>
@@ -1343,7 +1363,7 @@ export default function Room({ params }: { params: { id: string } }) {
                         </div>
 
                         {/* Sticky Header: Controls + Timeline - LOWERED Z-INDEX to fix menu conflict */}
-                        <div className={`sticky top-14 z-[30] bg-black/95 backdrop-blur-md pb-2 -mx-4 px-4 lg:mx-0 lg:px-0 lg:bg-black lg:border-b lg:border-white/10 lg:rounded-b-xl lg:mb-4 lg:pt-2 ${isCreatorMode ? 'border-t border-white/10' : ''}`}>
+                        <div className={`${isCreatorMode ? 'sticky top-0 z-[30] bg-black/95 backdrop-blur-md pb-2 px-4 border-t border-white/10' : 'sticky top-14 z-[30] bg-black/95 backdrop-blur-md pb-2 -mx-4 px-4 lg:mx-0 lg:px-0 lg:bg-black lg:border-b lg:border-white/10 lg:rounded-b-xl lg:mb-4 lg:pt-2'}`}>
 
                             {/* Compact Playback Controls */}
                             {(isYouTube || isSpotify) && (
@@ -1706,6 +1726,28 @@ export default function Room({ params }: { params: { id: string } }) {
                     }
                 }}
             />
+            {/* Duration Limit Modal */}
+            {durationLimitError && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setDurationLimitError(false)}>
+                    <div className="bg-zinc-900 border border-orange-500/30 rounded-2xl p-8 max-w-sm w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                        <div className="text-center space-y-2">
+                            <div className="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center mx-auto mb-4">
+                                <Clock size={24} className="text-orange-500" />
+                            </div>
+                            <h2 className="text-xl font-bold text-white">Moment Too Long! 🛑</h2>
+                            <p className="text-white/60">
+                                Moments cannot be longer than 3 min.
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setDurationLimitError(false)}
+                            className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl transition-colors shadow-lg shadow-orange-500/20"
+                        >
+                            Got it
+                        </button>
+                    </div>
+                </div>
+            )}
         </main >
     );
 }

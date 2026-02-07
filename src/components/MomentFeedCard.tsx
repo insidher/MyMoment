@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toggleLike } from '../../app/actions/moments';
 import VisualTimeline from './VisualTimeline';
+import UserAvatar from './UserAvatar';
 
 interface MomentFeedCardProps {
     moment: Moment;
@@ -51,12 +52,12 @@ export default function MomentFeedCard({ moment, onComment }: MomentFeedCardProp
             {/* Header */}
             <Link
                 href={`/room/view?url=${encodeURIComponent(moment.sourceUrl)}&start=${moment.startSec}&end=${moment.endSec}`}
-                className="flex items-center gap-3 p-4 hover:bg-white/5 transition-colors"
+                className="flex items-center gap-2 p-3 hover:bg-white/5 transition-colors"
             >
-                <img
-                    src={moment.user?.image || '/default-avatar.png'}
-                    alt={moment.user?.name || 'User'}
-                    className="w-10 h-10 rounded-full"
+                <UserAvatar
+                    name={moment.user?.name}
+                    image={moment.user?.image}
+                    size="w-8 h-8"
                 />
                 <div className="flex-1">
                     <p className="text-white font-medium">{moment.user?.name || 'Music Lover'}</p>
@@ -104,7 +105,7 @@ export default function MomentFeedCard({ moment, onComment }: MomentFeedCardProp
             </Link>
 
             {/* Visual Timeline */}
-            <div className="px-4 pt-4">
+            <div className="px-3 pt-1">
                 <VisualTimeline
                     duration={duration}
                     currentTime={moment.startSec}
@@ -119,7 +120,7 @@ export default function MomentFeedCard({ moment, onComment }: MomentFeedCardProp
             </div>
 
             {/* Footer */}
-            <div className="p-4 space-y-3">
+            <div className="p-3 pt-2 space-y-1.5">
                 {/* Title */}
                 <Link
                     href={`/room/view?url=${encodeURIComponent(moment.sourceUrl)}&start=${moment.startSec}&end=${moment.endSec}`}
@@ -130,7 +131,7 @@ export default function MomentFeedCard({ moment, onComment }: MomentFeedCardProp
 
                 {/* Quote */}
                 {moment.note && (
-                    <p className="font-serif italic text-lg text-gray-200 leading-relaxed">
+                    <p className="font-serif italic text-base text-gray-200 leading-snug">
                         "{moment.note}"
                     </p>
                 )}
@@ -159,10 +160,10 @@ export default function MomentFeedCard({ moment, onComment }: MomentFeedCardProp
 
                     <Link
                         href={`/room/view?url=${encodeURIComponent(moment.sourceUrl)}&start=${moment.startSec}&end=${moment.endSec}`}
-                        className="ml-auto bg-neutral-800 hover:bg-neutral-700 text-white text-sm px-4 py-2 rounded-lg transition-colors font-medium flex items-center gap-2"
+                        className="ml-auto bg-neutral-800 hover:bg-neutral-700 text-white text-xs px-3 py-1.5 rounded-lg transition-colors font-bold flex items-center gap-2"
                     >
                         <span>Open Moment</span>
-                        <ArrowRight size={16} />
+                        <ArrowRight size={14} />
                     </Link>
                 </div>
             </div>

@@ -4,6 +4,7 @@ import { MessageCircle, X, Send, Loader2 } from 'lucide-react';
 import { createComment } from '../../app/actions/moments';
 import { toast } from 'sonner';
 import { usePathname } from 'next/navigation';
+import UserAvatar from './UserAvatar';
 
 // Helper for relative time (e.g. "2h", "3d")
 function getRelativeTime(dateString: string | Date): string {
@@ -117,13 +118,11 @@ export default function ThreadComment({ comment, currentUserId, onReply, onRefre
             {/* LEVEL 2 CARD (The Comment) */}
             <div className="glass-panel p-2 bg-black/20 hover:bg-white/5 transition-colors">
                 <div className="flex gap-2 items-start">
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold shrink-0">
-                        {comment.user?.image ? (
-                            <img src={comment.user.image} alt={comment.user.name || 'User'} className="w-full h-full rounded-full" />
-                        ) : (
-                            (comment.user?.name?.[0] || 'U')
-                        )}
-                    </div>
+                    <UserAvatar
+                        name={comment.user?.name}
+                        image={comment.user?.image}
+                        size="w-7 h-7"
+                    />
 
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
@@ -201,13 +200,11 @@ export default function ThreadComment({ comment, currentUserId, onReply, onRefre
                         <div key={reply.id} className="relative animate-in fade-in slide-in-from-top-1">
                             <div className="glass-panel p-2 bg-black/40 border border-white/5">
                                 <div className="flex gap-3 items-start">
-                                    <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-500 to-cyan-500 flex items-center justify-center text-[10px] font-bold shrink-0">
-                                        {reply.user?.image ? (
-                                            <img src={reply.user.image} alt={reply.user.name || 'User'} className="w-full h-full rounded-full" />
-                                        ) : (
-                                            (reply.user?.name?.[0] || 'U')
-                                        )}
-                                    </div>
+                                    <UserAvatar
+                                        name={reply.user?.name}
+                                        image={reply.user?.image}
+                                        size="w-6 h-6"
+                                    />
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center justify-between mb-0.5">
                                             <span className="font-semibold text-xs text-white/90">{reply.user?.name || 'Unknown User'}</span>

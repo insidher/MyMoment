@@ -6,6 +6,7 @@ import { X, Heart, MessageSquare, Play, Users, Send, ChevronDown, ChevronUp } fr
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { toggleLike, createComment } from '../../app/actions/moments';
+import UserAvatar from './UserAvatar';
 
 interface MomentCardProps {
     moment: Moment;
@@ -265,13 +266,11 @@ export default function MomentCard({
                 <div className="flex items-center justify-between px-3 py-1.5 bg-black/40 border-b border-white/5">
                     {/* User Info - Left */}
                     <div className="flex items-center gap-1.5">
-                        <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-[9px] font-bold shrink-0 overflow-hidden">
-                            {moment.user?.image ? (
-                                <img src={moment.user.image} alt={moment.user?.name || 'User'} className="w-full h-full object-cover" />
-                            ) : (
-                                (moment.user?.name?.[0] || 'M')
-                            )}
-                        </div>
+                        <UserAvatar
+                            name={moment.user?.name}
+                            image={moment.user?.image}
+                            size="w-5 h-5"
+                        />
                         <span className="text-[11px] font-medium text-white/80">
                             {moment.user?.name || 'Music Lover'} <span className="text-purple-400 font-mono ml-1" title="Debug ID">{moment.id.slice(0, 8)}</span>
                         </span>
@@ -367,13 +366,11 @@ export default function MomentCard({
                                                     className="flex items-center gap-2 px-3 py-2 hover:bg-white/5 transition-colors group/user"
                                                     onClick={() => setShowLikesList(false)}
                                                 >
-                                                    <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-[10px] font-bold shrink-0">
-                                                        {like.user.image ? (
-                                                            <img src={like.user.image} alt={like.user.name || 'User'} className="w-full h-full rounded-full object-cover" />
-                                                        ) : (
-                                                            (like.user.name || 'User')[0]?.toUpperCase()
-                                                        )}
-                                                    </div>
+                                                    <UserAvatar
+                                                        name={like.user.name}
+                                                        image={like.user.image}
+                                                        size="w-6 h-6"
+                                                    />
                                                     <span className="text-xs text-white/90 group-hover/user:text-purple-300 transition-colors">{like.user.name || 'User'}</span>
                                                 </Link>
                                             ))

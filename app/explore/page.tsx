@@ -80,7 +80,7 @@ export default function ExplorePage() {
     }
 
     return (
-        <div className="flex flex-col gap-6 md:gap-8 min-h-[calc(100vh-80px)] p-6 md:p-8 pb-32 relative">
+        <div className="flex flex-col gap-4 md:gap-6 min-h-[calc(100vh-80px)] p-4 md:p-6 pb-32 relative">
 
 
             {/* Content Grid */}
@@ -101,22 +101,24 @@ export default function ExplorePage() {
                     </div>
                 ) : (
                     // Plaza View: Show individual MomentFeedCards in vertical feed
-                    <div className="flex flex-col space-y-12 pb-24">
-                        {moments.length === 0 ? (
-                            <div className="text-center py-12 text-white/40">
-                                <p>No moments found.</p>
-                                <Link href="/" className="text-purple-400 hover:text-purple-300 mt-2 inline-block">
-                                    Be the first to capture one!
-                                </Link>
-                            </div>
-                        ) : (
-                            moments.map((moment) => (
-                                <MomentFeedCard
-                                    key={moment.id}
-                                    moment={moment}
-                                />
-                            ))
-                        )}
+                    <div className="flex flex-col items-center pb-24">
+                        <div className="w-full max-w-2xl space-y-4">
+                            {moments.length === 0 ? (
+                                <div className="text-center py-12 text-white/40">
+                                    <p>No moments found.</p>
+                                    <Link href="/" className="text-purple-400 hover:text-purple-300 mt-2 inline-block">
+                                        Be the first to capture one!
+                                    </Link>
+                                </div>
+                            ) : (
+                                moments.map((moment) => (
+                                    <MomentFeedCard
+                                        key={moment.id}
+                                        moment={moment}
+                                    />
+                                ))
+                            )}
+                        </div>
                     </div>
                 )}
             </section>

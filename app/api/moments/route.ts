@@ -90,11 +90,11 @@ export async function POST(request: Request) {
             );
         }
 
-        // Maximum moment duration: 10 minutes (600 seconds)
-        const MAX_MOMENT_DURATION = 600;
+        // Maximum moment duration: 3 minutes (180 seconds)
+        const MAX_MOMENT_DURATION = 180;
         if (duration > MAX_MOMENT_DURATION) {
             return NextResponse.json(
-                { error: `Invalid duration: moment cannot exceed ${MAX_MOMENT_DURATION} seconds (10 minutes)` },
+                { error: `Invalid duration: moment cannot exceed ${MAX_MOMENT_DURATION} seconds (3 minutes)` },
                 { status: 400 }
             );
         }
@@ -166,18 +166,18 @@ export async function POST(request: Request) {
             trackSourceQuery = trackSourceQuery.eq('source_url', body.sourceUrl);
         }
 
-        const { data: existingTrackSource } = await trackSourceQuery.single();
+        const { data: existingTrackSource } = await trackSourceQuery.maybeSingle();
 
         if (existingTrackSource) {
             // Use existing track_source
             trackSourceId = existingTrackSource.id;
             console.log('[API] Using existing track_source:', trackSourceId);
 
-            // Auto-Heal: If new duration provided > 0, update existing record (using admin context)
-            if (duration > 0) {
+            // Auto-Heal: If new TOTAL track duration provided > 0, update existing record (using admin context)
+            if (body.duration && body.duration > 0) {
                 await adminClient
                     .from('track_sources')
-                    .update({ duration_sec: duration })
+                    .update({ duration_sec: body.duration })
                     .eq('id', trackSourceId);
             }
         } else {
