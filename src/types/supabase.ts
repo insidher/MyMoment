@@ -60,7 +60,7 @@ export interface Database {
                     category_id: string | null
                     tags: string[] | null
                     metadata_updated_at: string
-                    createdAt: string
+                    created_at: string
                     updated_at: string
                 }
                 Insert: {
@@ -98,7 +98,7 @@ export interface Database {
                     category_id?: string | null
                     tags?: string[] | null
                     metadata_updated_at?: string
-                    createdAt?: string
+                    created_at?: string
                     updated_at?: string
                 }
                 Relationships: []

@@ -192,7 +192,7 @@ export async function POST(request: Request) {
                     artist: body.artist || 'Unknown Artist',
                     artwork: body.artwork || null,
                     duration_sec: body.duration || 0,
-                    createdAt: new Date().toISOString(),
+                    created_at: new Date().toISOString(),
                 })
                 .select('id')
                 .single();

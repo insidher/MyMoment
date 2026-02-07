@@ -56,14 +56,4 @@ export async function proxy(request: NextRequest) {
     return response
 }
 
-// Configure which routes the proxy should run on
-export const config = {
-    matcher: [
-        /*
-         * Only run proxy on protected routes
-         * This prevents unnecessary checks on public pages
-         */
-        '/profile/:path*',
-        '/profile/:path*',
-    ],
-}
+// Configure which routes the proxy should run on - REMOVED, handled by middleware.ts
