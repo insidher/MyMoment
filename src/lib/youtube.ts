@@ -65,17 +65,44 @@ export interface YouTubeMetadata {
 
 /**
  * Fetch video details including duration
+ * Cache-First Logic: Checks track_sources before calling YouTube API
  */
 export async function getYouTubeVideoMetadata(videoId: string): Promise<YouTubeMetadata | null> {
-    const apiKey = process.env.YOUTUBE_API_KEY || process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
-    if (!apiKey) {
-        console.warn('YouTube API key not configured');
-        return null;
-    }
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const supabase = createAdminClient();
 
     try {
+        // 1. Check Cache
+        const { data: cached } = await supabase
+            .from('track_sources')
+            .select('*')
+            .eq('youtube_video_id', videoId)
+            .single();
+
+        if (cached && cached.title !== 'Unknown Title') {
+            console.log('🎯 Cache HIT for video:', videoId);
+            return {
+                title: cached.title || 'Unknown Title',
+                channelTitle: cached.channel_title || '',
+                description: cached.description || '',
+                thumbnails: {
+                    high: cached.artwork || undefined,
+                },
+                durationSec: cached.duration_sec || 0,
+            };
+        }
+
+        console.log('❄️ Thawing new video:', videoId);
+
+        // 2. Fetch from YouTube API
+        const apiKey = process.env.YOUTUBE_API_KEY || process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
+        if (!apiKey) {
+            console.warn('YouTube API key not configured');
+            return null;
+        }
+
         const url = new URL('https://www.googleapis.com/youtube/v3/videos');
-        url.searchParams.set('part', 'snippet,contentDetails');
+        url.searchParams.set('part', 'snippet,contentDetails,statistics,topicDetails');
         url.searchParams.set('id', videoId);
         url.searchParams.set('key', apiKey);
 
@@ -88,8 +115,9 @@ export async function getYouTubeVideoMetadata(videoId: string): Promise<YouTubeM
         const item = data.items[0];
         const snippet = item.snippet;
         const contentDetails = item.contentDetails;
+        const statistics = item.statistics;
 
-        return {
+        const metadata: YouTubeMetadata = {
             title: snippet.title,
             channelTitle: snippet.channelTitle,
             description: snippet.description || '',
@@ -101,7 +129,36 @@ export async function getYouTubeVideoMetadata(videoId: string): Promise<YouTubeM
             },
             durationSec: parseISODuration(contentDetails.duration),
         };
-    } catch (e) {
+
+        // 3. Freeze (Update/Insert Cache)
+        const { error: upsertError } = await supabase.from('track_sources').upsert({
+            youtube_video_id: videoId,
+            source_url: `https://www.youtube.com/watch?v=${videoId}`,
+            service: 'youtube',
+            title: metadata.title,
+            artist: metadata.channelTitle,
+            channel_title: metadata.channelTitle,
+            description: metadata.description,
+            artwork: metadata.thumbnails.high || metadata.thumbnails.medium || metadata.thumbnails.default,
+            duration_sec: metadata.durationSec,
+            view_count: statistics.viewCount ? parseInt(statistics.viewCount) : null,
+            category_id: snippet.categoryId,
+            tags: snippet.tags || [],
+            metadata_updated_at: new Date().toISOString(),
+            createdAt: new Date().toISOString(), // Using camelCase as required
+        }, { onConflict: 'youtube_video_id' });
+
+        if (upsertError) {
+            console.error('❌ Failed to cache metadata in track_sources:', {
+                message: upsertError.message,
+                details: upsertError.details,
+                hint: upsertError.hint,
+                code: upsertError.code
+            });
+        }
+
+        return metadata;
+    } catch (e: any) {
         console.error('Failed to get video details:', e);
         return null;
     }

@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
     // Define protected routes that require authentication
     const protectedPaths = ['/profile']
 
@@ -17,7 +17,7 @@ export async function middleware(request: NextRequest) {
         },
     })
 
-    // Create Supabase client for middleware
+    // Create Supabase client for proxy
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -56,11 +56,11 @@ export async function middleware(request: NextRequest) {
     return response
 }
 
-// Configure which routes the middleware should run on
+// Configure which routes the proxy should run on
 export const config = {
     matcher: [
         /*
-         * Only run middleware on protected routes
+         * Only run proxy on protected routes
          * This prevents unnecessary checks on public pages
          */
         '/profile/:path*',

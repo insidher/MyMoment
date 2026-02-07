@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { extractYouTubeId } from '@/lib/related';
 
 export async function POST(request: Request) {
     try {
@@ -147,47 +149,61 @@ export async function POST(request: Request) {
 
         // Detect service
         const service = body.service || detectService(body.sourceUrl);
+        const youtubeVideoId = service === 'youtube' ? extractYouTubeId(body.sourceUrl) : null;
 
-        // Step 1: Find or Create track_source (ALWAYS, regardless of duration)
+        // Step 1: Find or Create track_source (ALWAYS using Admin Client to bypass RLS)
+        const adminClient = createAdminClient();
         let trackSourceId: string | null = null;
 
-        // Check if track_source already exists for this URL
-        const { data: existingTrackSource } = await supabase
+        // Check if track_source already exists for this URL or Video ID
+        let trackSourceQuery = adminClient
             .from('track_sources')
-            .select('id')
-            .eq('source_url', body.sourceUrl)
-            .single();
+            .select('id');
+
+        if (youtubeVideoId) {
+            trackSourceQuery = trackSourceQuery.eq('youtube_video_id', youtubeVideoId);
+        } else {
+            trackSourceQuery = trackSourceQuery.eq('source_url', body.sourceUrl);
+        }
+
+        const { data: existingTrackSource } = await trackSourceQuery.single();
 
         if (existingTrackSource) {
             // Use existing track_source
             trackSourceId = existingTrackSource.id;
             console.log('[API] Using existing track_source:', trackSourceId);
 
-            // Auto-Heal: If new duration provided > 0, update existing record (blindly update to ensure latest duration)
+            // Auto-Heal: If new duration provided > 0, update existing record (using admin context)
             if (duration > 0) {
-                await supabase
+                await adminClient
                     .from('track_sources')
                     .update({ duration_sec: duration })
                     .eq('id', trackSourceId);
             }
         } else {
             // Create new track_source (even if duration is 0 or missing)
-            const { data: newTrackSource, error: trackSourceError } = await supabase
+            const { data: newTrackSource, error: trackSourceError } = await adminClient
                 .from('track_sources')
                 .insert({
                     service: service,
                     source_url: body.sourceUrl,
+                    youtube_video_id: youtubeVideoId,
                     title: body.title || 'Unknown Title',
                     artist: body.artist || 'Unknown Artist',
                     artwork: body.artwork || null,
-                    duration_sec: body.duration || 0, // Default to 0 if missing
+                    duration_sec: body.duration || 0,
+                    createdAt: new Date().toISOString(),
                 })
                 .select('id')
                 .single();
 
             if (trackSourceError) {
-                console.error('[API] Failed to create track_source:', trackSourceError);
-                // Continue without track_source rather than failing
+                console.error('❌ [API] Failed to create track_source with Admin Client:', {
+                    message: trackSourceError.message,
+                    details: trackSourceError.details,
+                    code: trackSourceError.code
+                });
+                // Continue without track_source rather than failing if possible
             } else {
                 trackSourceId = newTrackSource.id;
                 console.log('[API] Created new track_source:', trackSourceId);

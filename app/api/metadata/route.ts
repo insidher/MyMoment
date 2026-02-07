@@ -35,6 +35,7 @@ export async function GET(request: Request) {
 
             const metadata = await getYouTubeVideoMetadata(videoId);
             if (metadata) {
+                // Ensure the response matches what the frontend expects (durationSec)
                 return NextResponse.json(metadata);
             } else {
                 return NextResponse.json({ error: 'Failed to fetch metadata' }, { status: 404 });

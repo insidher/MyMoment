@@ -53,7 +53,14 @@ export interface Database {
                     artwork: string | null
                     duration_sec: number | null
                     canonical_track_id: string | null
-                    created_at: string
+                    youtube_video_id: string | null
+                    description: string | null
+                    channel_title: string | null
+                    view_count: number | null
+                    category_id: string | null
+                    tags: string[] | null
+                    metadata_updated_at: string
+                    createdAt: string
                     updated_at: string
                 }
                 Insert: {
@@ -65,7 +72,14 @@ export interface Database {
                     artwork?: string | null
                     duration_sec?: number | null
                     canonical_track_id?: string | null
-                    created_at?: string
+                    youtube_video_id?: string | null
+                    description?: string | null
+                    channel_title?: string | null
+                    view_count?: number | null
+                    category_id?: string | null
+                    tags?: string[] | null
+                    metadata_updated_at?: string
+                    createdAt?: string
                     updated_at?: string
                 }
                 Update: {
@@ -77,7 +91,14 @@ export interface Database {
                     artwork?: string | null
                     duration_sec?: number | null
                     canonical_track_id?: string | null
-                    created_at?: string
+                    youtube_video_id?: string | null
+                    description?: string | null
+                    channel_title?: string | null
+                    view_count?: number | null
+                    category_id?: string | null
+                    tags?: string[] | null
+                    metadata_updated_at?: string
+                    createdAt?: string
                     updated_at?: string
                 }
                 Relationships: []
