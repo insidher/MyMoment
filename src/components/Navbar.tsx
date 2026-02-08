@@ -10,18 +10,17 @@ import { checkIsAdmin } from '../../app/admin/feedback/actions';
 import FeedbackModal from './FeedbackModal';
 import SourceSelectorModal from './SourceSelectorModal';
 import UserAvatar from './UserAvatar';
+import SearchBar from './SearchBar';
 
 export default function Navbar() {
     const pathname = usePathname();
     const router = useRouter();
     const { user, signOut } = useAuth();
-    const [searchQuery, setSearchQuery] = useState('');
     const [showMenu, setShowMenu] = useState(false);
     const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
     const [isCreatorMode, setIsCreatorMode] = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
-    const [isSearchFocused, setIsSearchFocused] = useState(false);
     const [isSourceSelectorOpen, setIsSourceSelectorOpen] = useState(false);
 
     const menuRef = useRef<HTMLDivElement>(null);
@@ -79,17 +78,6 @@ export default function Navbar() {
 
     const isActive = (path: string) => pathname === path;
 
-    const handleSearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!searchQuery.trim()) return;
-
-        if (searchQuery.includes('.') || searchQuery.includes('http')) {
-            router.push(`/room/view?url=${encodeURIComponent(searchQuery)}`);
-        } else {
-            router.push(`/explore?q=${encodeURIComponent(searchQuery)}`);
-        }
-        setSearchQuery('');
-    };
 
     return (
         <>
@@ -106,7 +94,7 @@ export default function Navbar() {
                             {showMenu ? <X size={20} /> : <Menu size={20} />}
                         </button>
 
-                        <Link href="/explore" className="font-bold text-lg md:text-xl tracking-tight flex items-center shrink-0 -ml-1 md:ml-0">
+                        <Link href="/" className="font-bold text-lg md:text-xl tracking-tight flex items-center shrink-0 -ml-1 md:ml-0">
                             <span className="text-green-500">My</span>
                             <span className="ml-[0.1em] text-green-500">M</span>
                             <span className="relative inline-block px-[1px]">
@@ -134,33 +122,7 @@ export default function Navbar() {
 
                 {/* Center Area: Search Bar - Locked Visible */}
                 <div className={`flex-[3] md:flex-[2] transition-all duration-300 flex justify-center items-center`}>
-                    {!isCreatorMode && pathname !== '/' && (
-                        <form
-                            onSubmit={handleSearch}
-                            className={`w-full transition-all duration-300 ease-out flex items-center group max-w-2xl`}
-                        >
-                            <div className={`flex-1 flex items-center bg-white/5 border border-white/5 border-r-0 rounded-l-full px-2 md:px-4 h-9 md:h-10 transition-all duration-300 ${isSearchFocused ? 'bg-white/12 border-white/20 ring-1 ring-orange-500/20' : 'focus-within:bg-white/10'}`}>
-                                <Search size={14} className={`transition-colors duration-300 ${isSearchFocused ? 'text-white' : 'text-white/40'} mr-2 md:mr-3 shrink-0`} />
-                                <input
-                                    id="navbar-search-input"
-                                    type="text"
-                                    value={searchQuery}
-                                    onFocus={() => setIsSearchFocused(true)}
-                                    onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Paste link..."
-                                    className="bg-transparent border-none outline-none text-[13px] md:text-sm text-white placeholder-white/30 w-full"
-                                />
-                            </div>
-                            <button
-                                type="submit"
-                                disabled={!searchQuery.trim()}
-                                className={`px-3 md:px-6 h-9 md:h-10 bg-[#7c2a0c] hover:bg-[#9a3412] text-white/90 text-xs md:text-sm font-bold rounded-r-full transition-all duration-300 border-l border-white/5 disabled:opacity-50 disabled:cursor-not-allowed`}
-                            >
-                                Go
-                            </button>
-                        </form>
-                    )}
+                    {!isCreatorMode && <SearchBar />}
                 </div>
 
                 {/* Right Area: Actions */}
@@ -215,7 +177,7 @@ export default function Navbar() {
                                         <span className="text-sm">Settings</span>
                                     </button>
                                     <div className="mt-2 pt-2 border-t border-white/5 px-3 pb-1">
-                                        <span className="text-[10px] text-white/20 font-mono">v0.1.2</span>
+                                        <span className="text-white/40 text-xs">v0.1.3</span>
                                     </div>
                                 </div>
                             </div>
@@ -244,7 +206,7 @@ export default function Navbar() {
                 <div ref={menuRef} className="fixed top-16 left-0 w-72 h-[calc(100vh-4rem)] bg-[#050505]/95 backdrop-blur-2xl border-r border-white/10 z-[60] p-4 flex flex-col animate-in slide-in-from-left duration-300 shadow-2xl">
                     <div className="flex-1 space-y-1">
                         <Link
-                            href="/explore"
+                            href="/"
                             onClick={() => setShowMenu(false)}
                             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive('/explore') ? 'bg-white/10 text-white shadow-inner' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
                         >
