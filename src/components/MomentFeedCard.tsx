@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { toggleLike } from '../../app/actions/moments';
 import VisualTimeline from './VisualTimeline';
 import UserAvatar from './UserAvatar';
+import { CATEGORY_ID_TO_NAME } from '@/lib/constants';
 
 interface MomentFeedCardProps {
     moment: Moment;
@@ -63,9 +64,22 @@ export default function MomentFeedCard({ moment, onComment }: MomentFeedCardProp
                     <p className="text-white font-medium">{moment.user?.name || 'Music Lover'}</p>
                     <p className="text-white/50 text-sm">{moment.artist}</p>
                 </div>
-                <span className="text-xs text-white/40">
-                    {new Date(moment.createdAt).toLocaleDateString()}
-                </span>
+                <div className="flex flex-col items-end gap-1.5">
+                    {(() => {
+                        if (!moment.trackSource) return null;
+                        const catId = Number(moment.trackSource.category_id);
+                        const catName = CATEGORY_ID_TO_NAME[catId];
+                        if (!catName) return null;
+                        return (
+                            <div className="bg-blue-500/10 text-blue-500 text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                                {catName}
+                            </div>
+                        );
+                    })()}
+                    <span className="text-xs text-white/40">
+                        {new Date(moment.createdAt).toLocaleDateString()}
+                    </span>
+                </div>
             </Link>
 
             {/* Video Thumbnail - Clickable to Listening Room */}

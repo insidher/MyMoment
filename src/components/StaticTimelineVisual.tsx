@@ -19,7 +19,7 @@ export default function StaticTimelineVisual({ moments, totalDuration }: StaticT
                 return (
                     <div
                         key={moment.id || index}
-                        className="absolute top-0 bottom-0 bg-gradient-to-r from-orange-500 to-red-500"
+                        className="absolute top-0 bottom-0 bg-gradient-to-r from-amber-400 to-orange-500"
                         style={{
                             left: `${startPercent}%`,
                             width: `${widthPercent}%`,

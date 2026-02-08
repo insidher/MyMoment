@@ -130,27 +130,27 @@ export default function HomePage() {
             {/* Content Grid */}
             <section className="space-y-6 relative">
 
-                {/* Redesigned Active Filter Pills - Positioned to not take vertical space */}
+                {/* Redesigned Active Filter Pills - Sleek & Subtle */}
                 {(categoryFilter || sortParam) && (
                     <div className="absolute -top-1 md:-top-2 left-1/2 -translate-x-1/2 z-20 flex flex-wrap items-center justify-center gap-2">
                         {categoryFilter && (
                             <div
                                 onClick={() => clearFilter('category')}
-                                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-500/10 backdrop-blur-md border border-orange-500/20 text-orange-500 text-[10px] font-bold uppercase tracking-wider cursor-pointer hover:bg-orange-500/20 transition-all group shadow-2xl"
+                                className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 backdrop-blur-md border border-white/10 text-white/70 text-[10px] font-bold uppercase tracking-wider cursor-pointer hover:bg-white/10 hover:text-white transition-all group shadow-xl"
                             >
-                                <Check size={10} className="group-hover:hidden" />
-                                <X size={10} className="hidden group-hover:block" />
+                                <Check size={10} className="text-white/80" />
                                 <span>Category: {activeCategoryName}</span>
+                                <X size={10} className="hidden group-hover:block ml-1 opacity-50" />
                             </div>
                         )}
                         {sortParam && (
                             <div
                                 onClick={() => clearFilter('sort')}
-                                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 backdrop-blur-md border border-blue-500/20 text-blue-400 text-[10px] font-bold uppercase tracking-wider cursor-pointer hover:bg-blue-500/20 transition-all group shadow-2xl"
+                                className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 backdrop-blur-md border border-white/10 text-white/70 text-[10px] font-bold uppercase tracking-wider cursor-pointer hover:bg-white/10 hover:text-white transition-all group shadow-xl"
                             >
-                                <Check size={10} className="group-hover:hidden" />
-                                <X size={10} className="hidden group-hover:block" />
+                                <Check size={10} className="text-blue-400" />
                                 <span>Sort: {sortParam}</span>
+                                <X size={10} className="hidden group-hover:block ml-1 opacity-50" />
                             </div>
                         )}
                     </div>

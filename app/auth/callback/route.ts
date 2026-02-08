@@ -37,6 +37,6 @@ export async function GET(request: Request) {
         await supabase.auth.exchangeCodeForSession(code);
     }
 
-    // Redirect to the success page
-    return NextResponse.redirect(requestUrl.origin + '/auth/success');
+    // Redirect to the designated page (or success page if not specified)
+    return NextResponse.redirect(requestUrl.origin + next);
 }

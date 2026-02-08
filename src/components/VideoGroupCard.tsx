@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Moment } from '@/types';
-import { Heart, MessageSquare, ExternalLink, ArrowRight } from 'lucide-react';
+import { Heart, MessageSquare, ExternalLink, ArrowRight, Play } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toggleLike } from '../../app/actions/moments';
@@ -60,22 +60,25 @@ export default function VideoGroupCard({ moments }: VideoGroupCardProps) {
                     size="w-8 h-8"
                 />
                 <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                        <p className="text-white font-medium">{primaryMoment.user?.name || 'Music Lover'}</p>
-                        {primaryMoment.trackSource?.category_id && (
-                            <>
-                                <span className="text-white/20">•</span>
-                                <div className="text-[10px] font-black uppercase tracking-widest text-blue-400">
-                                    {CATEGORY_ID_TO_NAME[primaryMoment.trackSource.category_id] || `ID: ${primaryMoment.trackSource.category_id}`}
-                                </div>
-                            </>
-                        )}
-                    </div>
+                    <p className="text-white font-medium">{primaryMoment.user?.name || 'Music Lover'}</p>
                     <p className="text-white/50 text-sm">{primaryMoment.artist}</p>
                 </div>
-                <span className="text-xs text-white/40">
-                    {new Date(primaryMoment.createdAt).toLocaleDateString()}
-                </span>
+                <div className="flex flex-col items-end gap-1.5">
+                    {(() => {
+                        if (!primaryMoment.trackSource) return null;
+                        const catId = Number(primaryMoment.trackSource.category_id);
+                        const catName = CATEGORY_ID_TO_NAME[catId];
+                        if (!catName) return null;
+                        return (
+                            <div className="bg-blue-500/10 text-blue-500 text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                                {catName}
+                            </div>
+                        );
+                    })()}
+                    <span className="text-xs text-white/40">
+                        {new Date(primaryMoment.createdAt).toLocaleDateString()}
+                    </span>
+                </div>
             </Link>
 
             {/* Video Thumbnail - Clickable to Listening Room */}
@@ -116,8 +119,9 @@ export default function VideoGroupCard({ moments }: VideoGroupCardProps) {
                 {/* Moment Count Badge (Top Left) */}
                 <div className="absolute top-3 left-3 flex flex-col gap-2 z-10">
                     {moments.length > 1 && (
-                        <div className="backdrop-blur-md bg-orange-600/90 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-tight">
-                            {moments.length} Moments
+                        <div className="backdrop-blur-md bg-orange-600/90 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-tight flex items-center gap-1">
+                            <Play size={10} className="fill-current" />
+                            <span>{moments.length} Moments</span>
                         </div>
                     )}
                 </div>

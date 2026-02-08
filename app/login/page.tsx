@@ -116,7 +116,18 @@ export default function Login() {
 
                         {/* Password Field - Preserved Classes & Toggle */}
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-white/80">Password</label>
+                            <div className="flex items-center justify-between">
+                                <label className="text-sm font-medium text-white/80">Password</label>
+                                {view === 'sign-in' && (
+                                    <button
+                                        type="button"
+                                        onClick={() => router.push('/login/reset')}
+                                        className="text-xs text-white/40 hover:text-white/80 transition-colors"
+                                    >
+                                        Forgot Password?
+                                    </button>
+                                )}
+                            </div>
                             <div className="relative">
                                 <input
                                     type={showPassword ? "text" : "password"}

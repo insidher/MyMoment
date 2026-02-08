@@ -381,6 +381,7 @@ export async function getRecentMoments(options: GetMomentsOptions = {}): Promise
                 artist: m.track_sources.artist,
                 artwork: m.track_sources.artwork,
                 durationSec: m.track_sources.duration_sec,
+                category_id: m.track_sources.category_id,
             } : undefined,
         } as Moment));
 
@@ -425,7 +426,8 @@ export async function getUserMoments(userId: string, excludeSpotify = false): Pr
                     title,
                     artist,
                     artwork,
-                    duration_sec
+                    duration_sec,
+                    category_id
                 ),
                 replies: moments!parent_id(count)
                     `)
@@ -475,6 +477,7 @@ export async function getUserMoments(userId: string, excludeSpotify = false): Pr
                 artist: m.track_sources.artist,
                 artwork: m.track_sources.artwork,
                 durationSec: m.track_sources.duration_sec,
+                category_id: m.track_sources.category_id,
             } : undefined,
         } as Moment));
     } catch (error) {
@@ -517,7 +520,8 @@ export async function getLikedMoments(userId: string, excludeSpotify = false): P
                     title,
                     artist,
                     artwork,
-                    duration_sec
+                    duration_sec,
+                    category_id
                 )
             )
                 `)
@@ -568,6 +572,7 @@ export async function getLikedMoments(userId: string, excludeSpotify = false): P
                     artist: m.track_sources.artist,
                     artwork: m.track_sources.artwork,
                     durationSec: m.track_sources.duration_sec,
+                    category_id: m.track_sources.category_id,
                 } : undefined,
             } as Moment;
         });
@@ -617,7 +622,8 @@ export async function getTrackMoments(resourceId: string): Promise<Moment[]> {
                     title,
                     artist,
                     artwork,
-                    duration_sec
+                    duration_sec,
+                    category_id
                 ),
                     replies: moments!parent_id(
                         id,
@@ -688,6 +694,7 @@ export async function getTrackMoments(resourceId: string): Promise<Moment[]> {
                 artist: m.track_sources.artist,
                 artwork: m.track_sources.artwork,
                 durationSec: m.track_sources.duration_sec,
+                category_id: m.track_sources.category_id,
             } : undefined,
             replies: m.replies ? m.replies.map((r: any) => ({
                 id: r.id,
@@ -802,6 +809,37 @@ export async function fetchYoutubeMetadata(videoId: string) {
         };
     } catch (error) {
         console.error('[fetchYoutubeMetadata] Failed to fetch metadata:', error);
+        return null;
+    }
+}
+
+export async function getProfileData(userId: string) {
+    try {
+        const supabase = await createClient();
+
+        // Fetch profile info and moment count
+        const [profileRes, countRes] = await Promise.all([
+            supabase
+                .from('profiles')
+                .select('name, image')
+                .eq('id', userId)
+                .single(),
+            supabase
+                .from('moments')
+                .select('id', { count: 'exact', head: true })
+                .eq('user_id', userId)
+                .is('parent_id', null)
+        ]);
+
+        if (profileRes.error) throw profileRes.error;
+
+        return {
+            name: profileRes.data.name || 'Music Lover',
+            image: profileRes.data.image,
+            momentCount: countRes.count || 0
+        };
+    } catch (error) {
+        console.error('Failed to fetch profile data:', error);
         return null;
     }
 }

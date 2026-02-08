@@ -94,15 +94,13 @@ export default function Navbar() {
                             {showMenu ? <X size={20} /> : <Menu size={20} />}
                         </button>
 
-                        <Link href="/" className="font-bold text-lg md:text-xl tracking-tight flex items-center shrink-0 -ml-1 md:ml-0">
-                            <span className="text-green-500">My</span>
-                            <span className="ml-[0.1em] text-green-500">M</span>
-                            <span className="relative inline-block px-[1px]">
-                                <span className="absolute inset-0 bg-orange-600/60 rounded ring-1 ring-inset ring-orange-400/80" />
-                                <span className="relative z-10 text-black hidden sm:inline">ome</span>
-                                <span className="relative z-10 text-black sm:hidden">o</span>
+                        <Link href="/" className="font-bold text-lg md:text-xl tracking-tight flex items-center shrink-0 -ml-1 md:ml-0 group">
+                            <span className="text-white/50 transition-colors group-hover:text-white/70">my</span>
+                            <span className="text-white">moment</span>
+                            <span className="flex items-center">
+                                <span className="text-red-500">.</span>
+                                <span className="text-white/50 transition-colors group-hover:text-white/70">io</span>
                             </span>
-                            <span className="text-green-500 hidden sm:inline">nt</span>
                         </Link>
 
                         {isCreatorMode && (
@@ -153,7 +151,7 @@ export default function Navbar() {
                                 </div>
                                 <div className="p-2">
                                     <Link
-                                        href="/profile"
+                                        href={`/profile/${user.id}`}
                                         onClick={() => setShowProfileMenu(false)}
                                         className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors text-white/80 hover:text-white"
                                     >
@@ -177,7 +175,7 @@ export default function Navbar() {
                                         <span className="text-sm">Settings</span>
                                     </button>
                                     <div className="mt-2 pt-2 border-t border-white/5 px-3 pb-1">
-                                        <span className="text-white/40 text-xs">v0.1.8</span>
+                                        <span className="text-white/40 text-xs">v0.1.15</span>
                                     </div>
                                 </div>
                             </div>

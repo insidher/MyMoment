@@ -93,7 +93,7 @@ export default function VisualTimeline({
 
                 {/* Active Range */}
                 <div
-                    className="absolute h-full bg-gradient-to-r from-orange-500 to-orange-400 rounded-full shadow-[0_0_8px_rgba(249,115,22,0.5)]"
+                    className="absolute h-full bg-gradient-to-r from-amber-400 to-orange-500 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.3)]"
                     style={{
                         left: `${activeStartPercent}%`,
                         width: `${activeWidthPercent}%`,

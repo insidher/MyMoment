@@ -34,23 +34,7 @@ export async function GET(request: Request) {
         const searchTerm = `%${query.trim()}%`;
         const lowerQuery = query.toLowerCase().trim();
 
-        // 1. Static Category Match
-        let categoryMatch: SearchResult | null = null;
-        for (const [name, id] of Object.entries(CATEGORY_MAP)) {
-            if (name.includes(lowerQuery)) {
-                categoryMatch = {
-                    type: 'category',
-                    id: id.toString(),
-                    title: name.charAt(0).toUpperCase() + name.slice(1),
-                    subtitle: 'Category',
-                    thumbnail: null,
-                    url: `/?category=${id}`
-                };
-                break;
-            }
-        }
-
-        // 2. Parallel Queries (Removed Direct Video Search D)
+        // 1. Parallel Queries (Removed Direct Video Search D)
         const [usersResult, momentsByNoteResult, momentsBySourceResult] = await Promise.all([
             // Query A: Search users by name
             supabase
@@ -86,7 +70,6 @@ export async function GET(request: Request) {
         const results: SearchResult[] = [];
         const momentMap = new Map<string, any>();
 
-        if (categoryMatch) results.push(categoryMatch);
 
         // Process Moments (Deduplicated)
         [...(momentsByNoteResult.data || []), ...(momentsBySourceResult.data || [])].forEach((m: any) => {
