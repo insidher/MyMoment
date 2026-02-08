@@ -60,7 +60,16 @@ export default function VideoGroupCard({ moments }: VideoGroupCardProps) {
                     size="w-8 h-8"
                 />
                 <div className="flex-1">
-                    <p className="text-white font-medium">{primaryMoment.user?.name || 'Music Lover'}</p>
+                    <div className="flex items-center gap-2">
+                        <p className="text-white font-medium">{primaryMoment.user?.name || 'Music Lover'}</p>
+                        <span className="text-white/20">•</span>
+                        <div className={`text-[10px] font-black uppercase tracking-widest ${primaryMoment.trackSource?.category_id ? 'text-blue-400' : 'text-red-500/60'}`}>
+                            {primaryMoment.trackSource?.category_id
+                                ? (CATEGORY_name_BY_ID[primaryMoment.trackSource.category_id] || `ID: ${primaryMoment.trackSource.category_id}`)
+                                : 'ERROR: No Cat'
+                            }
+                        </div>
+                    </div>
                     <p className="text-white/50 text-sm">{primaryMoment.artist}</p>
                 </div>
                 <span className="text-xs text-white/40">
@@ -88,7 +97,7 @@ export default function VideoGroupCard({ moments }: VideoGroupCardProps) {
 
                 {/* Source Traffic Badge (Top Right) */}
                 {primaryMoment.trackSource && (
-                    <div className="absolute top-3 right-3 backdrop-blur-md bg-black/60 text-white text-xs font-medium px-3 py-1.5 rounded-full flex items-center gap-1.5 z-10">
+                    <div className="absolute top-3 right-3 backdrop-blur-md bg-black/60 text-white text-xs font-medium px-3 py-1.5 rounded-full flex items-center gap-1.5 z-10 border border-white/5">
                         {primaryMoment.trackSource.service === 'youtube' ? (
                             <>
                                 <div className="w-2 h-2 bg-red-500 rounded-full" />
@@ -108,11 +117,6 @@ export default function VideoGroupCard({ moments }: VideoGroupCardProps) {
                     {moments.length > 1 && (
                         <div className="backdrop-blur-md bg-orange-600/90 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-tight">
                             {moments.length} Moments
-                        </div>
-                    )}
-                    {primaryMoment.trackSource?.category_id && (
-                        <div className="backdrop-blur-md bg-blue-600/80 text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest border border-white/10">
-                            {CATEGORY_name_BY_ID[primaryMoment.trackSource.category_id] || 'Other'}
                         </div>
                     )}
                 </div>

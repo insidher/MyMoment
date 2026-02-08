@@ -111,7 +111,8 @@ export default function HomePage() {
     // Resolve category name for display
     let activeCategoryName = '';
     if (categoryFilter) {
-        activeCategoryName = categoryFilter.charAt(0).toUpperCase() + categoryFilter.slice(1);
+        const catId = parseInt(categoryFilter);
+        activeCategoryName = CATEGORY_name_BY_ID[catId] || categoryFilter.charAt(0).toUpperCase() + categoryFilter.slice(1);
     }
 
     // Helper to clear specific filter
@@ -125,29 +126,29 @@ export default function HomePage() {
         <div className="flex flex-col gap-4 md:gap-6 min-h-[calc(100vh-80px)] p-4 md:p-6 pb-32 relative">
 
             {/* Content Grid */}
-            <section className="space-y-6">
+            <section className="space-y-6 relative">
 
-                {/* Redesigned Active Filter Pills */}
+                {/* Redesigned Active Filter Pills - Positioned to not take vertical space */}
                 {(categoryFilter || sortParam) && (
-                    <div className="flex flex-wrap items-center justify-center gap-2 mb-2">
+                    <div className="absolute -top-1 md:-top-2 left-1/2 -translate-x-1/2 z-20 flex flex-wrap items-center justify-center gap-2">
                         {categoryFilter && (
                             <div
                                 onClick={() => clearFilter('category')}
-                                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-500 text-xs font-medium cursor-pointer hover:bg-orange-500/20 transition-all group"
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-500/10 backdrop-blur-md border border-orange-500/20 text-orange-500 text-[10px] font-bold uppercase tracking-wider cursor-pointer hover:bg-orange-500/20 transition-all group shadow-2xl"
                             >
-                                <Check size={12} className="group-hover:hidden" />
-                                <X size={12} className="hidden group-hover:block" />
-                                <span>Category: <b>{activeCategoryName}</b></span>
+                                <Check size={10} className="group-hover:hidden" />
+                                <X size={10} className="hidden group-hover:block" />
+                                <span>Category: {activeCategoryName}</span>
                             </div>
                         )}
                         {sortParam && (
                             <div
                                 onClick={() => clearFilter('sort')}
-                                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-500 text-xs font-medium cursor-pointer hover:bg-orange-500/20 transition-all group"
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 backdrop-blur-md border border-blue-500/20 text-blue-400 text-[10px] font-bold uppercase tracking-wider cursor-pointer hover:bg-blue-500/20 transition-all group shadow-2xl"
                             >
-                                <Check size={12} className="group-hover:hidden" />
-                                <X size={12} className="hidden group-hover:block" />
-                                <span>Sort: <b>{sortParam.charAt(0).toUpperCase() + sortParam.slice(1)}</b></span>
+                                <Check size={10} className="group-hover:hidden" />
+                                <X size={10} className="hidden group-hover:block" />
+                                <span>Sort: {sortParam}</span>
                             </div>
                         )}
                     </div>
