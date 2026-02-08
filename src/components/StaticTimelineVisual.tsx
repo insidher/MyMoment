@@ -24,7 +24,7 @@ export default function StaticTimelineVisual({ moments, totalDuration }: StaticT
                             left: `${startPercent}%`,
                             width: `${widthPercent}%`,
                         }}
-                        title={`${moment.startSec}s - ${moment.endSec}s`}
+                        title={`${moment.startSec}s - ${moment.endSec}s${moment.note ? ` | ${moment.note}` : ''}`}
                     />
                 );
             })}

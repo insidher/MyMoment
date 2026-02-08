@@ -8,7 +8,6 @@ import SongCard from '@/components/SongCard';
 import MomentCard from '@/components/MomentCard';
 import MomentFeedCard from '@/components/MomentFeedCard';
 import VideoGroupCard from '@/components/VideoGroupCard';
-import ValueProp from '@/components/ValueProp';
 import ArtistCard from '@/components/ArtistCard';
 import { getGroupedSongs, getUserArtistStats, getArtistSongs, getRecentMoments } from './actions';
 import { useAuth } from '@/context/AuthContext';
@@ -98,8 +97,6 @@ export default function HomePage() {
 
     return (
         <div className="flex flex-col gap-4 md:gap-6 min-h-[calc(100vh-80px)] p-4 md:p-6 pb-32 relative">
-            {/* Value Prop - Only show on home feed */}
-            {!artistFilter && <ValueProp />}
 
             {/* Content Grid */}
             <section className="space-y-6">
