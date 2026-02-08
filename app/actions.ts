@@ -207,7 +207,23 @@ export async function getArtistSongs(userId: string, artistName: string, exclude
     }
 }
 
-export async function getRecentMoments(limit = 50, excludeSpotify = false): Promise<Moment[]> {
+import { CATEGORY_MAP } from '@/lib/constants';
+
+interface GetMomentsOptions {
+    limit?: number;
+    excludeSpotify?: boolean;
+    category?: string;
+    sort?: 'newest' | 'oldest' | 'shortest' | 'longest';
+}
+
+export async function getRecentMoments(options: GetMomentsOptions = {}): Promise<Moment[]> {
+    const {
+        limit = 50,
+        excludeSpotify = false,
+        category,
+        sort = 'newest'
+    } = options;
+
     try {
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
@@ -248,6 +264,7 @@ export async function getRecentMoments(limit = 50, excludeSpotify = false): Prom
                     artist,
                     artwork,
                     duration_sec,
+                    category_id,
                     moments (
                         id,
                         start_time,
@@ -262,9 +279,47 @@ export async function getRecentMoments(limit = 50, excludeSpotify = false): Prom
             query = query.neq('platform', 'spotify');
         }
 
+        // Apply Category Filter
+        if (category) {
+            const categoryId = CATEGORY_MAP[category.toLowerCase()];
+            if (categoryId) {
+                // Must filter on the joined table column
+                // Note: filtering on joined tables in Supabase requires the join to be !inner for the filter to act as a WHERE clause on the result set effectively regarding that relation
+                // But here track_sources is already joined.
+                // Syntax for filtering nested: .eq('track_sources.category_id', categoryId)
+                // However, for this to filter the PARENT rows (moments), we generally need !inner on track_sources.
+                // The current query uses !track_source_id which implies a join. 
+                // Let's use the filter syntax:
+                query = query.filter('track_sources.category_id', 'eq', categoryId);
+                // Also ensure the join is inner to filter out moments that don't match
+                // We can't change the join type dynamically easily in the select string without rebuilding it.
+                // BUT, since every moment MUST have a track_source_id (FK), an inner join is effectively implied if we enforce existence.
+                // Actually, let's just use the .filter() and see. If it fails to filter parent rows, we might need a different approach.
+                // A safer way in Supabase JS for "Moments where TrackSource has Category X" is often:
+                // .not('track_sources', 'is', null) // redundant if FK is not null
+                // .filter... requires the joined resource to be named in the select path.
+            }
+        }
+
+        // Apply Sorting
+        switch (sort) {
+            case 'oldest':
+                query = query.order('created_at', { ascending: true });
+                break;
+            case 'shortest':
+                query = query.order('moment_duration_sec', { ascending: true });
+                break;
+            case 'longest':
+                query = query.order('moment_duration_sec', { ascending: false });
+                break;
+            case 'newest':
+            default:
+                query = query.order('created_at', { ascending: false });
+                break;
+        }
+
         const { data: moments, error } = await query
             .is('parent_id', null) // Stacked Feed: Only Top-Level
-            .order('created_at', { ascending: false })
             .limit(limit);
 
         if (error) {
@@ -272,15 +327,23 @@ export async function getRecentMoments(limit = 50, excludeSpotify = false): Prom
             return [];
         }
 
-        console.log('DEBUG: Fetched moments:', moments?.length);
-        if (moments && moments.length > 0) {
-            console.log('DEBUG: First moment raw:', JSON.stringify(moments[0], null, 2));
-        }
-
         if (!moments) return [];
 
+        // If filtering by category, we need to ensure we strictly filter out moments where the filter didn't apply match
+        // Supabase .filter on a joined table might return null for the joined relation if it doesn't match, but still return the moment.
+        // We need to filter in memory if we can't force inner join dynamically.
+        // Or better: Use !inner in the select string if category is present.
+        // To keep it simple for now, let's filter in memory if category was requested.
+        let filteredMoments = moments;
+        if (category) {
+            const categoryId = CATEGORY_MAP[category.toLowerCase()];
+            if (categoryId) {
+                filteredMoments = moments.filter((m: any) => m.track_sources?.category_id === categoryId);
+            }
+        }
+
         // Transform to camelCase format
-        return moments.map((m: any) => ({
+        return filteredMoments.map((m: any) => ({
             id: m.id,
             service: m.platform as any,
             sourceUrl: m.resource_id,

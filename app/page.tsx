@@ -31,12 +31,19 @@ function groupMomentsByVideo(moments: Moment[]): Map<string, Moment[]> {
     return grouped;
 }
 
+import { CATEGORY_name_BY_ID } from '@/lib/constants';
+import { X } from 'lucide-react';
+
 export default function HomePage() {
     const { user } = useAuth();
     const { showSpotify, isLoading: filterLoading } = useFilter();
     const searchParams = useSearchParams();
     const router = useRouter();
+
+    // Get filter params
     const artistFilter = searchParams.get('artist');
+    const categoryFilter = searchParams.get('category');
+    const sortParam = searchParams.get('sort') as 'newest' | 'oldest' | 'shortest' | 'longest' | null;
 
     const [songs, setSongs] = useState<SongGroup[]>([]);
     const [moments, setMoments] = useState<Moment[]>([]);
@@ -47,7 +54,7 @@ export default function HomePage() {
         if (!filterLoading) {
             fetchData();
         }
-    }, [artistFilter, user, showSpotify, filterLoading]);
+    }, [artistFilter, categoryFilter, sortParam, user, showSpotify, filterLoading]);
 
     const fetchData = async () => {
         setLoading(true);
@@ -56,7 +63,13 @@ export default function HomePage() {
                 const songsData = await getArtistSongs(user?.id || '', artistFilter, !showSpotify);
                 setSongs(songsData);
             } else {
-                const momentsData = await getRecentMoments(50, !showSpotify);
+                // Pass category and sort options
+                const momentsData = await getRecentMoments({
+                    limit: 50,
+                    excludeSpotify: !showSpotify,
+                    category: categoryFilter || undefined,
+                    sort: sortParam || 'newest'
+                });
                 setMoments(momentsData);
             }
 
@@ -77,7 +90,7 @@ export default function HomePage() {
     }, [moments]);
 
     // Show skeleton loading state while filter is initializing
-    if (filterLoading || loading) {
+    if (filterLoading || (loading && !moments.length && !songs.length)) {
         return (
             <main className="min-h-screen p-8 pb-24">
                 <div className="max-w-7xl mx-auto space-y-12">
@@ -95,11 +108,34 @@ export default function HomePage() {
         );
     }
 
+    // Resolve category name for display
+    let activeCategoryName = '';
+    if (categoryFilter) {
+        // Simple capitalization if not found in map name (it usually is the key)
+        activeCategoryName = categoryFilter.charAt(0).toUpperCase() + categoryFilter.slice(1);
+    }
+
     return (
         <div className="flex flex-col gap-4 md:gap-6 min-h-[calc(100vh-80px)] p-4 md:p-6 pb-32 relative">
 
             {/* Content Grid */}
             <section className="space-y-6">
+
+                {/* Active Filter Chip */}
+                {categoryFilter && (
+                    <div className="flex justify-center mb-4">
+                        <div className="inline-flex items-center gap-2 bg-blue-500/20 text-blue-400 px-4 py-2 rounded-full text-sm font-medium border border-blue-500/30">
+                            <span>Filter Active: <b>{activeCategoryName}</b></span>
+                            <Link
+                                href="/"
+                                className="ml-1 p-0.5 hover:bg-blue-500/20 rounded-full transition-colors"
+                                aria-label="Clear filter"
+                            >
+                                <X size={14} />
+                            </Link>
+                        </div>
+                    </div>
+                )}
 
                 {artistFilter ? (
                     // Artist View: Show grouped SongCards
@@ -120,7 +156,7 @@ export default function HomePage() {
                         <div className="w-full max-w-2xl space-y-4">
                             {groupedVideos.size === 0 ? (
                                 <div className="text-center py-12 text-white/40">
-                                    <p>No moments found.</p>
+                                    <p>No moments found{categoryFilter ? ` for ${activeCategoryName}` : ''}.</p>
                                     <Link href="/about" className="text-purple-400 hover:text-purple-300 mt-2 inline-block">
                                         Learn how to capture your first moment!
                                     </Link>

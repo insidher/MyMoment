@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Search } from 'lucide-react';
+import { Search, Music, Film, User as UserIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import UserAvatar from './UserAvatar';
 
@@ -44,15 +44,13 @@ export default function SearchBar({ placeholder = 'Search or paste link...' }: S
 
     // Debounced search function
     useEffect(() => {
-        if (mode === 'text' && query.trim().length > 0) {
+        if (mode === 'text' && query.trim().length >= 2) {
             setIsSearching(true);
 
-            // Clear previous timer
             if (debounceTimer.current) {
                 clearTimeout(debounceTimer.current);
             }
 
-            // Set new timer
             debounceTimer.current = setTimeout(async () => {
                 try {
                     const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
@@ -97,7 +95,6 @@ export default function SearchBar({ placeholder = 'Search or paste link...' }: S
         if (!query.trim()) return;
 
         if (mode === 'url') {
-            // URL mode: Navigate to room
             if (query.includes('.') || query.includes('http')) {
                 router.push(`/room/view?url=${encodeURIComponent(query)}`);
             } else {
@@ -106,7 +103,6 @@ export default function SearchBar({ placeholder = 'Search or paste link...' }: S
             setQuery('');
             setShowDropdown(false);
         }
-        // Text mode: dropdown handles navigation, or could trigger a search page
     };
 
     const handleResultClick = (result: SearchResult) => {
@@ -127,19 +123,27 @@ export default function SearchBar({ placeholder = 'Search or paste link...' }: S
             );
         }
 
+        if (result.type === 'moment') {
+            return (
+                <div className="w-10 h-10 shrink-0 rounded bg-orange-500/20 flex items-center justify-center text-orange-500 font-bold text-sm">
+                    M
+                </div>
+            );
+        }
+
         if (result.thumbnail) {
             return (
                 <img
                     src={result.thumbnail}
                     alt={result.title}
-                    className="w-10 h-10 rounded object-cover"
+                    className="w-10 h-10 rounded object-cover shrink-0 bg-white/5"
                 />
             );
         }
 
         return (
-            <div className="w-10 h-10 rounded bg-white/5 flex items-center justify-center">
-                <Search size={16} className="text-white/40" />
+            <div className="w-10 h-10 shrink-0 rounded bg-white/5 flex items-center justify-center">
+                {result.type === 'video' ? <Film size={18} className="text-white/40" /> : <Music size={18} className="text-white/40" />}
             </div>
         );
     };
