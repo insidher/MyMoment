@@ -48,8 +48,8 @@ export async function GET(request: Request) {
                 .select(`
                     id,
                     note,
-                    start_sec,
-                    end_sec,
+                    start_time,
+                    end_time,
                     source_url,
                     trackSource:track_sources(
                         id,
@@ -75,8 +75,8 @@ export async function GET(request: Request) {
                 .select(`
                     id,
                     note,
-                    start_sec,
-                    end_sec,
+                    start_time,
+                    end_time,
                     source_url,
                     trackSource:track_sources!inner(
                         id,
@@ -149,7 +149,7 @@ export async function GET(request: Request) {
                 title: moment.trackSource?.title || 'Untitled',
                 subtitle: moment.note || '',
                 thumbnail: moment.trackSource?.artwork || null,
-                url: `/room/view?url=${encodeURIComponent(moment.source_url)}&start=${moment.start_sec}&end=${moment.end_sec}`,
+                url: `/room/view?url=${encodeURIComponent(moment.source_url)}&start=${moment.start_time}&end=${moment.end_time}`,
                 user: moment.user,
                 service: moment.trackSource?.service
             });
