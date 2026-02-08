@@ -8,6 +8,7 @@ export interface TrackSource {
   artist?: string;
   artwork?: string;
   durationSec?: number;
+  category_id?: number;
   canonicalTrackId?: string;
   moments?: Array<{ id: string; startSec: number; endSec: number }>; // For ghost clusters
 }

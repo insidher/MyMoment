@@ -9,6 +9,7 @@ import { toggleLike } from '../../app/actions/moments';
 import VisualTimeline from './VisualTimeline';
 import StaticTimelineVisual from './StaticTimelineVisual';
 import UserAvatar from './UserAvatar';
+import { CATEGORY_name_BY_ID } from '@/lib/constants';
 
 interface VideoGroupCardProps {
     moments: Moment[];
@@ -103,11 +104,18 @@ export default function VideoGroupCard({ moments }: VideoGroupCardProps) {
                 )}
 
                 {/* Moment Count Badge (Top Left) */}
-                {moments.length > 1 && (
-                    <div className="absolute top-3 left-3 backdrop-blur-md bg-orange-600/90 text-white text-xs font-bold px-3 py-1.5 rounded-full z-10">
-                        {moments.length} Moments
-                    </div>
-                )}
+                <div className="absolute top-3 left-3 flex flex-col gap-2 z-10">
+                    {moments.length > 1 && (
+                        <div className="backdrop-blur-md bg-orange-600/90 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-tight">
+                            {moments.length} Moments
+                        </div>
+                    )}
+                    {primaryMoment.trackSource?.category_id && (
+                        <div className="backdrop-blur-md bg-blue-600/80 text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest border border-white/10">
+                            {CATEGORY_name_BY_ID[primaryMoment.trackSource.category_id] || 'Other'}
+                        </div>
+                    )}
+                </div>
             </Link>
 
             {/* Visual Timeline - Use StaticTimelineVisual for grouped moments */}

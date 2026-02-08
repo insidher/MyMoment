@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Play, TrendingUp, Music, Heart, User, ArrowLeft, Clock } from 'lucide-react';
+import { Play, TrendingUp, Music, Heart, User, ArrowLeft, Clock, Check } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import SongCard from '@/components/SongCard';
@@ -111,9 +111,15 @@ export default function HomePage() {
     // Resolve category name for display
     let activeCategoryName = '';
     if (categoryFilter) {
-        // Simple capitalization if not found in map name (it usually is the key)
         activeCategoryName = categoryFilter.charAt(0).toUpperCase() + categoryFilter.slice(1);
     }
+
+    // Helper to clear specific filter
+    const clearFilter = (type: 'category' | 'sort') => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.delete(type);
+        router.push(`/?${params.toString()}`);
+    };
 
     return (
         <div className="flex flex-col gap-4 md:gap-6 min-h-[calc(100vh-80px)] p-4 md:p-6 pb-32 relative">
@@ -121,19 +127,29 @@ export default function HomePage() {
             {/* Content Grid */}
             <section className="space-y-6">
 
-                {/* Active Filter Chip */}
-                {categoryFilter && (
-                    <div className="flex justify-center mb-4">
-                        <div className="inline-flex items-center gap-2 bg-blue-500/20 text-blue-400 px-4 py-2 rounded-full text-sm font-medium border border-blue-500/30">
-                            <span>Filter Active: <b>{activeCategoryName}</b></span>
-                            <Link
-                                href="/"
-                                className="ml-1 p-0.5 hover:bg-blue-500/20 rounded-full transition-colors"
-                                aria-label="Clear filter"
+                {/* Redesigned Active Filter Pills */}
+                {(categoryFilter || sortParam) && (
+                    <div className="flex flex-wrap items-center justify-center gap-2 mb-2">
+                        {categoryFilter && (
+                            <div
+                                onClick={() => clearFilter('category')}
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-500 text-xs font-medium cursor-pointer hover:bg-orange-500/20 transition-all group"
                             >
-                                <X size={14} />
-                            </Link>
-                        </div>
+                                <Check size={12} className="group-hover:hidden" />
+                                <X size={12} className="hidden group-hover:block" />
+                                <span>Category: <b>{activeCategoryName}</b></span>
+                            </div>
+                        )}
+                        {sortParam && (
+                            <div
+                                onClick={() => clearFilter('sort')}
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-500 text-xs font-medium cursor-pointer hover:bg-orange-500/20 transition-all group"
+                            >
+                                <Check size={12} className="group-hover:hidden" />
+                                <X size={12} className="hidden group-hover:block" />
+                                <span>Sort: <b>{sortParam.charAt(0).toUpperCase() + sortParam.slice(1)}</b></span>
+                            </div>
+                        )}
                     </div>
                 )}
 

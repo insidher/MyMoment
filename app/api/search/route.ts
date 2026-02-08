@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { CATEGORY_MAP } from '@/lib/constants';
 
+// VERSION: 0.1.6
 interface SearchResult {
     type: 'moment' | 'video' | 'user' | 'category';
     id: string;
@@ -49,14 +50,16 @@ export async function GET(request: Request) {
             }
         }
 
-        // 2. Parallel Queries
-        const [usersResult, momentsByNoteResult, momentsBySourceResult, directSourcesResult] = await Promise.all([
+        // 2. Parallel Queries (Removed Direct Video Search D)
+        const [usersResult, momentsByNoteResult, momentsBySourceResult] = await Promise.all([
+            // Query A: Search users by name
             supabase
                 .from('profiles')
                 .select('id, name, image')
                 .ilike('name', searchTerm)
                 .limit(4),
 
+            // Query B: Search moments by note content
             supabase
                 .from('moments')
                 .select(`
@@ -68,6 +71,7 @@ export async function GET(request: Request) {
                 .not('note', 'is', null)
                 .limit(10),
 
+            // Query C: Search moments by track source metadata
             supabase
                 .from('moments')
                 .select(`
@@ -76,25 +80,15 @@ export async function GET(request: Request) {
                     user:profiles(id, name, image)
                 `)
                 .or(`title.ilike.${searchTerm},artist.ilike.${searchTerm}`, { foreignTable: 'track_sources' })
-                .limit(10),
-
-            supabase
-                .from('track_sources')
-                .select(`
-                    id, title, artist, artwork, service, source_url,
-                    moments!inner(id, start_time, end_time)
-                `)
-                .or(`title.ilike.${searchTerm},artist.ilike.${searchTerm}`)
-                .limit(4)
+                .limit(10)
         ]);
 
         const results: SearchResult[] = [];
         const momentMap = new Map<string, any>();
-        const sourceMap = new Map<string, any>();
 
         if (categoryMatch) results.push(categoryMatch);
 
-        // Process Moments
+        // Process Moments (Deduplicated)
         [...(momentsByNoteResult.data || []), ...(momentsBySourceResult.data || [])].forEach((m: any) => {
             if (!momentMap.has(m.id)) {
                 momentMap.set(m.id, m);
@@ -108,22 +102,6 @@ export async function GET(request: Request) {
                     url: `/room/view?url=${encodeURIComponent(m.resource_id)}&start=${m.start_time}&end=${m.end_time}`,
                     user: m.user,
                     service: m.trackSource?.service
-                });
-            }
-        });
-
-        // Process Sources
-        (directSourcesResult.data || []).forEach((s: any) => {
-            if (!sourceMap.has(s.id) && s.moments?.[0]) {
-                sourceMap.set(s.id, s);
-                results.push({
-                    type: 'video',
-                    id: s.id,
-                    title: s.title || 'Untitled Video',
-                    subtitle: s.artist || 'Unknown Artist',
-                    thumbnail: s.artwork || null,
-                    url: `/room/listen?videoId=${s.source_url}`,
-                    service: s.service
                 });
             }
         });
