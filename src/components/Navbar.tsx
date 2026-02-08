@@ -134,7 +134,7 @@ export default function Navbar() {
 
                 {/* Center Area: Search Bar - Locked Visible */}
                 <div className={`flex-[3] md:flex-[2] transition-all duration-300 flex justify-center items-center`}>
-                    {!isCreatorMode && pathname !== '/' && (
+                    {!isCreatorMode && (
                         <form
                             onSubmit={handleSearch}
                             className={`w-full transition-all duration-300 ease-out flex items-center group max-w-2xl`}
