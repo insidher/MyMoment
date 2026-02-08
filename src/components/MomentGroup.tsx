@@ -194,7 +194,7 @@ export default function MomentGroup({
                                     }
                                 }}
                                 placeholder="Reply to this moment..."
-                                className="flex-1 bg-transparent border-none outline-none text-sm text-white placeholder:text-white/30 min-w-0"
+                                className="flex-1 bg-transparent border-none outline-none text-base text-white placeholder:text-white/30 min-w-0 touch-manipulation"
                             />
 
                             <div className="flex items-center gap-1">

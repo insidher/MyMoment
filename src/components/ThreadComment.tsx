@@ -128,7 +128,7 @@ export default function ThreadComment({ comment, currentUserId, onReply, onRefre
                         <div className="flex items-center justify-between mb-1">
                             <span className="font-semibold text-sm">{comment.user?.name || 'Unknown User'}</span>
                             <span className="text-xs text-white/40">
-                                {getRelativeTime(comment.createdAt)} <span className="text-purple-400 font-mono" title="Debug ID">{comment.id.slice(0, 8)}</span>
+                                {getRelativeTime(comment.createdAt)}
                             </span>
                         </div>
                         <p className="text-sm text-white/80 break-words">{comment.note || 'No comment'}</p>
@@ -171,7 +171,7 @@ export default function ThreadComment({ comment, currentUserId, onReply, onRefre
                                 }
                             }}
                             placeholder={`Reply to ${comment.user?.name}...`}
-                            className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-white/30 resize-none min-h-[60px]"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-base text-white focus:outline-none focus:border-white/30 resize-none min-h-[60px] touch-manipulation"
                         />
                         <div className="flex justify-end gap-2">
                             <button
