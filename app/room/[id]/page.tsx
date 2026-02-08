@@ -817,7 +817,7 @@ export default function Room({ params }: { params: { id: string } }) {
             console.error('Failed to save', error);
             const message = error instanceof Error ? error.message : 'Failed to save moment';
             setError(message);
-            toast.error(message);
+            toast.error(message, { duration: 5000 });
         } finally {
             setIsSaving(false);
         }
