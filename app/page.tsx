@@ -123,7 +123,7 @@ export default function HomePage() {
     };
 
     return (
-        <div className="flex flex-col gap-4 md:gap-6 min-h-[calc(100vh-80px)] p-4 md:p-6 pb-32 relative">
+        <div className="flex flex-col gap-4 md:gap-6 min-h-[calc(100vh-80px)] p-4 pt-0 md:p-6 md:pt-0 pb-32 relative">
 
             {/* Content Grid */}
             <section className="space-y-6 relative">
