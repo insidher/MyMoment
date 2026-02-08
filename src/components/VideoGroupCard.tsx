@@ -9,7 +9,7 @@ import { toggleLike } from '../../app/actions/moments';
 import VisualTimeline from './VisualTimeline';
 import StaticTimelineVisual from './StaticTimelineVisual';
 import UserAvatar from './UserAvatar';
-import { CATEGORY_name_BY_ID } from '@/lib/constants';
+import { CATEGORY_ID_TO_NAME } from '@/lib/constants';
 
 interface VideoGroupCardProps {
     moments: Moment[];
@@ -62,13 +62,14 @@ export default function VideoGroupCard({ moments }: VideoGroupCardProps) {
                 <div className="flex-1">
                     <div className="flex items-center gap-2">
                         <p className="text-white font-medium">{primaryMoment.user?.name || 'Music Lover'}</p>
-                        <span className="text-white/20">•</span>
-                        <div className={`text-[10px] font-black uppercase tracking-widest ${primaryMoment.trackSource?.category_id ? 'text-blue-400' : 'text-red-500/60'}`}>
-                            {primaryMoment.trackSource?.category_id
-                                ? (CATEGORY_name_BY_ID[primaryMoment.trackSource.category_id] || `ID: ${primaryMoment.trackSource.category_id}`)
-                                : 'ERROR: No Cat'
-                            }
-                        </div>
+                        {primaryMoment.trackSource?.category_id && (
+                            <>
+                                <span className="text-white/20">•</span>
+                                <div className="text-[10px] font-black uppercase tracking-widest text-blue-400">
+                                    {CATEGORY_ID_TO_NAME[primaryMoment.trackSource.category_id] || `ID: ${primaryMoment.trackSource.category_id}`}
+                                </div>
+                            </>
+                        )}
                     </div>
                     <p className="text-white/50 text-sm">{primaryMoment.artist}</p>
                 </div>

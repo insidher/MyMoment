@@ -11,8 +11,8 @@ export const CATEGORY_MAP: Record<string, number> = {
     'entertainment': 9
 };
 
-// Reverse mapping for display
-export const CATEGORY_name_BY_ID: Record<number, string> =
+// Reverse mapping for display (ID -> Name)
+export const CATEGORY_ID_TO_NAME: Record<number, string> =
     Object.entries(CATEGORY_MAP).reduce((acc, [name, id]) => {
         acc[id] = name;
         return acc;

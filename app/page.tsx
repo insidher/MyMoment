@@ -31,7 +31,7 @@ function groupMomentsByVideo(moments: Moment[]): Map<string, Moment[]> {
     return grouped;
 }
 
-import { CATEGORY_name_BY_ID } from '@/lib/constants';
+import { CATEGORY_ID_TO_NAME } from '@/lib/constants';
 import { X } from 'lucide-react';
 
 export default function HomePage() {
@@ -112,7 +112,9 @@ export default function HomePage() {
     let activeCategoryName = '';
     if (categoryFilter) {
         const catId = parseInt(categoryFilter);
-        activeCategoryName = CATEGORY_name_BY_ID[catId] || categoryFilter.charAt(0).toUpperCase() + categoryFilter.slice(1);
+        activeCategoryName = !isNaN(catId)
+            ? (CATEGORY_ID_TO_NAME[catId] || categoryFilter)
+            : categoryFilter.charAt(0).toUpperCase() + categoryFilter.slice(1);
     }
 
     // Helper to clear specific filter

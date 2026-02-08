@@ -177,7 +177,7 @@ export default function Navbar() {
                                         <span className="text-sm">Settings</span>
                                     </button>
                                     <div className="mt-2 pt-2 border-t border-white/5 px-3 pb-1">
-                                        <span className="text-white/40 text-xs">v0.1.7</span>
+                                        <span className="text-white/40 text-xs">v0.1.8</span>
                                     </div>
                                 </div>
                             </div>
