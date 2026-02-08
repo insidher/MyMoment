@@ -20,7 +20,7 @@ import MomentGroup from '@/components/MomentGroup';
 import PlayerTimeline from '@/components/PlayerTimeline';
 import MomentEditor from '@/components/MomentEditor';
 import CreatorStudio from '@/components/CreatorStudio';
-import { getTrackMoments, healTrackSource, fetchYoutubeMetadata } from '../../explore/actions';
+import { getTrackMoments, healTrackSource, fetchYoutubeMetadata } from '../../actions';
 import { sanitizeMoment } from '@/lib/sanitize';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
 import { MyMomentIcon } from '@/components/icons/MyMomentIcon';

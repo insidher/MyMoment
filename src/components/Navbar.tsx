@@ -106,7 +106,7 @@ export default function Navbar() {
                             {showMenu ? <X size={20} /> : <Menu size={20} />}
                         </button>
 
-                        <Link href="/explore" className="font-bold text-lg md:text-xl tracking-tight flex items-center shrink-0 -ml-1 md:ml-0">
+                        <Link href="/" className="font-bold text-lg md:text-xl tracking-tight flex items-center shrink-0 -ml-1 md:ml-0">
                             <span className="text-green-500">My</span>
                             <span className="ml-[0.1em] text-green-500">M</span>
                             <span className="relative inline-block px-[1px]">
@@ -241,7 +241,7 @@ export default function Navbar() {
                 <div ref={menuRef} className="fixed top-16 left-0 w-72 h-[calc(100vh-4rem)] bg-[#050505]/95 backdrop-blur-2xl border-r border-white/10 z-[60] p-4 flex flex-col animate-in slide-in-from-left duration-300 shadow-2xl">
                     <div className="flex-1 space-y-1">
                         <Link
-                            href="/explore"
+                            href="/"
                             onClick={() => setShowMenu(false)}
                             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive('/explore') ? 'bg-white/10 text-white shadow-inner' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
                         >

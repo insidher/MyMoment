@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { X, Send, Loader2, ChevronDown } from 'lucide-react';
-import { submitFeedback } from '../../app/explore/actions';
+import { submitFeedback } from '../../app/actions';
 
 interface FeedbackModalProps {
     isOpen: boolean;

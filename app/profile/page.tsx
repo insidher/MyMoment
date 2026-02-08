@@ -10,7 +10,7 @@ import { Play, Music, Calendar, Youtube, Settings } from 'lucide-react';
 import { Moment } from '@/types';
 import MomentCard from '@/components/MomentCard';
 // ... imports
-import { getUserMoments, getLikedMoments, getUserFeedback } from '../explore/actions';
+import { getUserMoments, getLikedMoments, getUserFeedback } from '../actions';
 import SettingsSidebar from '@/components/SettingsSidebar';
 import FeedbackDetailModal from '@/components/FeedbackDetailModal';
 
