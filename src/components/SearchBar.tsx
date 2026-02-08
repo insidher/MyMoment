@@ -1,15 +1,16 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Search, Music, Film, User as UserIcon } from 'lucide-react';
+import { Search, Music, Film, User as UserIcon, Hash } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import UserAvatar from './UserAvatar';
 
 interface SearchResult {
-    type: 'moment' | 'video' | 'user';
+    type: 'moment' | 'video' | 'user' | 'category';
     id: string;
     title: string;
     subtitle: string;
+    extra?: string;
     thumbnail: string | null;
     url: string;
     user?: {
@@ -123,14 +124,6 @@ export default function SearchBar({ placeholder = 'Search or paste link...' }: S
             );
         }
 
-        if (result.type === 'moment') {
-            return (
-                <div className="w-10 h-10 shrink-0 rounded bg-orange-500/20 flex items-center justify-center text-orange-500 font-bold text-sm">
-                    M
-                </div>
-            );
-        }
-
         if (result.thumbnail) {
             return (
                 <img
@@ -143,7 +136,13 @@ export default function SearchBar({ placeholder = 'Search or paste link...' }: S
 
         return (
             <div className="w-10 h-10 shrink-0 rounded bg-white/5 flex items-center justify-center">
-                {result.type === 'video' ? <Film size={18} className="text-white/40" /> : <Music size={18} className="text-white/40" />}
+                {result.type === 'moment' && (
+                    <div className="w-10 h-10 shrink-0 rounded bg-orange-500/20 flex items-center justify-center text-orange-500 font-bold text-sm">
+                        M
+                    </div>
+                )}
+                {result.type === 'video' && <Film size={18} className="text-white/40" />}
+                {result.type !== 'moment' && result.type !== 'video' && <Music size={18} className="text-white/40" />}
             </div>
         );
     };
@@ -199,33 +198,62 @@ export default function SearchBar({ placeholder = 'Search or paste link...' }: S
                         </div>
                     ) : (
                         <div className="divide-y divide-white/5">
-                            {results.map((result) => (
-                                <button
-                                    key={`${result.type}-${result.id}`}
-                                    onClick={() => handleResultClick(result)}
-                                    className="w-full flex items-center gap-3 p-3 hover:bg-white/5 cursor-pointer transition-colors text-left"
-                                >
-                                    {getResultIcon(result)}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <p className="text-white text-sm font-medium truncate">
-                                                {result.title}
-                                            </p>
-                                            <span className="text-[10px] text-white/40 uppercase tracking-wide shrink-0">
-                                                {getTypeLabel(result.type)}
-                                            </span>
+                            {results.map((result) => {
+                                const displayTitle = result.title.length > 35
+                                    ? result.title.substring(0, 35) + '...'
+                                    : result.title;
+
+                                return (
+                                    <button
+                                        key={`${result.type}-${result.id}`}
+                                        onClick={() => handleResultClick(result)}
+                                        className="w-full flex items-center gap-3 p-3 hover:bg-white/5 cursor-pointer transition-colors text-left"
+                                    >
+                                        {/* Left: Thumbnail/Placeholder */}
+                                        {getResultIcon(result)}
+
+                                        {/* Middle (Grow) */}
+                                        <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                            {/* Top Row: Title + Badge */}
+                                            <div className="flex items-center">
+                                                <p className="text-white text-sm font-bold truncate">
+                                                    {displayTitle}
+                                                </p>
+                                                {result.type === 'moment' && (
+                                                    <span className="ml-2 shrink-0 px-1.5 py-0.5 text-[10px] font-bold bg-orange-500/20 text-orange-500 rounded uppercase tracking-wider">
+                                                        MOMENT
+                                                    </span>
+                                                )}
+                                                {result.type === 'category' && (
+                                                    <span className="ml-2 shrink-0 px-1.5 py-0.5 text-[10px] font-bold bg-blue-500/20 text-blue-500 rounded uppercase tracking-wider">
+                                                        CATEGORY
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* Bottom Row: Subtitle (Artist) + Note */}
+                                            <div className="flex items-center gap-1.5 text-xs mt-0.5 truncate w-full">
+                                                <span className="text-white/60 font-medium shrink-0">
+                                                    {result.subtitle}
+                                                </span>
+                                                {result.extra && (
+                                                    <>
+                                                        <span className="text-white/20">•</span>
+                                                        <span className="text-white/40 truncate italic">
+                                                            {result.extra}
+                                                        </span>
+                                                    </>
+                                                )}
+                                            </div>
                                         </div>
-                                        {result.subtitle && (
-                                            <p className="text-white/60 text-xs truncate">
-                                                {result.subtitle}
-                                            </p>
+
+                                        {/* Right: Service Indicator (if applies) */}
+                                        {result.service && (
+                                            <div className={`w-2 h-2 rounded-full shrink-0 ${result.service === 'youtube' ? 'bg-red-500' : 'bg-green-500'}`} />
                                         )}
-                                    </div>
-                                    {result.service && (
-                                        <div className={`w-2 h-2 rounded-full shrink-0 ${result.service === 'youtube' ? 'bg-red-500' : 'bg-green-500'}`} />
-                                    )}
-                                </button>
-                            ))}
+                                    </button>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
