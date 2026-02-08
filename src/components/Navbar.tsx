@@ -215,7 +215,7 @@ export default function Navbar() {
                                         <span className="text-sm">Settings</span>
                                     </button>
                                     <div className="mt-2 pt-2 border-t border-white/5 px-3 pb-1">
-                                        <span className="text-[10px] text-white/20 font-mono">v0.1.1</span>
+                                        <span className="text-[10px] text-white/20 font-mono">v0.1.2</span>
                                     </div>
                                 </div>
                             </div>
