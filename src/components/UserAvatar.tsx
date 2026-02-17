@@ -20,7 +20,7 @@ export default function UserAvatar({ name, image, size = 'w-8 h-8' }: UserAvatar
         'bg-indigo-500',
         'bg-teal-500',
         'bg-emerald-500',
-        'bg-orange-500',
+        'bg-sky-500',
         'bg-rose-500',
         'bg-cyan-500',
         'bg-amber-500'
@@ -46,7 +46,7 @@ export default function UserAvatar({ name, image, size = 'w-8 h-8' }: UserAvatar
     }
 
     return (
-        <div className={`${size} rounded-full ${getColor(displayName)} flex items-center justify-center text-white font-bold text-xs border border-white/20 shadow-inner`}>
+        <div className={`${size} rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold text-xs border border-white/20 shadow-inner`}>
             {firstLetter}
         </div>
     );

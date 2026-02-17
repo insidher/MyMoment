@@ -84,7 +84,7 @@ export function CategoryDropdown() {
                             )}
                         >
                             <span>All Categories</span>
-                            {!currentCategory && <Check size={14} className="text-orange-500" />}
+                            {!currentCategory && <Check size={14} className="text-primary" />}
                         </button>
 
                         <div className="h-px bg-white/5 my-1 mx-2" />
@@ -105,7 +105,7 @@ export function CategoryDropdown() {
                                         )}
                                     >
                                         <span className="truncate">{category.label}</span>
-                                        {isActive && <Check size={14} className="text-orange-500" />}
+                                        {isActive && <Check size={14} className="text-primary" />}
                                     </button>
                                 );
                             })}

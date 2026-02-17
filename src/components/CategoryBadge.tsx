@@ -22,11 +22,11 @@ const CATEGORY_CONFIG: Record<number, { label: string; icon: typeof Music; color
     3: { label: 'Comedy', icon: Laugh, color: 'text-yellow-400', bg: 'bg-yellow-500/10' },
     4: { label: 'Education', icon: BookOpen, color: 'text-blue-400', bg: 'bg-blue-500/10' },
     5: { label: 'Gaming', icon: Gamepad2, color: 'text-green-400', bg: 'bg-green-500/10' },
-    6: { label: 'Sports', icon: Tv, color: 'text-orange-400', bg: 'bg-orange-500/10' },
+    6: { label: 'Sports', icon: Tv, color: 'text-primary', bg: 'bg-primary/10' },
     7: { label: 'News', icon: Newspaper, color: 'text-slate-400', bg: 'bg-slate-500/10' },
     8: { label: 'Technology', icon: Cpu, color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
     9: { label: 'Entertainment', icon: Film, color: 'text-amber-400', bg: 'bg-amber-500/10' },
-    10: { label: 'Debate', icon: MessageSquare, color: 'text-orange-400', bg: 'bg-orange-500/10' },
+    10: { label: 'Debate', icon: MessageSquare, color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
     11: { label: 'Politics', icon: Landmark, color: 'text-slate-500', bg: 'bg-slate-600/10' },
 };
 

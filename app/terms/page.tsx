@@ -47,8 +47,8 @@ export default function TermsPage() {
                             <span className="flex items-center justify-center w-8 h-8 rounded-full bg-white/10 text-sm font-mono text-white/60">3</span>
                             Beta Disclaimer
                         </h3>
-                        <div className="bg-orange-500/10 border border-orange-500/20 p-6 rounded-lg">
-                            <p className="text-sm text-orange-200/80 m-0">
+                        <div className="bg-cyan-500/10 border border-cyan-500/20 p-6 rounded-lg">
+                            <p className="text-sm text-cyan-200/80 m-0">
                                 <strong>"As Is" Service:</strong> MyMoment is currently in Beta. We provide the Service "as is" and "as available".
                                 We do not warrant that the Service will be uninterrupted or error-free. Features and pricing
                                 are subject to change.

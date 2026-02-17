@@ -38,7 +38,7 @@ export default function CreatorStudio({
                     </button>
                     <button
                         onClick={onSave}
-                        className="px-4 py-1.5 text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors shadow-lg shadow-orange-500/20"
+                        className="px-4 py-1.5 text-xs font-bold text-white bg-primary hover:bg-primary/80 rounded-lg transition-colors shadow-lg shadow-primary/20"
                     >
                         {isUpdate ? 'Update Moment' : 'Save Moment'}
                     </button>

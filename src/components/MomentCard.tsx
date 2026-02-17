@@ -483,7 +483,7 @@ export default function MomentCard({
                                     <div className="relative flex-1 h-5">
                                         {effectiveDuration === 0 ? (
                                             <div className="absolute bottom-0 left-0 w-full h-full bg-white/5 animate-pulse rounded-full border border-white/10 flex items-center px-3 gap-2">
-                                                <div className="w-2 h-2 rounded-full bg-orange-500/40" />
+                                                <div className="w-2 h-2 rounded-full bg-primary/40" />
                                                 <span className="text-[10px] text-white/20 font-mono italic">Loading duration...</span>
                                             </div>
                                         ) : (
@@ -508,14 +508,14 @@ export default function MomentCard({
                                                         }}
                                                         className={`cursor-pointer inline-flex items-center justify-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-mono min-w-[100px] transition-colors group/pill relative overflow-hidden
                                                         ${isActive
-                                                                ? 'bg-orange-500/20 border border-yellow-400 hover:bg-orange-500/30'
-                                                                : 'bg-orange-500/20 border border-orange-500/40 hover:bg-orange-500/30'
+                                                                ? 'bg-cyan-500/20 border border-cyan-400 hover:bg-cyan-500/30'
+                                                                : 'bg-cyan-500/20 border border-cyan-500/40 hover:bg-cyan-500/30'
                                                             }`}
                                                     >
                                                         {/* In-Pill Progress Background */}
                                                         {isActive && (
                                                             <div
-                                                                className="absolute inset-y-0 left-0 bg-orange-500/30 z-0 pointer-events-none transition-all duration-100 ease-linear"
+                                                                className="absolute inset-y-0 left-0 bg-cyan-500/30 z-0 pointer-events-none transition-all duration-100 ease-linear"
                                                                 style={{ width: `${progressPercent}%` }}
                                                             />
                                                         )}
@@ -523,18 +523,18 @@ export default function MomentCard({
                                                         <div className={`relative z-10 flex items-center gap-2 ${isActive ? 'font-bold' : ''}`}>
                                                             {isActive && isPlaying ? (
                                                                 <div className="w-2 h-2 flex gap-0.5 items-center justify-center">
-                                                                    <div className="w-0.5 h-2 bg-orange-400 rounded-full" />
-                                                                    <div className="w-0.5 h-2 bg-orange-400 rounded-full" />
+                                                                    <div className="w-0.5 h-2 bg-cyan-400 rounded-full" />
+                                                                    <div className="w-0.5 h-2 bg-cyan-400 rounded-full" />
                                                                 </div>
                                                             ) : (
-                                                                <Play size={10} className="fill-current text-orange-400" />
+                                                                <Play size={10} className="fill-current text-cyan-400" />
                                                             )}
 
-                                                            <span className="text-orange-100">
+                                                            <span className="text-cyan-100">
                                                                 {formatTime(isActive ? Math.max(currentTime, moment.startSec) : moment.startSec)} → {formatTime(moment.endSec)}
                                                             </span>
-                                                            <span className="text-orange-400/60">·</span>
-                                                            <span className="text-orange-200">{duration}s</span>
+                                                            <span className="text-cyan-400/60">·</span>
+                                                            <span className="text-cyan-200">{duration}s</span>
                                                         </div>
                                                     </button>
                                                 </div>
@@ -545,9 +545,9 @@ export default function MomentCard({
 
                                 {/* Gray Track Bar - Improved Visibility */}
                                 <div className="h-1 w-full bg-white/5 rounded-full relative overflow-hidden ring-1 ring-white/5">
-                                    {/* Orange Moment Segment */}
+                                    {/* Cyan Moment Segment */}
                                     <div
-                                        className={`absolute inset-y-0 rounded-full transition-colors bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.4)]`}
+                                        className={`absolute inset-y-0 rounded-full transition-colors bg-primary shadow-[0_0_10px_rgba(var(--primary),0.4)]`}
                                         style={{
                                             left: `${startPercent}%`,
                                             width: `${Math.max(1, widthPercent)}%`
@@ -567,7 +567,7 @@ export default function MomentCard({
                                 <div className="flex items-center gap-2 w-full">
                                     {effectiveDuration === 0 ? (
                                         <div className="w-full h-7 bg-white/5 animate-pulse rounded-full border border-white/10 flex items-center px-3 gap-2">
-                                            <div className="w-2 h-2 rounded-full bg-orange-500/40" />
+                                            <div className="w-2 h-2 rounded-full bg-primary/40" />
                                             <span className="text-[10px] text-white/20 font-mono italic">Loading duration...</span>
                                         </div>
                                     ) : (
@@ -584,14 +584,14 @@ export default function MomentCard({
                                             }}
                                             className={`cursor-pointer inline-flex items-center justify-center gap-1 rounded-full px-3 py-1 text-[11px] font-mono min-w-[110px] transition-colors group/pill relative overflow-hidden
                                                 ${isActive
-                                                    ? 'bg-orange-500/20 border border-yellow-400 hover:bg-orange-500/30'
-                                                    : 'bg-orange-500/20 border border-orange-500/40 hover:bg-orange-500/30'
+                                                    ? 'bg-cyan-500/20 border border-cyan-400 hover:bg-cyan-500/30'
+                                                    : 'bg-cyan-500/20 border border-cyan-500/40 hover:bg-cyan-500/30'
                                                 }`}
                                         >
                                             {/* In-Pill Progress Background */}
                                             {isActive && (
                                                 <div
-                                                    className="absolute inset-y-0 left-0 bg-orange-500/30 z-0 pointer-events-none transition-all duration-100 ease-linear"
+                                                    className="absolute inset-y-0 left-0 bg-cyan-500/30 z-0 pointer-events-none transition-all duration-100 ease-linear"
                                                     style={{ width: `${progressPercent}%` }}
                                                 />
                                             )}
@@ -599,17 +599,17 @@ export default function MomentCard({
                                             <div className={`relative z-10 flex items-center gap-2 ${isActive ? 'font-bold' : ''}`}>
                                                 {isActive && isPlaying ? (
                                                     <div className="w-2 h-2 flex gap-0.5 items-center justify-center">
-                                                        <div className="w-0.5 h-2 bg-orange-400 rounded-full" />
-                                                        <div className="w-0.5 h-2 bg-orange-400 rounded-full" />
+                                                        <div className="w-0.5 h-2 bg-cyan-400 rounded-full" />
+                                                        <div className="w-0.5 h-2 bg-cyan-400 rounded-full" />
                                                     </div>
                                                 ) : (
-                                                    <Play size={10} className="fill-current text-orange-400" />
+                                                    <Play size={10} className="fill-current text-cyan-400" />
                                                 )}
-                                                <span className="text-orange-100">
+                                                <span className="text-cyan-100">
                                                     {formatTime(isActive ? currentTime : moment.startSec)} → {formatTime(moment.endSec)}
                                                 </span>
-                                                <span className="text-orange-400/60">·</span>
-                                                <span className="text-orange-200">{duration}s</span>
+                                                <span className="text-cyan-400/60">·</span>
+                                                <span className="text-cyan-200">{duration}s</span>
                                             </div>
                                         </button>
                                     )}

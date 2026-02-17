@@ -475,9 +475,9 @@ export default function PlayerTimeline({
                         />
                         {/* Visible Dumbbell: Top circle + Line + Bottom circle */}
                         <div className="absolute inset-0 flex flex-col items-center pointer-events-none">
-                            <div className={`w-3 h-3 rounded-full bg-orange-500 border-2 border-white shadow-lg -mt-1 transition-transform ${draggingMarker === 'playhead' ? 'scale-125' : ''}`} />
+                            <div className={`w-3 h-3 rounded-full bg-cyan-500 border-2 border-white shadow-lg -mt-1 transition-transform ${draggingMarker === 'playhead' ? 'scale-125' : ''}`} />
                             <div className="flex-1 w-[2px] bg-white" />
-                            <div className={`w-3 h-3 rounded-full bg-orange-500 border-2 border-white shadow-lg -mb-1 transition-transform ${draggingMarker === 'playhead' ? 'scale-125' : ''}`} />
+                            <div className={`w-3 h-3 rounded-full bg-cyan-500 border-2 border-white shadow-lg -mb-1 transition-transform ${draggingMarker === 'playhead' ? 'scale-125' : ''}`} />
                         </div>
                     </div>
 
@@ -568,7 +568,7 @@ export default function PlayerTimeline({
 
 
                             {/* ZONE B: MIDDLE FRAME & TRIANGLE HANDLES */}
-                            <div className="absolute inset-0 bg-blue-500/10 border-x-2 border-orange-500">
+                            <div className="absolute inset-0 bg-blue-500/10 border-x-2 border-primary">
                                 {/* Active Red Track */}
                                 <div className="absolute top-1/2 -translate-y-1/2 inset-x-0 h-1 bg-red-500 rounded-full" />
 
@@ -581,7 +581,7 @@ export default function PlayerTimeline({
                                 >
                                     {/* Asymmetrical hit area: extends mostly to the left to prevent blocking the End handle when close */}
                                     <div className="absolute top-[-20px] bottom-[-20px] -left-[20px] -right-[5px] z-[50]" />
-                                    <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '7px solid #f97316' }} />
+                                    <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '7px solid #06b6d4' }} />
                                 </div>
 
                                 {/* End Handle */}
@@ -593,7 +593,7 @@ export default function PlayerTimeline({
                                 >
                                     {/* Asymmetrical hit area: extends mostly to the right to prevent blocking the Start handle when close */}
                                     <div className="absolute top-[-20px] bottom-[-20px] -left-[5px] -right-[20px] z-[50]" />
-                                    <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '7px solid #f97316' }} />
+                                    <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '7px solid #06b6d4' }} />
                                 </div>
                             </div>
 
@@ -634,7 +634,7 @@ export default function PlayerTimeline({
                     )}
 
                     {/* ======================================================== */}
-                    {/* ACTIVE/PINNED MOMENTS HIGHLIGHT (Orange) */}
+                    {/* ACTIVE/PINNED MOMENTS HIGHLIGHT (Cyan) */}
                     {/* ======================================================== */}
                     {allMomentHighlights.map((m) => (
                         <div
@@ -647,7 +647,7 @@ export default function PlayerTimeline({
                         >
                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-10 flex flex-col items-center origin-bottom pointer-events-auto">
                                 {expandedHighlightId === m.id ? (
-                                    <div className="flex items-center bg-black/90 backdrop-blur-md border border-orange-500/50 rounded-lg overflow-hidden shadow-xl animate-in zoom-in-95 duration-200">
+                                    <div className="flex items-center bg-black/90 backdrop-blur-md border border-primary/50 rounded-lg overflow-hidden shadow-xl animate-in zoom-in-95 duration-200">
                                         <button
                                             onClick={(e) => { e.stopPropagation(); onSeek(m.startSec); }}
                                             className="h-8 px-2 flex items-center justify-center hover:bg-white/10 text-white/70 hover:text-white transition-colors border-r border-white/10"
@@ -657,7 +657,7 @@ export default function PlayerTimeline({
                                         </button>
                                         <button
                                             onClick={(e) => { e.stopPropagation(); onMomentClick?.(m); }}
-                                            className="h-8 px-3 flex items-center justify-center text-orange-400 text-[10px] font-bold uppercase hover:bg-orange-400/10 transition-colors whitespace-nowrap border-r border-white/10"
+                                            className="h-8 px-3 flex items-center justify-center text-primary text-[10px] font-bold uppercase hover:bg-primary/10 transition-colors whitespace-nowrap border-r border-white/10"
                                         >
                                             VIEW
                                         </button>
@@ -668,7 +668,7 @@ export default function PlayerTimeline({
                                                     prev.includes(m.id) ? prev.filter(id => id !== m.id) : [...prev, m.id]
                                                 );
                                             }}
-                                            className={`h-8 px-2 flex items-center justify-center transition-colors ${pinnedMomentIds.includes(m.id) ? 'bg-orange-500 text-black' : 'hover:bg-orange-400/20 text-orange-400'}`}
+                                            className={`h-8 px-2 flex items-center justify-center transition-colors ${pinnedMomentIds.includes(m.id) ? 'bg-primary text-black' : 'hover:bg-primary/20 text-primary'}`}
                                             title={pinnedMomentIds.includes(m.id) ? "Unpin" : "Pin"}
                                         >
                                             <Pin size={12} className={pinnedMomentIds.includes(m.id) ? "fill-black" : ""} />
@@ -690,7 +690,7 @@ export default function PlayerTimeline({
                                 ) : (
                                     <button
                                         onClick={(e) => { e.stopPropagation(); setExpandedHighlightId(m.id); }}
-                                        className="w-8 h-8 flex items-center justify-center bg-orange-500/40 backdrop-blur-sm border border-orange-500/20 rounded-full text-white/50 hover:text-white hover:bg-orange-500/60 transition-all shadow-lg"
+                                        className="w-8 h-8 flex items-center justify-center bg-cyan-500/40 backdrop-blur-sm border border-cyan-500/20 rounded-full text-white/50 hover:text-white hover:bg-cyan-500/60 transition-all shadow-lg"
                                         title="Expand Menu"
                                     >
                                         <Menu size={14} />
@@ -698,19 +698,19 @@ export default function PlayerTimeline({
                                 )}
                             </div>
 
-                            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1 bg-orange-500/20 rounded-full border-x-2 border-orange-500">
-                                <div className="absolute inset-0 bg-orange-500 rounded-full" />
+                            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1 bg-cyan-500/20 rounded-full border-x-2 border-cyan-500">
+                                <div className="absolute inset-0 bg-cyan-500 rounded-full" />
                                 <div className="absolute top-1/2 left-0 -translate-y-1/2 -translate-x-1/2" style={{ marginTop: '-6px' }}>
-                                    <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '7px solid #f97316' }} />
+                                    <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '7px solid #06b6d4' }} />
                                 </div>
                                 <div className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2" style={{ marginTop: '-6px' }}>
-                                    <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '7px solid #f97316' }} />
+                                    <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '7px solid #06b6d4' }} />
                                 </div>
                             </div>
 
                             <div className="absolute top-full left-0 w-full">
-                                <div className="w-full h-4 bg-orange-500/10 border-x border-b border-orange-500/30 rounded-b-lg flex items-center justify-center">
-                                    <GripHorizontal size={10} className="text-orange-500/50" />
+                                <div className="w-full h-4 bg-cyan-500/10 border-x border-b border-cyan-500/30 rounded-b-lg flex items-center justify-center">
+                                    <GripHorizontal size={10} className="text-cyan-500/50" />
                                 </div>
                             </div>
                         </div>

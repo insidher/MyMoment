@@ -96,7 +96,7 @@ export default function MomentEditor({
                     {onPreview && (
                         <button
                             onClick={onPreview}
-                            className={`p-1.5 rounded-md hover:bg-white/10 transition-colors ${isPreviewing ? 'text-orange-400' : 'text-white/40 hover:text-white'}`}
+                            className={`p-1.5 rounded-md hover:bg-white/10 transition-colors ${isPreviewing ? 'text-primary' : 'text-white/40 hover:text-white'}`}
                             title={isPreviewing ? "Stop Preview" : "Play Preview"}
                         >
                             {isPreviewing ? (
@@ -110,7 +110,7 @@ export default function MomentEditor({
                     <button
                         onClick={handleSaveClick}
                         disabled={!note.trim()}
-                        className="px-3 py-1 bg-orange-500 hover:bg-orange-600 disabled:bg-white/5 disabled:text-white/20 disabled:cursor-not-allowed text-black text-[10px] font-black uppercase rounded-md shadow-lg shadow-orange-500/10 transition-colors"
+                        className="px-3 py-1 bg-primary hover:bg-primary/80 disabled:bg-white/5 disabled:text-white/20 disabled:cursor-not-allowed text-black text-[10px] font-black uppercase rounded-md shadow-lg shadow-primary/10 transition-colors"
                     >
                         {editingMomentId ? 'Update' : 'Save'}
                     </button>
@@ -128,7 +128,7 @@ export default function MomentEditor({
                     onChange={(e) => onNoteChange(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder="What's happening in this moment?"
-                    className="w-full h-24 bg-white/5 border border-white/10 rounded-lg p-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-orange-500/50 resize-none scrollbar-thin scrollbar-thumb-white/20 font-serif leading-relaxed"
+                    className="w-full h-24 bg-white/5 border border-white/10 rounded-lg p-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-primary/50 resize-none scrollbar-thin scrollbar-thumb-white/20 font-serif leading-relaxed"
                 />
 
             </div>

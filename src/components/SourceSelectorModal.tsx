@@ -27,7 +27,7 @@ export default function SourceSelectorModal({ isOpen, onClose }: SourceSelectorM
             >
                 {/* Background Splashes */}
                 <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/10 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-                <div className="absolute bottom-0 left-0 w-64 h-64 bg-orange-500/10 rounded-full blur-[80px] translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary/10 rounded-full blur-[80px] translate-y-1/2 -translate-x-1/2 pointer-events-none" />
 
                 <div className="text-center space-y-2 relative z-10">
                     <h2 className="text-2xl font-black text-white tracking-tight flex items-center justify-center gap-2">
@@ -75,8 +75,8 @@ export default function SourceSelectorModal({ isOpen, onClose }: SourceSelectorM
                     </div>
                 </div>
 
-                <div className="bg-orange-500/5 border border-orange-500/10 rounded-xl p-4 text-center">
-                    <p className="text-xs text-orange-200/60 leading-relaxed font-medium">
+                <div className="bg-primary/5 border border-primary/10 rounded-xl p-4 text-center">
+                    <p className="text-xs text-primary/60 leading-relaxed font-medium">
                         Found a clip? Just paste the URL in the search bar above to start editing!
                     </p>
                 </div>

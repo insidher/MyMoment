@@ -39,14 +39,14 @@ export default function GroupingPromptModal({
             {/* Modal */}
             <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 pointer-events-none">
                 <div
-                    className="bg-zinc-900 border border-orange-500/30 rounded-2xl shadow-2xl shadow-orange-900/20 max-w-md w-full pointer-events-auto animate-in zoom-in-95 duration-200"
+                    className="bg-zinc-900 border border-cyan-500/30 rounded-2xl shadow-2xl shadow-cyan-900/20 max-w-md w-full pointer-events-auto animate-in zoom-in-95 duration-200"
                     onClick={(e) => e.stopPropagation()}
                 >
                     {/* Header */}
                     <div className="flex items-center justify-between p-6 border-b border-white/10">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
-                                <Users size={20} className="text-orange-400" />
+                            <div className="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                                <Users size={20} className="text-cyan-400" />
                             </div>
                             <h2 className="text-xl font-bold text-white">Overlap Detected</h2>
                         </div>
@@ -61,7 +61,7 @@ export default function GroupingPromptModal({
                     {/* Content */}
                     <div className="p-6 space-y-4">
                         <p className="text-white/80 leading-relaxed">
-                            Your new moment <span className="font-mono text-orange-400">{formatTime(draftStart)} → {formatTime(draftEnd)}</span> overlaps with an existing moment:
+                            Your new moment <span className="font-mono text-cyan-400">{formatTime(draftStart)} → {formatTime(draftEnd)}</span> overlaps with an existing moment:
                         </p>
 
                         {/* Existing Moment Card */}
@@ -77,7 +77,7 @@ export default function GroupingPromptModal({
                                 <span className="text-sm text-white/60">{parentMoment.user?.name || 'Unknown'}</span>
                             </div>
                             <p className="text-white font-medium italic">"{parentMoment.note || 'Moment'}"</p>
-                            <p className="text-xs text-orange-400 font-mono">
+                            <p className="text-xs text-cyan-400 font-mono">
                                 {formatTime(parentMoment.startSec)} → {formatTime(parentMoment.endSec)}
                             </p>
                         </div>
@@ -98,7 +98,7 @@ export default function GroupingPromptModal({
                         </button>
                         <button
                             onClick={onConfirm}
-                            className="flex-1 px-4 py-3 rounded-lg bg-orange-500 hover:bg-orange-600 transition-colors text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-orange-900/30"
+                            className="flex-1 px-4 py-3 rounded-lg bg-primary hover:bg-primary/80 transition-colors text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/30"
                         >
                             <Users size={16} />
                             Group Together

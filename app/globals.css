@@ -4,6 +4,84 @@
   --foreground-rgb: 255, 255, 255;
   --background-start-rgb: 10, 10, 10;
   --background-end-rgb: 0, 0, 0;
+
+  /* Theme: Cyan (Default) - Tailwind cyan-500 */
+  --primary: 6 182 212;
+  --primary-foreground: 0 0 0;
+}
+
+[data-theme='purple'] {
+  --primary: 168 85 247;
+}
+
+/* purple-500 */
+[data-theme='rose'] {
+  --primary: 244 63 94;
+}
+
+/* rose-500 */
+[data-theme='amber'] {
+  --primary: 245 158 11;
+}
+
+/* amber-500 */
+[data-theme='emerald'] {
+  --primary: 16 185 129;
+}
+
+/* emerald-500 */
+[data-theme='indigo'] {
+  --primary: 99 102 241;
+}
+
+/* indigo-500 */
+
+@layer utilities {
+  .bg-primary {
+    background-color: rgb(var(--primary));
+  }
+
+  .bg-primary\/10 {
+    background-color: rgb(var(--primary) / 0.1);
+  }
+
+  .bg-primary\/20 {
+    background-color: rgb(var(--primary) / 0.2);
+  }
+
+  .bg-primary\/50 {
+    background-color: rgb(var(--primary) / 0.5);
+  }
+
+  .text-primary {
+    color: rgb(var(--primary));
+  }
+
+  .text-primary\/60 {
+    color: rgb(var(--primary) / 0.6);
+  }
+
+  .border-primary {
+    border-color: rgb(var(--primary));
+  }
+
+  .border-primary\/20 {
+    border-color: rgb(var(--primary) / 0.2);
+  }
+
+  .border-primary\/30 {
+    border-color: rgb(var(--primary) / 0.3);
+  }
+
+  .border-primary\/50 {
+    border-color: rgb(var(--primary) / 0.5);
+  }
+
+  .ring-primary {
+    --tw-ring-color: rgb(var(--primary));
+  }
+
+
 }
 
 body {

@@ -150,7 +150,7 @@ export default function InspectorPage() {
                     </Link>
                     <div className="flex-1">
                         <h1 className="text-lg font-bold tracking-tight">
-                            <span className="text-orange-400">🔍</span> Metadata Inspector
+                            <span className="text-cyan-400">🔍</span> Metadata Inspector
                         </h1>
                         <p className="text-xs text-white/40">Debug YouTube API responses · Admin Tool</p>
                     </div>
@@ -188,13 +188,13 @@ export default function InspectorPage() {
                             onChange={(e) => setInputUrl(e.target.value)}
                             onKeyDown={handleKeyDown}
                             placeholder="YouTube URL or Video ID (e.g. dQw4w9WgXcQ)"
-                            className="w-full bg-neutral-900 border border-white/10 rounded-xl pl-12 pr-4 py-3.5 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50 transition-all text-sm"
+                            className="w-full bg-neutral-900 border border-white/10 rounded-xl pl-12 pr-4 py-3.5 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all text-sm"
                         />
                     </div>
                     <button
                         onClick={handleInspect}
                         disabled={loading || !inputUrl.trim()}
-                        className="bg-orange-500 hover:bg-orange-600 disabled:bg-neutral-700 disabled:text-white/30 text-white font-bold px-6 py-3.5 rounded-xl transition-all flex items-center gap-2 text-sm"
+                        className="bg-cyan-500 hover:bg-cyan-600 disabled:bg-neutral-700 disabled:text-white/30 text-white font-bold px-6 py-3.5 rounded-xl transition-all flex items-center gap-2 text-sm"
                     >
                         {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
                         Inspect
@@ -333,7 +333,7 @@ export default function InspectorPage() {
                             {/* LEFT: Parsed (Current Reality) */}
                             <div className="space-y-3">
                                 <h3 className="text-sm font-bold text-white/60 uppercase tracking-wider">
-                                    Current Reality <span className="text-orange-400">(What Our App Sees)</span>
+                                    Current Reality <span className="text-cyan-400">(What Our App Sees)</span>
                                 </h3>
                                 <div className="bg-neutral-900 border border-white/10 rounded-xl p-5 space-y-4">
                                     {result.parsed.thumbnails?.high && (
@@ -375,7 +375,7 @@ export default function InspectorPage() {
                                                         setOverrideCategoryId(val ? Number(val) : null);
                                                         setSyncStatus('idle');
                                                     }}
-                                                    className="bg-neutral-800 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-orange-500/50"
+                                                    className="bg-neutral-800 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
                                                 >
                                                     <option value="">— Auto (Smart Map) —</option>
                                                     {Object.entries(CATEGORY_LABELS).map(([id, label]) => (
@@ -383,7 +383,7 @@ export default function InspectorPage() {
                                                     ))}
                                                 </select>
                                                 {overrideCategoryId !== null && (
-                                                    <span className="text-[10px] text-orange-400 font-bold uppercase">⚠ Manual Override</span>
+                                                    <span className="text-[10px] text-cyan-400 font-bold uppercase">⚠ Manual Override</span>
                                                 )}
                                             </div>
                                         </div>

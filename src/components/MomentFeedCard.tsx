@@ -163,8 +163,8 @@ export default function MomentFeedCard({ moments, onComment, isAdmin = false }: 
                                     key={m.id}
                                     onClick={() => setSelectedMoment(m)}
                                     className={`absolute top-0 bottom-0 rounded-full transition-all duration-200 cursor-pointer ${isSelected
-                                        ? 'bg-orange-500 z-20 shadow-[0_0_8px_rgba(249,115,22,0.4)] scale-y-110'
-                                        : 'bg-orange-500/40 hover:bg-orange-500/70 z-10'
+                                        ? 'bg-primary z-20 shadow-[0_0_8px_rgba(var(--primary),0.4)] scale-y-110'
+                                        : 'bg-primary/40 hover:bg-primary/70 z-10'
                                         }`}
                                     style={{
                                         left: `${leftPercent}%`,
@@ -207,7 +207,7 @@ export default function MomentFeedCard({ moments, onComment, isAdmin = false }: 
                     {/* Primary CTA Button */}
                     <Link
                         href={`/room/view?url=${encodeURIComponent(selectedMoment.sourceUrl)}&start=${selectedMoment.startSec}&end=${selectedMoment.endSec}`}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-orange-500 bg-neutral-900/50 hover:bg-orange-500/20 transition-all group/btn shadow-lg"
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-primary bg-neutral-900/50 hover:bg-primary/20 transition-all group/btn shadow-lg"
                     >
                         <Play size={14} className="fill-white" />
                         <span className="text-white font-bold text-xs">

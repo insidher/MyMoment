@@ -4,6 +4,7 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import { AuthProvider } from "@/context/AuthContext";
 import { FilterProvider } from "@/context/FilterContext";
+import { ThemeProvider } from "@/context/ThemeContext";
 import { Toaster } from "sonner";
 import FooterWrapper from "@/components/layout/FooterWrapper";
 
@@ -24,12 +25,14 @@ export default function RootLayout({
             <body className={`${inter.className} bg-black text-white antialiased`} suppressHydrationWarning>
                 <AuthProvider>
                     <FilterProvider>
-                        <Navbar />
-                        <div className="pt-14 min-h-screen flex flex-col">
-                            {children}
-                            <FooterWrapper />
-                        </div>
-                        <Toaster position="bottom-right" />
+                        <ThemeProvider>
+                            <Navbar />
+                            <div className="pt-14 min-h-screen flex flex-col">
+                                {children}
+                                <FooterWrapper />
+                            </div>
+                            <Toaster position="bottom-right" />
+                        </ThemeProvider>
                     </FilterProvider>
                 </AuthProvider>
             </body>

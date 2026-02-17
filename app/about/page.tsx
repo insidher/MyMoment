@@ -23,11 +23,11 @@ const TimelineIcon = () => (
             <div className="absolute left-0 top-0 bottom-0 w-[30%] bg-green-500 rounded-l-full" />
 
             {/* Edit Range Pill */}
-            <div className="absolute left-[30%] right-[30%] top-1/2 -translate-y-1/2 h-5 bg-[#1a2332] border-x-2 border-orange-500/50 flex items-center justify-center z-10">
+            <div className="absolute left-[30%] right-[30%] top-1/2 -translate-y-1/2 h-5 bg-[#1a2332] border-x-2 border-cyan-500/50 flex items-center justify-center z-10">
                 <span className="text-[8px] font-bold text-blue-200 tracking-wider">EDIT</span>
                 {/* Handles */}
-                <div className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-orange-500 rounded-full border-2 border-black" />
-                <div className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-orange-500 rounded-full border-2 border-black" />
+                <div className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-cyan-500 rounded-full border-2 border-black" />
+                <div className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-cyan-500 rounded-full border-2 border-black" />
             </div>
         </div>
     </div>
@@ -64,7 +64,7 @@ export default function Home() {
         <main className="h-screen w-full bg-black text-white flex flex-col pt-16 overflow-hidden relative selection:bg-green-500/30">
             {/* Background Gradients */}
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[80vw] h-[50vh] bg-green-900/10 rounded-full blur-[120px] -z-10" />
-            <div className="absolute bottom-0 right-0 w-[60vw] h-[40vh] bg-orange-900/10 rounded-full blur-[100px] -z-10" />
+            <div className="absolute bottom-0 right-0 w-[60vw] h-[40vh] bg-cyan-900/10 rounded-full blur-[100px] -z-10" />
 
             <div className="flex-1 flex flex-col justify-start items-center p-4 md:p-8 max-w-7xl mx-auto w-full gap-8 md:gap-12 pt-12 md:pt-24">
 
@@ -78,22 +78,22 @@ export default function Home() {
                             className="relative group cursor-pointer inline-flex items-center justify-center px-6 py-1 bg-[#1a2332] rounded-lg hover:scale-105 transition-transform"
                             onClick={() => setShowTutorial(true)}
                         >
-                            <span className="text-[#431407] [-webkit-text-stroke:1.5px_rgb(249_115_22)] relative z-10">Curate</span>
+                            <span className="text-[#431407] [-webkit-text-stroke:1.5px_rgb(6_182_212)] relative z-10">Curate</span>
 
                             {/* Left Handle */}
-                            <div className="absolute left-0 top-1/2 -translate-y-1/2 h-[140%] w-[3px] bg-orange-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.3)]">
-                                <div className="absolute right-[calc(50%+4px)] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-orange-500 border-2 border-black shadow-md" />
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 h-[140%] w-[3px] bg-cyan-500 rounded-full shadow-[0_0_10px_rgba(6,182,212,0.3)]">
+                                <div className="absolute right-[calc(50%+4px)] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-cyan-500 border-2 border-black shadow-md" />
                             </div>
 
                             {/* Right Handle */}
-                            <div className="absolute right-0 top-1/2 -translate-y-1/2 h-[140%] w-[3px] bg-orange-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.3)]">
-                                <div className="absolute left-[calc(50%+4px)] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-orange-500 border-2 border-black shadow-md" />
+                            <div className="absolute right-0 top-1/2 -translate-y-1/2 h-[140%] w-[3px] bg-cyan-500 rounded-full shadow-[0_0_10px_rgba(6,182,212,0.3)]">
+                                <div className="absolute left-[calc(50%+4px)] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-cyan-500 border-2 border-black shadow-md" />
                             </div>
 
                             {/* Tutorial Tooltip */}
                             {showTutorial && (
-                                <div className="absolute bottom-full mb-6 left-1/2 -translate-x-1/2 w-80 md:w-96 bg-zinc-900 border border-orange-500/50 p-5 rounded-xl shadow-2xl z-50 animate-in fade-in zoom-in-95 tracking-normal">
-                                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-zinc-900 border-b border-r border-orange-500/50 rotate-45" />
+                                <div className="absolute bottom-full mb-6 left-1/2 -translate-x-1/2 w-80 md:w-96 bg-zinc-900 border border-cyan-500/50 p-5 rounded-xl shadow-2xl z-50 animate-in fade-in zoom-in-95 tracking-normal">
+                                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-zinc-900 border-b border-r border-cyan-500/50 rotate-45" />
                                     <p className="text-sm text-white/90 leading-relaxed font-medium text-left">
                                         Paste a YouTube link of new long-form content.
                                     </p>
@@ -103,7 +103,7 @@ export default function Home() {
 
                                     {/* Arrow pointing up to navbar search bar */}
                                     <div className="flex justify-center mt-4">
-                                        <ArrowRight className="text-orange-500 -rotate-90 animate-bounce" size={20} />
+                                        <ArrowRight className="text-cyan-500 -rotate-90 animate-bounce" size={20} />
                                     </div>
                                 </div>
                             )}
@@ -129,7 +129,7 @@ export default function Home() {
                             <button
                                 type="submit"
                                 disabled={!url.trim()}
-                                className="absolute right-2 px-6 py-2 bg-[#7c2a0c] hover:bg-[#9a3412] text-white font-medium rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="absolute right-2 px-6 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-medium rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Go
                             </button>
@@ -169,7 +169,7 @@ export default function Home() {
                             </div>
                         </div>
                         <div className="space-y-1">
-                            <h3 className="font-bold text-xl text-orange-100">Select Range</h3>
+                            <h3 className="font-bold text-xl text-cyan-100">Select Range</h3>
                             <p className="text-sm text-white/40 leading-snug max-w-[200px] mx-auto">
                                 Drag handles to pick your part.
                             </p>
@@ -214,7 +214,7 @@ export default function Home() {
                     >
                         {/* Background Splashes */}
                         <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/10 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-                        <div className="absolute bottom-0 left-0 w-64 h-64 bg-orange-500/10 rounded-full blur-[80px] translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+                        <div className="absolute bottom-0 left-0 w-64 h-64 bg-cyan-500/10 rounded-full blur-[80px] translate-y-1/2 -translate-x-1/2 pointer-events-none" />
 
                         <div className="text-center space-y-2 relative z-10">
                             <h2 className="text-2xl font-black text-white tracking-tight flex items-center justify-center gap-2">

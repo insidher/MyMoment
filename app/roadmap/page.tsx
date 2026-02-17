@@ -35,17 +35,17 @@ export default function RoadmapPage() {
 
                 {/* Q2 2026 */}
                 <div className="relative">
-                    <div className="absolute -left-[41px] md:-left-[57px] top-1 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center ring-4 ring-black">
+                    <div className="absolute -left-[41px] md:-left-[57px] top-1 w-6 h-6 bg-cyan-500 rounded-full flex items-center justify-center ring-4 ring-black">
                         <Clock size={14} className="text-black" />
                     </div>
-                    <h3 className="text-lg font-bold text-orange-400 mb-1">Q2 2026: Audio Expansion</h3>
+                    <h3 className="text-lg font-bold text-cyan-400 mb-1">Q2 2026: Audio Expansion</h3>
                     <p className="text-sm text-white/40 font-mono mb-4">IN DEVELOPMENT</p>
                     <ul className="space-y-3 text-gray-300">
                         <li className="flex items-start gap-2">
-                            <span className="text-orange-500 mt-1">•</span> Deep Spotify Integration (Audio-only mode)
+                            <span className="text-cyan-500 mt-1">•</span> Deep Spotify Integration (Audio-only mode)
                         </li>
                         <li className="flex items-start gap-2">
-                            <span className="text-orange-500 mt-1">•</span> Collaborative Playlists
+                            <span className="text-cyan-500 mt-1">•</span> Collaborative Playlists
                         </li>
                     </ul>
                 </div>

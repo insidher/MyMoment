@@ -137,7 +137,7 @@ export default function SearchBar({ placeholder = 'Search or paste link...' }: S
         return (
             <div className="w-10 h-10 shrink-0 rounded bg-white/5 flex items-center justify-center">
                 {result.type === 'moment' && (
-                    <div className="w-10 h-10 shrink-0 rounded bg-orange-500/20 flex items-center justify-center text-orange-500 font-bold text-sm">
+                    <div className="w-10 h-10 shrink-0 rounded bg-cyan-500/20 flex items-center justify-center text-cyan-500 font-bold text-sm">
                         M
                     </div>
                 )}
@@ -162,7 +162,7 @@ export default function SearchBar({ placeholder = 'Search or paste link...' }: S
                 onSubmit={handleSubmit}
                 className="w-full transition-all duration-300 ease-out flex items-center group max-w-2xl mx-auto"
             >
-                <div className={`flex-1 flex items-center bg-white/5 border border-white/5 border-r-0 rounded-l-full px-2 md:px-4 h-9 md:h-10 transition-all duration-300 ${isFocused ? 'bg-white/12 border-white/20 ring-1 ring-orange-500/20' : 'focus-within:bg-white/10'}`}>
+                <div className={`flex-1 flex items-center bg-white/5 border border-white/5 border-r-0 rounded-l-full px-2 md:px-4 h-9 md:h-10 transition-all duration-300 ${isFocused ? 'bg-white/12 border-white/20 ring-1 ring-cyan-500/20' : 'focus-within:bg-white/10'}`}>
                     <Search size={14} className={`transition-colors duration-300 ${isFocused ? 'text-white' : 'text-white/40'} mr-2 md:mr-3 shrink-0`} />
                     <input
                         ref={inputRef}
@@ -220,7 +220,7 @@ export default function SearchBar({ placeholder = 'Search or paste link...' }: S
                                                     {displayTitle}
                                                 </p>
                                                 {result.type === 'moment' && (
-                                                    <span className="ml-2 shrink-0 px-1.5 py-0.5 text-[10px] font-bold bg-orange-500/20 text-orange-500 rounded uppercase tracking-wider">
+                                                    <span className="ml-2 shrink-0 px-1.5 py-0.5 text-[10px] font-bold bg-primary/20 text-primary rounded uppercase tracking-wider">
                                                         MOMENT
                                                     </span>
                                                 )}

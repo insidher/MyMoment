@@ -1338,7 +1338,7 @@ export default function Room({ params }: { params: { id: string } }) {
                                 )}
                                 {isSeekingToStart && !isReloading && (
                                     <div className="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center gap-4 animate-in fade-in duration-300">
-                                        <Loader2 className="w-10 h-10 text-orange-500 animate-spin" />
+                                        <Loader2 className="w-10 h-10 text-cyan-500 animate-spin" />
                                         <div className="text-white/80 font-medium font-mono text-sm">
                                             Loading song...
                                         </div>
@@ -1431,7 +1431,7 @@ export default function Room({ params }: { params: { id: string } }) {
                         {/* Header for Moments List */}
                         <div className="flex items-center gap-3 pb-2">
                             <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                <Sparkles size={18} className="text-orange-500" />
+                                <Sparkles size={18} className="text-cyan-500" />
                                 Saved Moments
                             </h3>
                             <span className="text-xs font-mono text-white/40 px-2 py-0.5 rounded-full bg-white/5 border border-white/5">
@@ -1535,10 +1535,10 @@ export default function Room({ params }: { params: { id: string } }) {
             />
             {durationLimitError && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setDurationLimitError(false)}>
-                    <div className="bg-neutral-900 border border-orange-500/50 p-6 rounded-2xl shadow-2xl max-w-sm text-center space-y-4">
+                    <div className="bg-neutral-900 border border-cyan-500/50 p-6 rounded-2xl shadow-2xl max-w-sm text-center space-y-4">
                         <h2 className="text-xl font-bold text-white">Moment Too Long</h2>
                         <p className="text-white/60">Moments must be under 3 minutes.</p>
-                        <button onClick={() => setDurationLimitError(false)} className="w-full py-2 bg-orange-500 rounded-xl font-bold">Got it</button>
+                        <button onClick={() => setDurationLimitError(false)} className="w-full py-2 bg-cyan-500 text-black hover:bg-cyan-400 transition-colors rounded-xl font-bold">Got it</button>
                     </div>
                 </div>
             )}

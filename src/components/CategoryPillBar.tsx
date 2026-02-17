@@ -49,7 +49,7 @@ export default function CategoryPillBar() {
                             className={cn(
                                 "snap-start shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-all border whitespace-nowrap",
                                 isActive
-                                    ? "bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20"
+                                    ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20"
                                     : "bg-neutral-900/50 text-white/60 border-white/10 hover:bg-white/10 hover:text-white"
                             )}
                         >
