@@ -13,6 +13,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useFilter } from '@/context/FilterContext';
 import { SongGroup, ArtistStats, Moment } from '@/types';
 import { checkIsAdmin } from './admin/feedback/actions';
+import { CategoryDropdown } from '@/components/CategoryDropdown';
+import CategoryPillBar from '@/components/CategoryPillBar';
 
 // Helper to group moments by video source
 function groupMomentsByVideo(moments: Moment[]): Map<string, Moment[]> {
@@ -74,7 +76,7 @@ export default function HomePage() {
                 const momentsData = await getRecentMoments({
                     limit: 50,
                     excludeSpotify: !showSpotify,
-                    category: categoryFilter || undefined,
+                    categoryId: categoryFilter ? parseInt(categoryFilter) : undefined,
                     sort: sortParam || 'newest'
                 });
                 setMoments(momentsData);
@@ -132,57 +134,44 @@ export default function HomePage() {
     };
 
     return (
-        <div className="flex flex-col gap-4 md:gap-6 min-h-[calc(100vh-80px)] p-4 pt-0 md:p-6 md:pt-0 pb-32 relative">
+        <div className="min-h-screen pt-4 md:pt-6 bg-black">
 
-            {/* Content Grid */}
-            <section className="space-y-6 relative">
+            {/* Desktop Category Dropdown - Fixed Left under Logo */}
+            <div className="hidden md:block fixed top-[72px] left-6 z-40">
+                <CategoryDropdown />
+            </div>
 
-                {/* Redesigned Active Filter Pills - Sleek & Subtle */}
-                {(categoryFilter || sortParam) && (
-                    <div className="absolute -top-1 md:-top-2 left-1/2 -translate-x-1/2 z-20 flex flex-wrap items-center justify-center gap-2">
-                        {categoryFilter && (
-                            <div
-                                onClick={() => clearFilter('category')}
-                                className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 backdrop-blur-md border border-white/10 text-white/70 text-[10px] font-bold uppercase tracking-wider cursor-pointer hover:bg-white/10 hover:text-white transition-all group shadow-xl"
-                            >
-                                <Check size={10} className="text-white/80" />
-                                <span>Category: {activeCategoryName}</span>
-                                <X size={10} className="hidden group-hover:block ml-1 opacity-50" />
-                            </div>
-                        )}
-                        {sortParam && (
-                            <div
-                                onClick={() => clearFilter('sort')}
-                                className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 backdrop-blur-md border border-white/10 text-white/70 text-[10px] font-bold uppercase tracking-wider cursor-pointer hover:bg-white/10 hover:text-white transition-all group shadow-xl"
-                            >
-                                <Check size={10} className="text-blue-400" />
-                                <span>Sort: {sortParam}</span>
-                                <X size={10} className="hidden group-hover:block ml-1 opacity-50" />
-                            </div>
-                        )}
-                    </div>
-                )}
+            {/* Main Content Area */}
+            <main className="pb-32 px-4 md:px-0">
 
-                {artistFilter ? (
-                    // Artist View: Show grouped SongCards
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {songs.length === 0 ? (
-                            <div className="col-span-full text-center py-12 text-white/40">
-                                <p>No songs found for this artist.</p>
-                            </div>
-                        ) : (
-                            songs.map((song) => (
-                                <SongCard key={`${song.service}-${song.sourceUrl}`} song={song} />
-                            ))
-                        )}
-                    </div>
-                ) : (
-                    // Home Feed: Show grouped VideoGroupCards
-                    <div className="flex flex-col items-center pb-24">
-                        <div className="w-full max-w-2xl space-y-4">
+                {/* Mobile Pill Bar */}
+                <CategoryPillBar />
+
+                {/* Content Container - Locked Width */}
+                <section className="w-full max-w-[600px] mx-auto space-y-6">
+                    {artistFilter ? (
+                        // Artist View: Show grouped SongCards
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {songs.length === 0 ? (
+                                <div className="col-span-full text-center py-12 text-white/40">
+                                    <p>No songs found for this artist.</p>
+                                </div>
+                            ) : (
+                                songs.map((song) => (
+                                    <SongCard key={`${song.service}-${song.sourceUrl}`} song={song} />
+                                ))
+                            )}
+                        </div>
+                    ) : (
+                        // Home Feed: Show grouped VideoGroupCards
+                        <div className="w-full space-y-4">
                             {groupedVideos.size === 0 ? (
                                 <div className="text-center py-12 text-white/40">
-                                    <p>No moments found{categoryFilter ? ` for ${activeCategoryName}` : ''}.</p>
+                                    {categoryFilter ? (
+                                        <p className="text-lg font-medium text-white/60">Be the first to capture a moment in this category!</p>
+                                    ) : (
+                                        <p>No moments found.</p>
+                                    )}
                                     <Link href="/about" className="text-purple-400 hover:text-purple-300 mt-2 inline-block">
                                         Learn how to capture your first moment!
                                     </Link>
@@ -197,10 +186,9 @@ export default function HomePage() {
                                 ))
                             )}
                         </div>
-                    </div>
-                )}
-            </section>
-
+                    )}
+                </section>
+            </main>
         </div>
     );
 }

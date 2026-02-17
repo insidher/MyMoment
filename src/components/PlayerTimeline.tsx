@@ -379,9 +379,14 @@ export default function PlayerTimeline({
             {/* Timeline Container */}
             <div className="glass-panel px-4 py-8 flex flex-col gap-1 relative group/timeline">
 
-                {/* Time Display */}
-                <div className="absolute top-2 right-4 text-xs font-mono text-white/40">
-                    {formatTime(currentTime)} / {formatTime(duration)}
+                {/* Visual Timeline Header & Time */}
+                <div className="absolute top-2 left-4 flex flex-col pointer-events-none">
+                    <span className="text-[10px] font-bold text-white/90 tracking-wider uppercase mb-0.5">
+                        Visual Timeline:
+                    </span>
+                    <span className="text-xs font-mono text-white/40">
+                        {formatTime(currentTime)} / {formatTime(duration)}
+                    </span>
                 </div>
 
                 {/* Main Track Interactive Area */}

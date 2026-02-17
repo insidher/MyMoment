@@ -8,7 +8,9 @@ export const CATEGORY_MAP: Record<string, number> = {
     'sports': 6,
     'news': 7,
     'technology': 8,
-    'entertainment': 9
+    'entertainment': 9,
+    'debate': 10,
+    'politics': 11
 };
 
 // Reverse mapping for display (ID -> Name)

@@ -143,18 +143,6 @@ export default function MomentFeedCard({ moments, onComment, isAdmin = false }: 
                     </div>
                 </div>
 
-                {/* Centered Action Button - Constant Text, Dynamic Link */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <Link
-                        href={`/room/view?url=${encodeURIComponent(selectedMoment.sourceUrl)}&start=${selectedMoment.startSec}&end=${selectedMoment.endSec}`}
-                        className="pointer-events-auto backdrop-blur-md bg-white/10 hover:bg-white/20 border border-white/20 text-white px-5 py-2.5 rounded-full transition-all group-hover/card:scale-105 flex items-center gap-2 group/btn shadow-xl"
-                    >
-                        <Play size={18} className="fill-white" />
-                        <span className="font-bold">
-                            Open {moments.length} Moment{moments.length !== 1 ? 's' : ''}
-                        </span>
-                    </Link>
-                </div>
             </div>
 
             {/* Shishkabob Timeline */}
@@ -194,13 +182,13 @@ export default function MomentFeedCard({ moments, onComment, isAdmin = false }: 
             {/* Footer Content */}
             <div className="p-4 pt-2 flex items-end justify-between gap-4">
                 {/* Left: Comment & Note & Date */}
-                <div className="flex-1 space-y-2">
+                <div className="flex-1 space-y-2 min-w-0">
                     {selectedMoment.note ? (
                         <div className="space-y-1">
                             <p className="text-xs font-bold text-white/50 uppercase tracking-wide">
                                 Curator comment:
                             </p>
-                            <p className="font-serif italic text-base text-gray-200 leading-snug">
+                            <p className="font-serif italic text-base text-gray-200 leading-snug line-clamp-2">
                                 "{selectedMoment.note}"
                             </p>
                         </div>
@@ -214,40 +202,54 @@ export default function MomentFeedCard({ moments, onComment, isAdmin = false }: 
                     </p>
                 </div>
 
-                {/* Right: Social Actions */}
-                <div className="flex items-center gap-1">
-                    {/* Like */}
-                    <button
-                        onClick={handleLike}
-                        className={`flex items-center gap-1.5 transition-colors p-2 rounded-lg hover:bg-white/5 ${currentLikeState.isLiked ? 'text-red-500' : 'text-white/60 hover:text-red-500'
-                            }`}
-                        title="Like this moment"
-                    >
-                        <Heart
-                            size={20}
-                            className={currentLikeState.isLiked ? 'fill-current' : ''}
-                        />
-                        <span className="text-sm font-medium">{currentLikeState.count}</span>
-                    </button>
-
-                    {/* Comment */}
-                    <button
-                        onClick={handleCommentClick}
-                        className="flex items-center gap-1.5 text-white/60 hover:text-blue-400 transition-colors p-2 rounded-lg hover:bg-white/5"
-                        title="View comments"
-                    >
-                        <MessageSquare size={20} />
-                        <span className="text-sm font-medium">{selectedMoment.replyCount || 0}</span>
-                    </button>
-
-                    {/* Share */}
+                {/* Right: Actions Column (Socials + Open Button) */}
+                <div className="flex flex-col items-end gap-3 shrink-0">
+                    {/* Primary CTA Button */}
                     <Link
                         href={`/room/view?url=${encodeURIComponent(selectedMoment.sourceUrl)}&start=${selectedMoment.startSec}&end=${selectedMoment.endSec}`}
-                        className="flex items-center gap-1.5 text-white/60 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/5"
-                        title="Share moment"
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-orange-500 bg-neutral-900/50 hover:bg-orange-500/20 transition-all group/btn shadow-lg"
                     >
-                        <Share2 size={20} />
+                        <Play size={14} className="fill-white" />
+                        <span className="text-white font-bold text-xs">
+                            Open {moments.length} Moment{moments.length !== 1 ? 's' : ''}
+                        </span>
                     </Link>
+
+                    {/* Social Actions Row */}
+                    <div className="flex items-center gap-1">
+                        {/* Like */}
+                        <button
+                            onClick={handleLike}
+                            className={`flex items-center gap-1.5 transition-colors p-2 rounded-lg hover:bg-white/5 ${currentLikeState.isLiked ? 'text-red-500' : 'text-white/60 hover:text-red-500'
+                                }`}
+                            title="Like this moment"
+                        >
+                            <Heart
+                                size={18}
+                                className={currentLikeState.isLiked ? 'fill-current' : ''}
+                            />
+                            <span className="text-xs font-medium">{currentLikeState.count}</span>
+                        </button>
+
+                        {/* Comment */}
+                        <button
+                            onClick={handleCommentClick}
+                            className="flex items-center gap-1.5 text-white/60 hover:text-blue-400 transition-colors p-2 rounded-lg hover:bg-white/5"
+                            title="View comments"
+                        >
+                            <MessageSquare size={18} />
+                            <span className="text-xs font-medium">{selectedMoment.replyCount || 0}</span>
+                        </button>
+
+                        {/* Share */}
+                        <Link
+                            href={`/room/view?url=${encodeURIComponent(selectedMoment.sourceUrl)}&start=${selectedMoment.startSec}&end=${selectedMoment.endSec}`}
+                            className="flex items-center gap-1.5 text-white/60 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/5"
+                            title="Share moment"
+                        >
+                            <Share2 size={18} />
+                        </Link>
+                    </div>
                 </div>
             </div>
         </div>

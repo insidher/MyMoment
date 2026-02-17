@@ -5,7 +5,7 @@ import { createComment } from '../../actions/moments';
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Play, Pause, Save, Clock, ArrowLeft, Check, RotateCcw, ListMusic, Loader2, X } from 'lucide-react';
+import { Play, Pause, Save, Clock, ArrowLeft, Check, RotateCcw, ListMusic, Loader2, X, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import YouTube, { YouTubeEvent } from 'react-youtube';
 import { toast } from 'sonner';
@@ -1280,171 +1280,98 @@ export default function Room({ params }: { params: { id: string } }) {
     };
 
     return (
-        <main className="flex flex-col min-h-screen bg-black text-white">
+        <main className="flex flex-col h-[calc(100vh-3.5rem)] bg-black text-white overflow-hidden">
             <SignupPromptModal
                 isOpen={showSignupModal}
                 onClose={() => setShowSignupModal(false)}
             />
-            {/* RIGID ZONE: Fixed Video Player + Timeline */}
-            <section className="shrink-0 w-full relative z-10 bg-black">
-                {/* Desktop: 65/35 Split | Mobile: Full Width */}
-                <div className="flex flex-col lg:flex-row lg:gap-4 lg:px-4">
-                    {/* Left: Video Player + Timeline (65% on desktop) */}
-                    <div className={`w-full lg:w-[65%] px-4 lg:px-0 ${isCreatorMode ? 'fixed top-16 left-0 right-0 bottom-0 z-50 bg-black !p-0 flex flex-col overflow-y-auto overflow-x-hidden' : ''}`}>
-                        <div className={`glass-panel p-1 overflow-hidden relative bg-black ${isCreatorMode ? 'shrink-0 h-[35vh] rounded-none !border-0' : 'aspect-video'}`}>
-                            {isYouTube && youtubeId ? (
-                                <>
-                                    <YouTube
-                                        videoId={youtubeId}
-                                        className="w-full h-full"
-                                        iframeClassName="w-full h-full rounded-xl"
-                                        onReady={onPlayerReady}
-                                        onStateChange={(event) => {
-                                            if (event.data === 1) setIsPlaying(true); // Playing
-                                            if (event.data === 2) setIsPlaying(false); // Paused
 
-                                            if (event.data === 1 && !hasUpdatedDuration.current) {
-                                                const dur = event.target.getDuration();
-                                                if (dur > 0 && Math.abs(dur - metadata.duration_sec) > 5) {
-                                                    console.log(`[YouTube] Updating duration: ${metadata.duration_sec} -> ${dur}`);
-                                                    setMetadata(prev => ({ ...prev, duration_sec: dur }));
+            {/* FIXED TOP: Video Player + Timeline */}
+            <section className="shrink-0 w-full z-20 bg-black shadow-2xl relative">
+                <div className="max-w-[1800px] mx-auto">
+                    {/* Two-Column Layout for Desktop Player to reduce vertical height if needed, 
+                        BUT for now we keep the stack: Video -> Timeline 
+                    */}
 
-                                                    // Heal DB
-                                                    // Use URL as the key since that's what getTrackMoments uses
-                                                    healTrackSource(url, dur).then(() => {
-                                                        console.log('[YouTube] DB duration healed');
-                                                    });
-
-                                                    hasUpdatedDuration.current = true;
-                                                }
+                    {/* 1. Video Player Container */}
+                    <div className={`w-full bg-black relative ${isCreatorMode ? 'h-[35vh]' : 'aspect-video lg:h-[50vh] lg:w-auto lg:aspect-video mx-auto'}`}>
+                        {isYouTube && youtubeId ? (
+                            <>
+                                <YouTube
+                                    videoId={youtubeId}
+                                    className="w-full h-full"
+                                    iframeClassName="w-full h-full"
+                                    onReady={onPlayerReady}
+                                    onStateChange={(event) => {
+                                        if (event.data === 1) setIsPlaying(true);
+                                        if (event.data === 2) setIsPlaying(false);
+                                        if (event.data === 1 && !hasUpdatedDuration.current) {
+                                            const dur = event.target.getDuration();
+                                            if (dur > 0 && Math.abs(dur - metadata.duration_sec) > 5) {
+                                                console.log(`[YouTube] Updating duration: ${metadata.duration_sec} -> ${dur}`);
+                                                setMetadata(prev => ({ ...prev, duration_sec: dur }));
+                                                healTrackSource(url, dur);
+                                                hasUpdatedDuration.current = true;
                                             }
-                                        }}
-                                        opts={{
-                                            playerVars: {
-                                                autoplay: 1,
-                                                controls: 0, // Hide native controls
-                                                modestbranding: 1,
-                                                rel: 0,
-                                                start: startParam ? parseInt(startParam) : undefined
-                                            }
-                                        }}
-                                    />
-                                    {/* Scrubber Overlay */}
-                                    <div className="absolute inset-x-0 bottom-0 h-1 bg-transparent group hover:h-2 transition-all z-10 cursor-pointer pointer-events-none">
-                                        {/* Visual scrubber bar could go here if we wanted a native-like overlay */}
+                                        }
+                                    }}
+                                    opts={{
+                                        playerVars: {
+                                            autoplay: 1,
+                                            controls: 0,
+                                            modestbranding: 1,
+                                            rel: 0,
+                                            start: startParam ? parseInt(startParam) : undefined
+                                        }
+                                    }}
+                                />
+                                <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
+                            </>
+                        ) : isSpotify ? (
+                            <div className="relative w-full h-full">
+                                <div id="spotify-embed" className="w-full h-full" />
+                                {isReloading && (
+                                    <div className="absolute top-0 left-0 right-0 z-[60] bg-red-500/90 text-white text-xs font-bold px-4 py-2 flex items-center justify-center gap-2 animate-in slide-in-from-top-full">
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                        Refreshing...
                                     </div>
-                                </>
-                            ) : isSpotify ? (
-                                <div className="relative w-full h-full">
-                                    <div id="spotify-embed" className="w-full h-full rounded-xl" />
-
-                                    {isReloading && (
-                                        <div className="absolute top-0 left-0 right-0 z-[60] bg-red-500/90 text-white text-xs font-bold px-4 py-2 flex items-center justify-center gap-2 animate-in slide-in-from-top-full">
-                                            <Loader2 className="w-3 h-3 animate-spin" />
-                                            Refreshing...
+                                )}
+                                {isSeekingToStart && !isReloading && (
+                                    <div className="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center gap-4 animate-in fade-in duration-300">
+                                        <Loader2 className="w-10 h-10 text-orange-500 animate-spin" />
+                                        <div className="text-white/80 font-medium font-mono text-sm">
+                                            Loading song...
                                         </div>
-                                    )}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-white/30">
+                                <p>Invalid or unsupported URL</p>
+                            </div>
+                        )}
+                    </div>
 
-                                    {isSeekingToStart && !isReloading && (
-                                        <div className="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center gap-4 animate-in fade-in duration-300 rounded-xl">
-                                            <Loader2 className="w-10 h-10 text-orange-500 animate-spin" />
-                                            <div className="text-white/80 font-medium font-mono text-sm">
-                                                Loading song at moment...
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center text-white/30">
-                                    <p>Invalid or unsupported URL</p>
-                                </div>
-                            )}
-                        </div>
+                    {/* 2. Controls & Timeline Bar */}
+                    <div className="bg-black/95 backdrop-blur-md border-b border-white/10 relative z-30">
+                        {/* Playback Controls Row */}
+                        {(isYouTube || isSpotify) && (
+                            <div className="flex items-center justify-center gap-2 py-2 border-b border-white/5">
+                                <button onClick={() => handleSeekRelative(-15)} disabled={controlsDisabled} className="p-1.5 rounded hover:bg-white/10 transition-colors disabled:opacity-30">
+                                    <RotateCcw size={16} className="text-white/70" />
+                                </button>
+                                <button onClick={() => handleTogglePlay(!isPlaying)} disabled={controlsDisabled} className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-30">
+                                    {isPlaying ? <Pause size={20} className="fill-white" /> : <Play size={20} className="fill-white" />}
+                                </button>
+                                <button onClick={() => handleSeekRelative(15)} disabled={controlsDisabled} className="p-1.5 rounded hover:bg-white/10 transition-colors disabled:opacity-30">
+                                    <RotateCcw size={16} className="text-white/70 scale-x-[-1]" />
+                                </button>
+                            </div>
+                        )}
 
-                        {/* Sticky Header: Controls + Timeline - LOWERED Z-INDEX to fix menu conflict */}
-                        <div className={`${isCreatorMode ? 'sticky top-0 z-[30] bg-black/95 backdrop-blur-md pb-2 px-4 border-t border-white/10' : 'sticky top-14 z-[30] bg-black/95 backdrop-blur-md pb-2 -mx-4 px-4 lg:mx-0 lg:px-0 lg:bg-black lg:border-b lg:border-white/10 lg:rounded-b-xl lg:mb-4 lg:pt-2'}`}>
-
-                            {/* Compact Playback Controls */}
-                            {(isYouTube || isSpotify) && (
-                                <div className="flex items-center justify-center gap-1.5 py-1.5 px-2">
-                                    {/* Skip Back 10 min */}
-                                    <button
-                                        onClick={() => handleSeekRelative(-600)}
-                                        disabled={controlsDisabled}
-                                        className="px-1.5 py-0.5 rounded text-[10px] font-mono hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-white/60"
-                                        title="Skip back 10 min"
-                                    >
-                                        -10m
-                                    </button>
-
-                                    {/* Skip Back 1 min */}
-                                    <button
-                                        onClick={() => handleSeekRelative(-60)}
-                                        disabled={controlsDisabled}
-                                        className="px-1.5 py-0.5 rounded text-[10px] font-mono hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-white/60"
-                                        title="Skip back 1 min"
-                                    >
-                                        -1m
-                                    </button>
-
-                                    {/* Skip Back 15s */}
-                                    <button
-                                        onClick={() => handleSeekRelative(-15)}
-                                        disabled={controlsDisabled}
-                                        className="p-1 rounded hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                        title="Skip back 15s"
-                                    >
-                                        <RotateCcw size={14} className="text-white/70" />
-                                    </button>
-
-                                    {/* Play/Pause */}
-                                    <button
-                                        onClick={() => handleTogglePlay(!isPlaying)}
-                                        disabled={controlsDisabled}
-                                        className="p-1.5 rounded-full hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                        title={isPlaying ? 'Pause' : 'Play'}
-                                    >
-                                        {isPlaying ? (
-                                            <Pause size={16} className="text-white" fill="white" />
-                                        ) : (
-                                            <Play size={16} className="text-white" fill="white" />
-                                        )}
-                                    </button>
-
-                                    {/* Skip Forward 15s */}
-                                    <button
-                                        onClick={() => handleSeekRelative(15)}
-                                        disabled={controlsDisabled}
-                                        className="p-1 rounded hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                        title="Skip forward 15s"
-                                    >
-                                        <RotateCcw size={14} className="text-white/70 scale-x-[-1]" />
-                                    </button>
-
-                                    {/* Skip Forward 1 min */}
-                                    <button
-                                        onClick={() => handleSeekRelative(60)}
-                                        disabled={controlsDisabled}
-                                        className="px-1.5 py-0.5 rounded text-[10px] font-mono hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-white/60"
-                                        title="Skip forward 1 min"
-                                    >
-                                        +1m
-                                    </button>
-
-                                    {/* Skip Forward 10 min */}
-                                    <button
-                                        onClick={() => handleSeekRelative(600)}
-                                        disabled={controlsDisabled}
-                                        className="px-1.5 py-0.5 rounded text-[10px] font-mono hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-white/60"
-                                        title="Skip forward 10 min"
-                                    >
-                                        +10m
-                                    </button>
-                                </div>
-                            )}
-
-                            {/* Unified Player Timeline (Spotify & YouTube) */}
-                            {(isSpotify || isYouTube) && (
+                        {/* Timeline Component */}
+                        {(isSpotify || isYouTube) && (
+                            <div className="pb-2">
                                 <PlayerTimeline
                                     currentTime={isSpotify ? spotifyProgress.current : guardCurrentTime}
                                     duration={isSpotify ? spotifyProgress.duration : guardDuration}
@@ -1456,12 +1383,8 @@ export default function Room({ params }: { params: { id: string } }) {
                                     service={isYouTube ? 'youtube' : 'spotify'}
                                     onChapterClick={(chapter) => handleSeek(chapter.startSec)}
                                     onPause={() => {
-                                        // Pause the video when clicking draft markers
-                                        if (isYouTube && youtubePlayer) {
-                                            youtubePlayer.pauseVideo();
-                                        } else if (isSpotify && spotifyPlayer) {
-                                            spotifyPlayer.pause();
-                                        }
+                                        if (isYouTube && youtubePlayer) youtubePlayer.pauseVideo();
+                                        else if (isSpotify && spotifyPlayer) spotifyPlayer.pause();
                                         setIsPlaying(false);
                                     }}
                                     editingMomentId={editingMomentId}
@@ -1473,181 +1396,94 @@ export default function Room({ params }: { params: { id: string } }) {
                                     onNoteChange={setNote}
                                     onSaveMoment={handleSave}
                                     onCancelCapture={() => {
-                                        setStartSec(null);
-                                        setEndSec(null);
-                                        setCaptureState('idle');
-                                        setError('');
-                                        setNote('');
-                                        handleCreatorModeChange(false);
+                                        setStartSec(null); setEndSec(null); setCaptureState('idle'); setError(''); setNote(''); handleCreatorModeChange(false);
                                     }}
                                     onCancelDraft={() => {
-                                        setStartSec(null);
-                                        setEndSec(null);
-                                        setCaptureState('idle');
-                                        setError('');
-                                        setNote('');
-                                        handleCreatorModeChange(false);
+                                        setStartSec(null); setEndSec(null); setCaptureState('idle'); setError(''); setNote(''); handleCreatorModeChange(false);
                                     }}
                                     onPreviewCapture={handlePreviewCapture}
-                                    onCaptureStart={(time) => {
-                                        setStartSec(time);
-                                        setCaptureState('start-captured');
-                                        setError('');
-                                    }}
-                                    // Creator Mode Props
+                                    onCaptureStart={(time) => { setStartSec(time); setCaptureState('start-captured'); setError(''); }}
                                     isEditorOpen={isCreatorMode}
                                     onEditorOpenChange={handleCreatorModeChange}
                                     onFocusRequest={() => setFocusTrigger(prev => prev + 1)}
-                                    onCaptureEnd={(time) => {
-                                        setEndSec(time);
-                                        setCaptureState('end-captured');
-                                        setError('');
-                                    }}
+                                    onCaptureEnd={(time) => { setEndSec(time); setCaptureState('end-captured'); setError(''); }}
                                     onCaptureUpdate={(start, end) => {
-                                        // Allow clearing (null)
-                                        if (start === null && end === null) {
-                                            setStartSec(null);
-                                            setEndSec(null);
-                                            setCaptureState('idle');
-                                        } else {
-                                            if (start !== undefined) setStartSec(start);
-                                            if (end !== undefined) setEndSec(end);
-
-                                            // State Inference
-                                            if (start === null) {
-                                                setCaptureState('idle');
-                                            } else if (end === null) {
-                                                setCaptureState('start-captured');
-                                            } else if (start !== null && end !== null) {
-                                                setCaptureState('end-captured');
-                                            }
+                                        if (start === null && end === null) { setStartSec(null); setEndSec(null); setCaptureState('idle'); }
+                                        else {
+                                            if (start !== undefined) setStartSec(start); if (end !== undefined) setEndSec(end);
+                                            if (start === null) setCaptureState('idle'); else if (end === null) setCaptureState('start-captured'); else setCaptureState('end-captured');
                                         }
                                     }}
                                     chapters={chapters}
                                 />
-                            )}
-
-                        </div>
-
-                        {/* CREATOR STUDIO (Visible only in Creator Mode) */}
-                        {isCreatorMode && (
-                            <div className="flex-1 min-h-0 bg-neutral-900 animate-in slide-in-from-bottom duration-300">
-                                <CreatorStudio
-                                    note={note}
-                                    onNoteChange={setNote}
-                                    onSave={handleSave}
-                                    onCancel={() => {
-                                        handleCreatorModeChange(false);
-                                        setCaptureState('end-captured');
-                                        // PERSIST DRAFT: Don't null out startSec/endSec!
-                                    }}
-                                />
                             </div>
-                        )}
-
-                        {/* SCROLLABLE MOMENTS FEED (Moved here for Sticky Behavior) */}
-                        {!isCreatorMode && (
-                            <div className="w-full space-y-3 pb-16">
-                                {/* Moments List */}
-                                <div className="glass-panel p-3 space-y-3">
-                                    <div className="flex items-center gap-3 border-b border-white/10 pb-3">
-                                        {metadata.artwork ? (
-                                            <img
-                                                src={metadata.artwork}
-                                                alt="Album Art"
-                                                className="w-12 h-12 rounded-md object-cover shadow-lg shrink-0"
-                                            />
-                                        ) : (
-                                            <div className="w-12 h-12 rounded-md bg-white/10 animate-pulse shrink-0" />
-                                        )}
-                                        <div className="min-w-0">
-                                            <h3 className="text-base font-semibold text-white truncate">
-                                                Saved Moments
-                                            </h3>
-                                            <p className="text-xs text-white/60 truncate">
-                                                for <span className="text-white/90 font-medium">{metadata.title || 'Unknown Video'}</span>
-                                            </p>
-                                        </div>
-                                        <div className="ml-auto text-xs text-white/40 font-mono bg-white/5 px-2 py-1 rounded-full">
-                                            {groupMoments(moments).length}
-                                        </div>
-                                    </div>
-
-                                    <div className="grid gap-2">
-                                        {moments.length === 0 ? (
-                                            <div className="text-center py-8 text-white/30 italic">
-                                                No moments saved yet. Be the first!
-                                            </div>
-                                        ) : (
-                                            groupMoments(moments)
-                                                .sort((a, b) => (activeMoment?.id === a.main.id ? -1 : activeMoment?.id === b.main.id ? 1 : 0))
-                                                .map((group) => {
-                                                    if (group.main.id.toString().includes('temp')) {
-                                                        console.log("👀 [Render Loop] Found Optimistic Moment in JSX:", group.main.id);
-                                                    }
-                                                    return (
-                                                        <MomentGroup
-                                                            key={group.main.id}
-                                                            mainMoment={group.main}
-                                                            replies={group.replies}
-                                                            trackDuration={(isSpotify ? spotifyProgress.duration : playbackState.duration) || metadata.duration_sec || group.main.trackSource?.durationSec}
-                                                            onDelete={async (id) => {
-                                                                try {
-                                                                    const res = await fetch(`/api/moments/${id}`, { method: 'DELETE' });
-                                                                    if (res.ok) {
-                                                                        setMoments(prev => {
-                                                                            const target = prev.find(m => m.id === id);
-                                                                            if (!target) return prev.filter(m => m.id !== id);
-
-                                                                            return prev.filter(m =>
-                                                                                !(m.id === id || (
-                                                                                    m.sourceUrl === target.sourceUrl &&
-                                                                                    m.startSec === target.startSec &&
-                                                                                    m.endSec === target.endSec
-                                                                                ))
-                                                                            );
-                                                                        });
-                                                                    }
-                                                                } catch (e) {
-                                                                    console.error(e);
-                                                                }
-                                                            }}
-                                                            showDelete={false}
-                                                            onPlayFull={() => {
-                                                                router.push(`/room/view?url=${encodeURIComponent(group.main.sourceUrl)}`);
-                                                            }}
-                                                            onPlayMoment={playMoment}
-                                                            onPauseMoment={handlePauseMoment}
-                                                            currentTime={isSpotify ? spotifyProgress.current : playbackState.current}
-                                                            activeMomentId={activeMoment?.id}
-                                                            isPlaying={isPlaying}
-                                                            currentUserId={user?.id || ''}
-                                                            currentUser={user ? { id: user.id, name: user.email, image: null } : undefined}
-                                                            onReply={(momentId, username) => {
-                                                                setReplyingTo({ id: momentId, username });
-                                                                noteInputRef.current?.focus();
-                                                            }}
-                                                            onRefresh={fetchMoments}
-                                                            onNewReply={handleNewReply}
-                                                        />
-                                                    );
-                                                })
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="pb-8">
-                                    <Footer />
-                                </div>
-                            </div>
-
                         )}
                     </div>
+                </div>
+            </section>
 
-                    {/* Right: Sidebar (35% on desktop, hidden on mobile) */}
-                    <div className="hidden lg:block lg:w-[35%] shrink-0">
-                        {/* Render MomentEditor in sidebar when active AND explicitly opened */}
-                        {((startSec !== null || endSec !== null) && isCreatorMode) ? (
-                            <div className="sticky top-4">
+            {/* SCROLLABLE BOTTOM: Moments List + Sidebar */}
+            <div className="flex-1 overflow-y-auto min-h-0 bg-neutral-950 scrollbar-hide">
+                <div className="max-w-[1800px] mx-auto flex flex-col lg:flex-row h-full">
+
+                    {/* Left: Moments Feed */}
+                    <div className="flex-1 p-4 lg:p-6 space-y-4">
+                        {/* Header for Moments List */}
+                        <div className="flex items-center gap-3 pb-2">
+                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                <Sparkles size={18} className="text-orange-500" />
+                                Saved Moments
+                            </h3>
+                            <span className="text-xs font-mono text-white/40 px-2 py-0.5 rounded-full bg-white/5 border border-white/5">
+                                {moments.length}
+                            </span>
+                        </div>
+
+                        {/* The Grid/List */}
+                        <div className="space-y-4 pb-20">
+                            {moments.length === 0 ? (
+                                <div className="text-center py-12 px-4 rounded-xl border border-white/5 bg-white/5">
+                                    <p className="text-white/40 italic">No moments saved yet. Be the first to capture one!</p>
+                                </div>
+                            ) : (
+                                groupMoments(moments)
+                                    .sort((a, b) => (activeMoment?.id === a.main.id ? -1 : activeMoment?.id === b.main.id ? 1 : 0))
+                                    .map((group) => (
+                                        <MomentGroup
+                                            key={group.main.id}
+                                            mainMoment={group.main}
+                                            replies={group.replies}
+                                            trackDuration={(isSpotify ? spotifyProgress.duration : playbackState.duration) || metadata.duration_sec || group.main.trackSource?.durationSec}
+                                            onDelete={async (id) => {
+                                                try {
+                                                    const res = await fetch(`/api/moments/${id}`, { method: 'DELETE' });
+                                                    if (res.ok) {
+                                                        setMoments(prev => prev.filter(m => m.id !== id)); // Simplified optimistic update
+                                                    }
+                                                } catch (e) { console.error(e); }
+                                            }}
+                                            showDelete={false}
+                                            onPlayFull={() => router.push(`/room/view?url=${encodeURIComponent(group.main.sourceUrl)}`)}
+                                            onPlayMoment={playMoment}
+                                            onPauseMoment={handlePauseMoment}
+                                            currentTime={isSpotify ? spotifyProgress.current : playbackState.current}
+                                            activeMomentId={activeMoment?.id}
+                                            isPlaying={isPlaying}
+                                            currentUserId={user?.id || ''}
+                                            currentUser={user ? { id: user.id, name: user.email, image: null } : undefined}
+                                            onReply={(momentId, username) => { setReplyingTo({ id: momentId, username }); noteInputRef.current?.focus(); }}
+                                            onRefresh={fetchMoments}
+                                            onNewReply={handleNewReply}
+                                        />
+                                    ))
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Right: Sidebar / Creator Studio Place */}
+                    <div className="w-full lg:w-[400px] shrink-0 p-4 lg:p-6 border-t lg:border-t-0 lg:border-l border-white/10 bg-black/20">
+                        {isCreatorMode ? (
+                            <div className="sticky top-6">
                                 <MomentEditor
                                     isOpen={true}
                                     focusTrigger={focusTrigger}
@@ -1659,94 +1495,53 @@ export default function Room({ params }: { params: { id: string } }) {
                                     onNoteChange={setNote}
                                     onSave={handleSave}
                                     onCancel={() => {
-                                        setStartSec(null);
-                                        setEndSec(null);
-                                        setCaptureState('idle');
-                                        setError('');
-                                        setNote('');
-                                        handleCreatorModeChange(false);
+                                        setStartSec(null); setEndSec(null); setCaptureState('idle'); setError(''); setNote(''); handleCreatorModeChange(false);
                                     }}
                                     onPreview={() => {
                                         if (startSec === null || endSec === null) return;
-                                        const mockMoment = {
-                                            id: 'preview-draft',
-                                            startSec,
-                                            endSec,
-                                            service: isYouTube ? 'youtube' : 'spotify',
-                                            userId: user ? user.id : 'me',
-                                            note: note,
-                                            createdAt: new Date().toISOString()
-                                        };
+                                        const mockMoment = { id: 'preview-draft', startSec, endSec, service: isYouTube ? 'youtube' : 'spotify', userId: user ? user.id : 'me', note, createdAt: new Date().toISOString() };
                                         playMoment(mockMoment as any);
                                     }}
                                     isPreviewing={activeMoment?.id === 'preview-draft'}
                                     formatTime={(seconds) => {
-                                        const h = Math.floor(seconds / 3600);
-                                        const m = Math.floor((seconds % 3600) / 60);
-                                        const s = Math.floor(seconds % 60);
-                                        return h > 0
-                                            ? `${h}h ${m}m ${s}s`
-                                            : `${m}:${s.toString().padStart(2, '0')}`;
+                                        const h = Math.floor(seconds / 3600); const m = Math.floor((seconds % 3600) / 60); const s = Math.floor(seconds % 60);
+                                        return h > 0 ? `${h}h ${m}m ${s}s` : `${m}:${s.toString().padStart(2, '0')}`;
                                     }}
                                 />
                             </div>
                         ) : (
-                            <div className="glass-panel p-3 h-fit space-y-3 sticky top-4">
-                                <h3 className="text-sm font-semibold flex items-center gap-2">
-                                    <Clock size={16} className="text-purple-400" />
-                                    Moment Details
-                                </h3>
-                                <p className="text-xs text-white/50">
-                                    Capture controls and details will appear here when you create a moment.
+                            <div className="sticky top-6 p-6 rounded-2xl border border-white/5 bg-white/5 text-center space-y-3">
+                                <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mx-auto text-white/30">
+                                    <Sparkles size={20} />
+                                </div>
+                                <h3 className="text-white font-medium">Ready to Capture?</h3>
+                                <p className="text-sm text-white/50">
+                                    Click or tap anywhere on the timeline to start.
                                 </p>
                             </div>
                         )}
                     </div>
                 </div>
-            </section>
+            </div>
 
-
-            {/* Grouping Confirmation Modal */}
+            {/* Modals */}
             <GroupingPromptModal
                 isOpen={!!groupingConfirmation}
                 parentMoment={groupingConfirmation?.conflictMoment!}
                 draftStart={startSec || 0}
                 draftEnd={endSec || 0}
-                onConfirm={() => {
-                    if (groupingConfirmation) {
-                        executeSmartGroup(groupingConfirmation.conflictMoment, groupingConfirmation.payload);
-                        setGroupingConfirmation(null);
-                    }
-                }}
-                onCancel={() => {
-                    if (groupingConfirmation) {
-                        executeCreateMoment(groupingConfirmation.payload, null);
-                        setGroupingConfirmation(null);
-                    }
-                }}
+                onConfirm={() => { if (groupingConfirmation) { executeSmartGroup(groupingConfirmation.conflictMoment, groupingConfirmation.payload); setGroupingConfirmation(null); } }}
+                onCancel={() => { if (groupingConfirmation) { executeCreateMoment(groupingConfirmation.payload, null); setGroupingConfirmation(null); } }}
             />
-            {/* Duration Limit Modal */}
             {durationLimitError && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setDurationLimitError(false)}>
-                    <div className="bg-zinc-900 border border-orange-500/30 rounded-2xl p-8 max-w-sm w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-                        <div className="text-center space-y-2">
-                            <div className="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center mx-auto mb-4">
-                                <Clock size={24} className="text-orange-500" />
-                            </div>
-                            <h2 className="text-xl font-bold text-white">Moment Too Long! 🛑</h2>
-                            <p className="text-white/60">
-                                Moments cannot be longer than 3 min.
-                            </p>
-                        </div>
-                        <button
-                            onClick={() => setDurationLimitError(false)}
-                            className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl transition-colors shadow-lg shadow-orange-500/20"
-                        >
-                            Got it
-                        </button>
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setDurationLimitError(false)}>
+                    <div className="bg-neutral-900 border border-orange-500/50 p-6 rounded-2xl shadow-2xl max-w-sm text-center space-y-4">
+                        <h2 className="text-xl font-bold text-white">Moment Too Long</h2>
+                        <p className="text-white/60">Moments must be under 3 minutes.</p>
+                        <button onClick={() => setDurationLimitError(false)} className="w-full py-2 bg-orange-500 rounded-xl font-bold">Got it</button>
                     </div>
                 </div>
             )}
-        </main >
+        </main>
     );
 }
