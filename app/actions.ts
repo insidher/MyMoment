@@ -265,6 +265,10 @@ export async function getRecentMoments(options: GetMomentsOptions = {}): Promise
                     artwork,
                     duration_sec,
                     category_id,
+                    youtube_category_id,
+                    source_url,
+                    tags,
+                    topics,
                     moments (
                         id,
                         start_time,
@@ -382,6 +386,10 @@ export async function getRecentMoments(options: GetMomentsOptions = {}): Promise
                 artwork: m.track_sources.artwork,
                 durationSec: m.track_sources.duration_sec,
                 category_id: m.track_sources.category_id,
+                youtube_category_id: m.track_sources.youtube_category_id,
+                source_url: m.track_sources.source_url,
+                tags: m.track_sources.tags || [],
+                topics: m.track_sources.topics || [],
             } : undefined,
         } as Moment));
 
@@ -427,7 +435,11 @@ export async function getUserMoments(userId: string, excludeSpotify = false): Pr
                     artist,
                     artwork,
                     duration_sec,
-                    category_id
+                    category_id,
+                    youtube_category_id,
+                    source_url,
+                    tags,
+                    topics
                 ),
                 replies: moments!parent_id(count)
                     `)
@@ -478,6 +490,10 @@ export async function getUserMoments(userId: string, excludeSpotify = false): Pr
                 artwork: m.track_sources.artwork,
                 durationSec: m.track_sources.duration_sec,
                 category_id: m.track_sources.category_id,
+                youtube_category_id: m.track_sources.youtube_category_id,
+                source_url: m.track_sources.source_url,
+                tags: m.track_sources.tags || [],
+                topics: m.track_sources.topics || [],
             } : undefined,
         } as Moment));
     } catch (error) {
@@ -521,7 +537,11 @@ export async function getLikedMoments(userId: string, excludeSpotify = false): P
                     artist,
                     artwork,
                     duration_sec,
-                    category_id
+                    category_id,
+                    youtube_category_id,
+                    source_url,
+                    tags,
+                    topics
                 )
             )
                 `)
@@ -573,6 +593,10 @@ export async function getLikedMoments(userId: string, excludeSpotify = false): P
                     artwork: m.track_sources.artwork,
                     durationSec: m.track_sources.duration_sec,
                     category_id: m.track_sources.category_id,
+                    youtube_category_id: m.track_sources.youtube_category_id,
+                    source_url: m.track_sources.source_url,
+                    tags: m.track_sources.tags || [],
+                    topics: m.track_sources.topics || [],
                 } : undefined,
             } as Moment;
         });

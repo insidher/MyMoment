@@ -3,7 +3,7 @@
 import { useState, useEffect, use, useMemo } from 'react';
 import { Moment } from '@/types';
 import { getUserMoments, getLikedMoments, getProfileData } from '../../actions';
-import VideoGroupCard from '@/components/VideoGroupCard';
+import MomentFeedCard from '@/components/MomentFeedCard';
 import UserAvatar from '@/components/UserAvatar';
 import { Music, Heart, Sparkles, LayoutGrid } from 'lucide-react';
 import { useFilter } from '@/context/FilterContext';
@@ -137,7 +137,7 @@ export default function PublicProfile({ params }: ProfilePageProps) {
                     {activeTab === 'captured' ? (
                         groupedCaptured.size > 0 ? (
                             Array.from(groupedCaptured.entries()).map(([videoId, videoMoments]) => (
-                                <VideoGroupCard key={videoId} moments={videoMoments} />
+                                <MomentFeedCard key={videoId} moments={videoMoments} />
                             ))
                         ) : (
                             <div className="py-20 text-center space-y-3">
@@ -150,7 +150,7 @@ export default function PublicProfile({ params }: ProfilePageProps) {
                     ) : (
                         groupedLiked.size > 0 ? (
                             Array.from(groupedLiked.entries()).map(([videoId, videoMoments]) => (
-                                <VideoGroupCard key={videoId} moments={videoMoments} />
+                                <MomentFeedCard key={videoId} moments={videoMoments} />
                             ))
                         ) : (
                             <div className="py-20 text-center space-y-3">

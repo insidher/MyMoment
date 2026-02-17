@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Sparkles, Compass, User, LogOut, Search, Music, Home, Menu, ArrowRight, ArrowLeft, X, Info, MessageSquare, ChevronDown } from 'lucide-react';
+import { Sparkles, Compass, User, LogOut, Search, Music, Home, Menu, ArrowRight, ArrowLeft, X, Info, MessageSquare, ChevronDown, Wrench } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useFilter } from '@/context/FilterContext';
 import { useState, useEffect, useRef } from 'react';
@@ -175,7 +175,7 @@ export default function Navbar() {
                                         <span className="text-sm">Settings</span>
                                     </button>
                                     <div className="mt-2 pt-2 border-t border-white/5 px-3 pb-1">
-                                        <span className="text-white/40 text-xs">v0.1.15</span>
+                                        <span className="text-white/40 text-xs">v0.1.16</span>
                                     </div>
                                 </div>
                             </div>
@@ -258,14 +258,24 @@ export default function Navbar() {
                         </button>
 
                         {isAdmin && (
-                            <Link
-                                href="/admin/feedback"
-                                onClick={() => setShowMenu(false)}
-                                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive('/admin/feedback') ? 'bg-purple-500/20 text-purple-300' : 'text-purple-400/60 hover:bg-purple-500/10 hover:text-purple-400'}`}
-                            >
-                                <Sparkles size={20} />
-                                <span className="font-semibold">Admin Panel</span>
-                            </Link>
+                            <>
+                                <Link
+                                    href="/admin/feedback"
+                                    onClick={() => setShowMenu(false)}
+                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive('/admin/feedback') ? 'bg-purple-500/20 text-purple-300' : 'text-purple-400/60 hover:bg-purple-500/10 hover:text-purple-400'}`}
+                                >
+                                    <Sparkles size={20} />
+                                    <span className="font-semibold">Admin Panel</span>
+                                </Link>
+                                <Link
+                                    href="/admin/inspector"
+                                    onClick={() => setShowMenu(false)}
+                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive('/admin/inspector') ? 'bg-purple-500/20 text-purple-300' : 'text-purple-400/60 hover:bg-purple-500/10 hover:text-purple-400'}`}
+                                >
+                                    <Wrench size={20} />
+                                    <span className="font-semibold">Admin Inspector</span>
+                                </Link>
+                            </>
                         )}
                     </div>
                 </div>

@@ -14,7 +14,6 @@ import { useAuth } from '@/context/AuthContext';
 import SignupPromptModal from '@/components/SignupPromptModal';
 
 
-import MomentTimeline from '@/components/MomentTimeline';
 import MomentCard from '@/components/MomentCard';
 import MomentGroup from '@/components/MomentGroup';
 import PlayerTimeline from '@/components/PlayerTimeline';

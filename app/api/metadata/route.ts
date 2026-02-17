@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getSpotifyTrackMetadata, extractSpotifyId, extractYouTubeId } from '@/lib/related';
-import { getYouTubeVideoMetadata } from '@/lib/youtube';
+import { getYouTubeVideoMetadata, getYouTubeVideoDebugData } from '@/lib/youtube';
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const url = searchParams.get('url');
+    const debug = searchParams.get('debug') === 'true';
 
     if (!url) {
         return NextResponse.json({ error: 'Missing url parameter' }, { status: 400 });
@@ -33,9 +34,19 @@ export async function GET(request: Request) {
                 return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 });
             }
 
+            // Debug mode: return both parsed and raw data
+            if (debug) {
+                const debugData = await getYouTubeVideoDebugData(videoId);
+                if (debugData) {
+                    return NextResponse.json(debugData);
+                } else {
+                    return NextResponse.json({ error: 'Failed to fetch debug data' }, { status: 404 });
+                }
+            }
+
+            // Standard mode: return simplified metadata
             const metadata = await getYouTubeVideoMetadata(videoId);
             if (metadata) {
-                // Ensure the response matches what the frontend expects (durationSec)
                 return NextResponse.json(metadata);
             } else {
                 return NextResponse.json({ error: 'Failed to fetch metadata' }, { status: 404 });

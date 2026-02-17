@@ -7,12 +7,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import SongCard from '@/components/SongCard';
 import MomentCard from '@/components/MomentCard';
 import MomentFeedCard from '@/components/MomentFeedCard';
-import VideoGroupCard from '@/components/VideoGroupCard';
 import ArtistCard from '@/components/ArtistCard';
 import { getGroupedSongs, getUserArtistStats, getArtistSongs, getRecentMoments } from './actions';
 import { useAuth } from '@/context/AuthContext';
 import { useFilter } from '@/context/FilterContext';
 import { SongGroup, ArtistStats, Moment } from '@/types';
+import { checkIsAdmin } from './admin/feedback/actions';
 
 // Helper to group moments by video source
 function groupMomentsByVideo(moments: Moment[]): Map<string, Moment[]> {
@@ -49,6 +49,13 @@ export default function HomePage() {
     const [moments, setMoments] = useState<Moment[]>([]);
     const [artistStats, setArtistStats] = useState<ArtistStats[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isAdmin, setIsAdmin] = useState(false);
+
+    // Check admin status once
+    useEffect(() => {
+        if (!user) { setIsAdmin(false); return; }
+        checkIsAdmin().then(r => setIsAdmin(r.isAdmin || false));
+    }, [user]);
 
     useEffect(() => {
         if (!filterLoading) {
@@ -182,9 +189,10 @@ export default function HomePage() {
                                 </div>
                             ) : (
                                 Array.from(groupedVideos.entries()).map(([videoId, videoMoments]) => (
-                                    <VideoGroupCard
+                                    <MomentFeedCard
                                         key={videoId}
                                         moments={videoMoments}
+                                        isAdmin={isAdmin}
                                     />
                                 ))
                             )}

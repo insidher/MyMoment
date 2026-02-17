@@ -98,7 +98,7 @@ export default function PlayerTimeline({
     const safeDuration = duration > 0 ? duration : 180;
 
     // Interaction State
-    const [draggingMarker, setDraggingMarker] = useState<'start' | 'end' | 'range' | null>(null);
+    const [draggingMarker, setDraggingMarker] = useState<'start' | 'end' | 'range' | 'playhead' | null>(null);
     const [hoverTime, setHoverTime] = useState<number | null>(null);
     const [dragStartMouseX, setDragStartMouseX] = useState<number | null>(null);
     const [isHovering, setIsHovering] = useState(false);
@@ -254,7 +254,10 @@ export default function PlayerTimeline({
             const time = Math.floor(percent * safeDuration);
 
             // LOGIC FOR DRAGGING
-            if (draggingMarker === 'start') {
+            if (draggingMarker === 'playhead') {
+                // Live scrub — just seek, no draft manipulation
+                onSeek(time);
+            } else if (draggingMarker === 'start') {
                 if (endSec !== null && time >= endSec) return;
                 onCaptureUpdate(time, endSec);
                 onSeek(time);
@@ -290,8 +293,9 @@ export default function PlayerTimeline({
                 const touch = e.touches[0];
 
                 // Directional Gatekeeper Logic
-                if (draggingMarker) {
-                    // If actively dragging a handle, lock ALL scrolling
+                const currentDragging = stateRef.current.draggingMarker;
+                if (currentDragging) {
+                    // If actively dragging ANY handle (including playhead), lock ALL scrolling
                     if (e.cancelable) e.preventDefault();
                     handleMove(touch.clientX);
                 } else if (touchStartX !== null && touchStartY !== null) {
@@ -313,9 +317,28 @@ export default function PlayerTimeline({
         };
 
         const handleUp = () => {
-            const { draggingMarker, endSec } = stateRef.current;
+            const { draggingMarker, endSec, startSec, safeDuration } = stateRef.current;
             if (draggingMarker) {
-                if (draggingMarker === 'end' && endSec !== null) {
+                if (draggingMarker === 'playhead') {
+                    // SCRUB-TO-CREATE: On drop, create a draft at the current scrub position
+                    // Only create if no draft already exists
+                    if (startSec === null && endSec === null) {
+                        const rect = timelineRef.current?.getBoundingClientRect();
+                        if (rect) {
+                            // Use onSeek's last position (currentTime will be updated by the player)
+                            // We read the playhead position from the DOM
+                            const playheadEl = timelineRef.current?.querySelector('[data-playhead]') as HTMLElement;
+                            if (playheadEl) {
+                                const leftPercent = parseFloat(playheadEl.style.left) / 100;
+                                const dropTime = Math.floor(leftPercent * safeDuration);
+                                const defaultDuration = 30;
+                                const newEnd = Math.min(dropTime + defaultDuration, safeDuration);
+                                onCaptureStart(dropTime);
+                                onCaptureEnd(newEnd);
+                            }
+                        }
+                    }
+                } else if (draggingMarker === 'end' && endSec !== null) {
                     onSeek(endSec);
                 }
                 justDraggedRef.current = true;
@@ -335,7 +358,7 @@ export default function PlayerTimeline({
             window.removeEventListener('touchmove', handleTouchMove);
             window.removeEventListener('touchend', handleUp);
         };
-    }, [safeDuration, onCaptureUpdate, onSeek]);
+    }, [safeDuration, onCaptureUpdate, onSeek, onCaptureStart, onCaptureEnd]);
 
 
     // ============================================
@@ -425,11 +448,33 @@ export default function PlayerTimeline({
                         />
                     </div>
 
-                    {/* PLAYHEAD INDICATOR */}
+                    {/* DUMBBELL PLAYHEAD HANDLE */}
                     <div
-                        className="absolute top-0 bottom-0 w-[2px] bg-white z-30 pointer-events-none"
+                        data-playhead
+                        className={`absolute top-0 bottom-0 z-30 ${startSec !== null ? 'pointer-events-none opacity-50' : 'pointer-events-auto cursor-ew-resize'}`}
                         style={{ left: `${(currentTime / safeDuration) * 100}%` }}
-                    />
+                    >
+                        {/* Invisible wide touch target */}
+                        <div
+                            className="absolute top-0 bottom-0 w-8 -ml-4 z-30"
+                            onMouseDown={(e) => {
+                                if (startSec !== null) return; // Don't allow playhead drag when draft exists
+                                e.stopPropagation();
+                                setDraggingMarker('playhead');
+                            }}
+                            onTouchStart={(e) => {
+                                if (startSec !== null) return;
+                                e.stopPropagation();
+                                setDraggingMarker('playhead');
+                            }}
+                        />
+                        {/* Visible Dumbbell: Top circle + Line + Bottom circle */}
+                        <div className="absolute inset-0 flex flex-col items-center pointer-events-none">
+                            <div className={`w-3 h-3 rounded-full bg-orange-500 border-2 border-white shadow-lg -mt-1 transition-transform ${draggingMarker === 'playhead' ? 'scale-125' : ''}`} />
+                            <div className="flex-1 w-[2px] bg-white" />
+                            <div className={`w-3 h-3 rounded-full bg-orange-500 border-2 border-white shadow-lg -mb-1 transition-transform ${draggingMarker === 'playhead' ? 'scale-125' : ''}`} />
+                        </div>
+                    </div>
 
                     {/* EXISTING MOMENTS OVERLAY */}
                     {moments.filter(m => !m.parentId).map((moment) => (

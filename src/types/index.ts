@@ -9,6 +9,10 @@ export interface TrackSource {
   artwork?: string;
   durationSec?: number;
   category_id?: number;
+  youtube_category_id?: string;
+  source_url?: string;
+  tags?: string[];
+  topics?: string[];
   canonicalTrackId?: string;
   moments?: Array<{ id: string; startSec: number; endSec: number }>; // For ghost clusters
 }
