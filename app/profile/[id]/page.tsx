@@ -7,6 +7,8 @@ import MomentFeedCard from '@/components/MomentFeedCard';
 import UserAvatar from '@/components/UserAvatar';
 import { Music, Heart, Sparkles, LayoutGrid } from 'lucide-react';
 import { useFilter } from '@/context/FilterContext';
+import { useAuth } from '@/context/AuthContext';
+import { createClient } from '@/lib/supabase/client';
 
 // Helper to group moments by video source
 function groupMomentsByVideo(moments: Moment[]): Map<string, Moment[]> {
@@ -27,6 +29,7 @@ interface ProfilePageProps {
 
 export default function PublicProfile({ params }: ProfilePageProps) {
     const { id: userId } = use(params);
+    const { user } = useAuth();
     const { showSpotify } = useFilter();
 
     const [profile, setProfile] = useState<{ name: string; image: string | null; momentCount: number } | null>(null);
@@ -34,6 +37,8 @@ export default function PublicProfile({ params }: ProfilePageProps) {
     const [likedMoments, setLikedMoments] = useState<Moment[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'captured' | 'liked'>('captured');
+
+    const isOwner = user?.id === userId;
 
     useEffect(() => {
         const fetchAllData = async () => {
@@ -57,6 +62,38 @@ export default function PublicProfile({ params }: ProfilePageProps) {
 
         fetchAllData();
     }, [userId, showSpotify]);
+
+    const handleDelete = async (id: string) => {
+        try {
+            const supabase = createClient();
+            const { error } = await supabase
+                .from('moments')
+                .delete()
+                .eq('id', id);
+
+            if (!error) {
+                const cleanup = (prev: Moment[]) => {
+                    const target = prev.find(m => m.id === id);
+                    if (!target) return prev.filter(m => m.id !== id);
+
+                    return prev.filter(m =>
+                        !(m.id === id || (
+                            m.sourceUrl === target.sourceUrl &&
+                            m.startSec === target.startSec &&
+                            m.endSec === target.endSec
+                        ))
+                    );
+                };
+
+                setCapturedMoments(prev => cleanup(prev));
+                setLikedMoments(prev => cleanup(prev));
+            } else {
+                console.error('Failed to delete moment:', error);
+            }
+        } catch (error) {
+            console.error('Failed to delete moment', error);
+        }
+    };
 
     // Grouping
     const groupedCaptured = useMemo(() => groupMomentsByVideo(capturedMoments), [capturedMoments]);
@@ -98,7 +135,7 @@ export default function PublicProfile({ params }: ProfilePageProps) {
                     </div>
                 </div>
 
-                {/* Follow Placeholder */}
+                {/* Follow Placeholder or Settings if Owner */}
                 <div className="flex flex-col items-end gap-1">
                     <button disabled className="px-4 py-1.5 rounded-xl bg-white/5 text-white/40 text-sm font-bold border border-white/5 cursor-not-allowed">
                         Follow
@@ -137,7 +174,11 @@ export default function PublicProfile({ params }: ProfilePageProps) {
                     {activeTab === 'captured' ? (
                         groupedCaptured.size > 0 ? (
                             Array.from(groupedCaptured.entries()).map(([videoId, videoMoments]) => (
-                                <MomentFeedCard key={videoId} moments={videoMoments} />
+                                <MomentFeedCard
+                                    key={videoId}
+                                    moments={videoMoments}
+                                    onDelete={isOwner ? handleDelete : undefined}
+                                />
                             ))
                         ) : (
                             <div className="py-20 text-center space-y-3">
@@ -150,7 +191,11 @@ export default function PublicProfile({ params }: ProfilePageProps) {
                     ) : (
                         groupedLiked.size > 0 ? (
                             Array.from(groupedLiked.entries()).map(([videoId, videoMoments]) => (
-                                <MomentFeedCard key={videoId} moments={videoMoments} />
+                                <MomentFeedCard
+                                    key={videoId}
+                                    moments={videoMoments}
+                                    onDelete={isOwner ? handleDelete : undefined}
+                                />
                             ))
                         ) : (
                             <div className="py-20 text-center space-y-3">

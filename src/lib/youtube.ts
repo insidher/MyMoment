@@ -133,19 +133,26 @@ export async function getYouTubeVideoMetadata(videoId: string): Promise<YouTubeM
             .single();
 
         if (cached && cached.title !== 'Unknown Title') {
-            console.log('🎯 Cache HIT for video:', videoId);
-            return {
-                title: cached.title || 'Unknown Title',
-                channelTitle: cached.channel_title || '',
-                description: cached.description || '',
-                thumbnails: {
-                    high: cached.artwork || undefined,
-                },
-                durationSec: cached.duration_sec || 0,
-            };
-        }
+            const lastUpdated = cached.metadata_updated_at ? new Date(cached.metadata_updated_at) : new Date(0);
+            const now = new Date();
+            const daysSinceUpdate = (now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24);
 
-        console.log('❄️ Thawing new video:', videoId);
+            if (daysSinceUpdate < 30) {
+                console.log('🎯 Cache HIT (Fresh) for video:', videoId);
+                return {
+                    title: cached.title || 'Unknown Title',
+                    channelTitle: cached.channel_title || '',
+                    description: cached.description || '',
+                    thumbnails: {
+                        high: cached.artwork || undefined,
+                    },
+                    durationSec: cached.duration_sec || 0,
+                };
+            }
+            console.log('♻️ Cache STALE (30+ days). Refreshing video:', videoId);
+        } else {
+            console.log('❄️ Thawing new video:', videoId);
+        }
 
         // 2. Fetch from YouTube API
         const apiKey = process.env.YOUTUBE_API_KEY || process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
@@ -210,12 +217,13 @@ export async function getYouTubeVideoMetadata(videoId: string): Promise<YouTubeM
             artwork: metadata.thumbnails.high || metadata.thumbnails.medium || metadata.thumbnails.default,
             duration_sec: metadata.durationSec,
             view_count: statistics.viewCount ? parseInt(statistics.viewCount) : null,
-            category_id: String(internalCategoryId),       // Our internal category (1-9)
-            youtube_category_id: youtubeCategoryId,         // Raw YouTube categoryId (10, 22, etc.)
+            // PRESERVE CATEGORY: Only use internalCategoryId if no existing category is set
+            category_id: (cached && cached.category_id) ? cached.category_id : String(internalCategoryId),
+            youtube_category_id: youtubeCategoryId,
             tags: snippet.tags || [],
             topics: cleanedTopics,
             metadata_updated_at: new Date().toISOString(),
-            createdAt: new Date().toISOString(),
+            created_at: cached ? (cached as any).created_at : new Date().toISOString(),
         }, { onConflict: 'youtube_video_id' });
 
         if (upsertError) {

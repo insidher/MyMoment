@@ -39,7 +39,19 @@ export async function uploadAvatar(formData: FormData) {
 
     if (updateError) {
         console.error('Update user error:', updateError);
-        return { error: 'Failed to update user profile' };
+        return { error: 'Failed to update user identity metadata' };
+    }
+
+    // 4. Update Profiles Table (Sync for moments)
+    const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ image: publicUrl })
+        .eq('id', userId);
+
+    if (profileError) {
+        console.error('Update profile error:', profileError);
+        // We don't necessarily return error here if auth update worked, 
+        // but it's better to be aware of the failure.
     }
 
     revalidatePath('/', 'layout');

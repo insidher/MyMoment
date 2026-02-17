@@ -83,7 +83,13 @@ export default function Footer() {
                         </p>
                     </div>
                 </div>
+            </div>
 
+            {/* Bottom Disclaimer Row */}
+            <div className="max-w-7xl mx-auto px-6 mt-12 pt-8 border-t border-white/5">
+                <p className="text-[10px] text-gray-600 font-medium tracking-wide uppercase text-center">
+                    MyMoment does not host content and is an API client for metadata curation. All media playback is served directly from third-party platforms.
+                </p>
             </div>
         </footer>
     );

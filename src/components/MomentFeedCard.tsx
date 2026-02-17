@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { Moment } from '@/types';
-import { Heart, MessageSquare, ArrowRight, Share2, Play } from 'lucide-react';
+import { Heart, MessageSquare, ArrowRight, Share2, Play, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toggleLike } from '../../app/actions/moments';
@@ -13,10 +13,11 @@ import { formatRelativeTime } from '@/lib/time';
 interface MomentFeedCardProps {
     moments: Moment[];
     onComment?: (momentId: string) => void;
+    onDelete?: (momentId: string) => void;
     isAdmin?: boolean;
 }
 
-export default function MomentFeedCard({ moments, onComment, isAdmin = false }: MomentFeedCardProps) {
+export default function MomentFeedCard({ moments, onComment, onDelete, isAdmin = false }: MomentFeedCardProps) {
     const router = useRouter();
 
     if (!moments || moments.length === 0) return null;
@@ -103,7 +104,24 @@ export default function MomentFeedCard({ moments, onComment, isAdmin = false }: 
                         )}
                     </p>
                 </div>
-                <CategoryBadge categoryId={selectedMoment.trackSource?.category_id} />
+                <div className="flex items-center gap-2">
+                    <CategoryBadge categoryId={selectedMoment.trackSource?.category_id} />
+                    {onDelete && (
+                        <button
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (confirm('Are you sure you want to delete this moment?')) {
+                                    onDelete(selectedMoment.id);
+                                }
+                            }}
+                            className="p-1 rounded-md text-white/20 hover:text-white hover:bg-white/10 transition-colors"
+                            title="Delete moment"
+                        >
+                            <X size={16} />
+                        </button>
+                    )}
+                </div>
             </Link>
 
             {/* Video Thumbnail Area */}

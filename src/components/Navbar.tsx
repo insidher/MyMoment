@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { Sparkles, Compass, User, LogOut, Search, Music, Home, Menu, ArrowRight, ArrowLeft, X, Info, MessageSquare, ChevronDown, Wrench } from 'lucide-react';
+import { Sparkles, Compass, User, LogOut, Search, Music, Home, Menu, ArrowRight, ArrowLeft, X, Info, MessageSquare, ChevronDown, Wrench, Youtube } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useFilter } from '@/context/FilterContext';
 import { useState, useEffect, useRef } from 'react';
@@ -140,7 +140,13 @@ export default function Navbar() {
 
                 {/* Right Area: Actions */}
                 <div className={`flex-1 flex items-center justify-end gap-2 md:gap-4 shrink-0 transition-opacity duration-300 opacity-100 visible`}>
-                    {/* Send Feedback removed from here as requested */}
+
+                    {/* YouTube Attribution */}
+                    <div className="hidden sm:flex items-center gap-1.5 opacity-40 hover:opacity-100 transition-opacity pr-2 border-r border-white/10 mr-2">
+                        <span className="text-[10px] font-bold text-white/60 uppercase tracking-tighter">Powered by</span>
+                        <Youtube size={14} className="text-red-600" />
+                        <span className="text-[10px] font-black tracking-tight text-white">YouTube</span>
+                    </div>
 
                     {user ? (
                         <div className="relative group">
