@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { Twitter, Github, Linkedin, Disc } from 'lucide-react';
 
 export default function Footer() {
@@ -8,14 +9,15 @@ export default function Footer() {
 
                 {/* Col 1: Brand */}
                 <div className="space-y-4">
-                    <div className="font-bold text-xl tracking-tight flex items-center">
-                        <span className="text-green-500">My</span>
-                        <span className="ml-[0.2em] text-green-500">M</span>
-                        <span className="relative inline-block px-[1px]">
-                            <span className="absolute inset-0 bg-orange-600/60 rounded ring-1 ring-inset ring-orange-400/80" />
-                            <span className="relative z-10 text-black">ome</span>
-                        </span>
-                        <span className="text-green-500">nt</span>
+                    <div className="flex items-center">
+                        <div className="relative h-10 w-48">
+                            <Image
+                                src="/images/MyMomentlogoV1.2.png"
+                                alt="MyMoment"
+                                fill
+                                className="object-contain object-left"
+                            />
+                        </div>
                     </div>
                     <p className="text-xs text-gray-500 leading-relaxed max-w-xs">
                         Capture, curate, and share the best parts of your favorite content. The ultimate robust timeline for creators and consumers.

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { Sparkles, Compass, User, LogOut, Search, Music, Home, Menu, ArrowRight, ArrowLeft, X, Info, MessageSquare, ChevronDown, Wrench } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -94,13 +95,27 @@ export default function Navbar() {
                             {showMenu ? <X size={20} /> : <Menu size={20} />}
                         </button>
 
-                        <Link href="/" className="font-bold text-lg md:text-xl tracking-tight flex items-center shrink-0 -ml-1 md:ml-0 group">
-                            <span className="text-white/50 transition-colors group-hover:text-white/70">my</span>
-                            <span className="text-white">moment</span>
-                            <span className="flex items-center">
-                                <span className="text-red-500">.</span>
-                                <span className="text-white/50 transition-colors group-hover:text-white/70">io</span>
-                            </span>
+                        <Link href="/" className="flex items-center shrink-0 -ml-1 md:ml-0 transition-opacity hover:opacity-80">
+                            {/* Mobile Logo */}
+                            <div className="block md:hidden relative h-8 w-8">
+                                <Image
+                                    src="/images/MyMomentSmalllogoV1.2.png"
+                                    alt="MyMoment"
+                                    fill
+                                    className="object-contain"
+                                    priority
+                                />
+                            </div>
+                            {/* Desktop Logo */}
+                            <div className="hidden md:block relative h-8 w-40">
+                                <Image
+                                    src="/images/MyMomentlogoV1.2.png"
+                                    alt="MyMoment"
+                                    fill
+                                    className="object-contain object-left"
+                                    priority
+                                />
+                            </div>
                         </Link>
 
                         {isCreatorMode && (
