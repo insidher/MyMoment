@@ -159,6 +159,7 @@ export async function POST(request: Request) {
         // Detect service
         const service = body.service || detectService(body.sourceUrl);
         const youtubeVideoId = service === 'youtube' ? extractYouTubeId(body.sourceUrl) : null;
+        console.log('[DEBUG] Extracted videoId:', youtubeVideoId, '| service:', service, '| sourceUrl:', body.sourceUrl);
 
         // Step 1: Find or Create track_source (ALWAYS using Admin Client to bypass RLS)
         const adminClient = createAdminClient();
@@ -191,19 +192,22 @@ export async function POST(request: Request) {
             }
         } else {
             // Create new track_source (even if duration is 0 or missing)
+            const insertPayload = {
+                service: service,
+                source_url: body.sourceUrl,
+                youtube_video_id: youtubeVideoId,
+                title: body.title || 'Unknown Title',
+                artist: body.artist || 'Unknown Artist',
+                artwork: body.artwork || null,
+                duration_sec: body.duration || 0,
+                created_at: new Date().toISOString(),
+            };
+            console.log('[DEBUG] Inserting new track_source:', JSON.stringify(insertPayload, null, 2));
+
             const { data: newTrackSource, error: trackSourceError } = await adminClient
                 .from('track_sources')
-                .insert({
-                    service: service,
-                    source_url: body.sourceUrl,
-                    youtube_video_id: youtubeVideoId,
-                    title: body.title || 'Unknown Title',
-                    artist: body.artist || 'Unknown Artist',
-                    artwork: body.artwork || null,
-                    duration_sec: body.duration || 0,
-                    created_at: new Date().toISOString(),
-                })
-                .select('id')
+                .insert(insertPayload)
+                .select('id, youtube_video_id')
                 .single();
 
             if (trackSourceError) {
@@ -215,7 +219,7 @@ export async function POST(request: Request) {
                 // Continue without track_source rather than failing if possible
             } else {
                 trackSourceId = newTrackSource.id;
-                console.log('[API] Created new track_source:', trackSourceId);
+                console.log('[DEBUG] Created new track_source:', trackSourceId, '| youtube_video_id:', newTrackSource.youtube_video_id);
             }
         }
 

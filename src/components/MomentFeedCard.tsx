@@ -2,13 +2,14 @@
 
 import { useState, useMemo } from 'react';
 import { Moment } from '@/types';
-import { Heart, MessageSquare, ArrowRight, Share2, Play, X } from 'lucide-react';
+import { Heart, MessageSquare, ArrowRight, Share2, Play, X, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toggleLike } from '../../app/actions/moments';
 import UserAvatar from './UserAvatar';
 import CategoryBadge from './CategoryBadge';
 import { formatRelativeTime } from '@/lib/time';
+import ShareModal from './ShareModal';
 
 interface MomentFeedCardProps {
     moments: Moment[];
@@ -33,6 +34,8 @@ export default function MomentFeedCard({ moments, onComment, onDelete, isAdmin =
         });
         return initial;
     });
+
+    const [showShareModal, setShowShareModal] = useState(false);
 
     const currentLikeState = likesState[selectedMoment.id] || { isLiked: false, count: 0 };
 
@@ -84,192 +87,214 @@ export default function MomentFeedCard({ moments, onComment, onDelete, isAdmin =
     }, [moments, selectedMoment.userId]);
 
     return (
-        <div className="bg-neutral-900 rounded-2xl overflow-hidden border border-white/10 hover:border-white/20 transition-all group/card">
-            {/* Header - Minimal: User + "and others" + Category */}
-            <Link
-                href={`/room/view?url=${encodeURIComponent(selectedMoment.sourceUrl)}&start=${selectedMoment.startSec}&end=${selectedMoment.endSec}`}
-                className="flex items-center gap-2 p-3 hover:bg-white/5 transition-colors"
-                onClick={(e) => e.stopPropagation()}
-            >
-                <UserAvatar
-                    name={selectedMoment.user?.name}
-                    image={selectedMoment.user?.image}
-                    size="w-8 h-8"
-                />
-                <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium truncate">
-                        {selectedMoment.user?.name || 'Music Lover'}
-                        {uniqueUsersText && (
-                            <span className="text-white/50 font-normal ml-1 text-sm">{uniqueUsersText}</span>
-                        )}
-                    </p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <CategoryBadge categoryId={selectedMoment.trackSource?.category_id} />
-                    {onDelete && (
-                        <button
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (confirm('Are you sure you want to delete this moment?')) {
-                                    onDelete(selectedMoment.id);
-                                }
-                            }}
-                            className="p-1 rounded-md text-white/20 hover:text-white hover:bg-white/10 transition-colors"
-                            title="Delete moment"
-                        >
-                            <X size={16} />
-                        </button>
-                    )}
-                </div>
-            </Link>
-
-            {/* Video Thumbnail Area */}
-            <div className="relative aspect-video bg-black group-thumbnail cursor-pointer">
-                {/* Clicking image goes to room */}
+        <>
+            <div className="bg-neutral-900 rounded-2xl overflow-hidden border border-white/10 hover:border-white/20 transition-all group/card">
+                {/* Header - Minimal: User + "and others" + Category */}
                 <Link
                     href={`/room/view?url=${encodeURIComponent(selectedMoment.sourceUrl)}&start=${selectedMoment.startSec}&end=${selectedMoment.endSec}`}
-                    className="absolute inset-0"
+                    className="flex items-center gap-2 p-3 hover:bg-white/5 transition-colors"
+                    onClick={(e) => e.stopPropagation()}
                 >
-                    <img
-                        src={selectedMoment.artwork || '/placeholder-artwork.jpg'}
-                        alt={selectedMoment.title || 'Video thumbnail'}
-                        className="w-full h-full object-cover opacity-90 transition-opacity group-hover/card:opacity-100"
+                    <UserAvatar
+                        name={selectedMoment.user?.name}
+                        image={selectedMoment.user?.image}
+                        size="w-8 h-8"
                     />
-                    {/* Dark gradient overlay for top text visibility */}
-                    <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-black/80 to-transparent pointer-events-none" />
-                </Link>
-
-                {/* Top Metadata Overlay */}
-                <div className="absolute top-3 left-3 right-3 pointer-events-none flex flex-col gap-0.5">
-                    {/* Title */}
-                    <h3 className="text-white font-bold leading-tight line-clamp-1 text-lg drop-shadow-md">
-                        {selectedMoment.title || 'Untitled'}
-                    </h3>
-
-                    {/* Channel + Source */}
-                    <div className="flex items-center gap-2 text-sm text-white/90 font-medium drop-shadow-md">
-                        <span>{selectedMoment.artist}</span>
-                        {selectedMoment.trackSource && (
-                            <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-white/90">
-                                <div className={`w-1.5 h-1.5 rounded-full ${selectedMoment.trackSource.service === 'youtube' ? 'bg-red-500' : 'bg-green-500'} shadow-[0_0_4px_rgba(0,0,0,0.5)]`} />
-                                <span style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
-                                    {selectedMoment.trackSource.service === 'youtube' ? 'YouTube' : 'Spotify'}
-                                </span>
-                            </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-white font-medium truncate">
+                            {selectedMoment.user?.name || 'Music Lover'}
+                            {uniqueUsersText && (
+                                <span className="text-white/50 font-normal ml-1 text-sm">{uniqueUsersText}</span>
+                            )}
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <CategoryBadge categoryId={selectedMoment.trackSource?.category_id} />
+                        {onDelete && (
+                            <button
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (confirm('Are you sure you want to delete this moment?')) {
+                                        onDelete(selectedMoment.id);
+                                    }
+                                }}
+                                className="p-1 rounded-md text-white/20 hover:text-white hover:bg-white/10 transition-colors"
+                                title="Delete moment"
+                            >
+                                <X size={16} />
+                            </button>
                         )}
                     </div>
-                </div>
+                </Link>
 
-            </div>
-
-            {/* Shishkabob Timeline */}
-            <div className="px-3 pt-3 pb-1 relative">
-                <div className="relative h-3 w-full flex items-center">
-                    {/* The Skewer Line */}
-                    <div className="absolute w-full h-[1px] bg-white/20 z-0" />
-
-                    {/* Segments */}
-                    <div className="relative w-full h-full z-10">
-                        {moments.map((m, idx) => {
-                            const widthPercent = ((m.endSec - m.startSec) / safeDuration) * 100;
-                            const leftPercent = (m.startSec / safeDuration) * 100;
-                            const isSelected = m.id === selectedMoment.id;
-
-                            return (
-                                <button
-                                    key={m.id}
-                                    onClick={() => setSelectedMoment(m)}
-                                    className={`absolute top-0 bottom-0 rounded-full transition-all duration-200 cursor-pointer ${isSelected
-                                        ? 'bg-primary z-20 shadow-[0_0_8px_rgba(var(--primary),0.4)] scale-y-110'
-                                        : 'bg-primary/40 hover:bg-primary/70 z-10'
-                                        }`}
-                                    style={{
-                                        left: `${leftPercent}%`,
-                                        width: `${Math.max(widthPercent, 2)}%`, // Minimum visual width
-                                        minWidth: '6px'
-                                    }}
-                                    aria-label={`Select moment ${idx + 1}`}
-                                />
-                            );
-                        })}
-                    </div>
-                </div>
-            </div>
-
-            {/* Footer Content */}
-            <div className="p-4 pt-2 flex items-end justify-between gap-4">
-                {/* Left: Comment & Note & Date */}
-                <div className="flex-1 space-y-2 min-w-0">
-                    {selectedMoment.note ? (
-                        <div className="space-y-1">
-                            <p className="text-xs font-bold text-white/50 uppercase tracking-wide">
-                                Curator comment:
-                            </p>
-                            <p className="font-serif italic text-base text-gray-200 leading-snug line-clamp-2">
-                                "{selectedMoment.note}"
-                            </p>
-                        </div>
-                    ) : (
-                        <div className="h-1" />
-                    )}
-
-                    {/* Relative Time */}
-                    <p className="text-xs text-white/30 font-mono">
-                        {formatRelativeTime(selectedMoment.createdAt)}
-                    </p>
-                </div>
-
-                {/* Right: Actions Column (Socials + Open Button) */}
-                <div className="flex flex-col items-end gap-3 shrink-0">
-                    {/* Primary CTA Button */}
+                {/* Video Thumbnail Area */}
+                <div className="relative aspect-video bg-black group-thumbnail cursor-pointer">
+                    {/* Clicking image goes to room */}
                     <Link
                         href={`/room/view?url=${encodeURIComponent(selectedMoment.sourceUrl)}&start=${selectedMoment.startSec}&end=${selectedMoment.endSec}`}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-primary bg-neutral-900/50 hover:bg-primary/20 transition-all group/btn shadow-lg"
+                        className="absolute inset-0"
                     >
-                        <Play size={14} className="fill-white" />
-                        <span className="text-white font-bold text-xs">
-                            Open {moments.length} Moment{moments.length !== 1 ? 's' : ''}
-                        </span>
+                        <img
+                            src={selectedMoment.artwork || '/placeholder-artwork.jpg'}
+                            alt={selectedMoment.title || 'Video thumbnail'}
+                            className="w-full h-full object-cover opacity-90 transition-opacity group-hover/card:opacity-100"
+                        />
+                        {/* Dark gradient overlay for top text visibility */}
+                        <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-black/80 to-transparent pointer-events-none" />
                     </Link>
 
-                    {/* Social Actions Row */}
-                    <div className="flex items-center gap-1">
-                        {/* Like */}
-                        <button
-                            onClick={handleLike}
-                            className={`flex items-center gap-1.5 transition-colors p-2 rounded-lg hover:bg-white/5 ${currentLikeState.isLiked ? 'text-red-500' : 'text-white/60 hover:text-red-500'
-                                }`}
-                            title="Like this moment"
-                        >
-                            <Heart
-                                size={18}
-                                className={currentLikeState.isLiked ? 'fill-current' : ''}
-                            />
-                            <span className="text-xs font-medium">{currentLikeState.count}</span>
-                        </button>
+                    {/* Top Metadata Overlay */}
+                    <div className="absolute top-3 left-3 right-3 pointer-events-none flex flex-col gap-0.5">
+                        {/* Title */}
+                        <h3 className="text-white font-bold leading-tight line-clamp-1 text-lg drop-shadow-md">
+                            {selectedMoment.title || 'Untitled'}
+                        </h3>
 
-                        {/* Comment */}
-                        <button
-                            onClick={handleCommentClick}
-                            className="flex items-center gap-1.5 text-white/60 hover:text-blue-400 transition-colors p-2 rounded-lg hover:bg-white/5"
-                            title="View comments"
-                        >
-                            <MessageSquare size={18} />
-                            <span className="text-xs font-medium">{selectedMoment.replyCount || 0}</span>
-                        </button>
+                        {/* Channel + Source */}
+                        <div className="flex items-center gap-2 text-sm text-white/90 font-medium drop-shadow-md">
+                            <span>{selectedMoment.artist}</span>
+                            {selectedMoment.trackSource && (
+                                <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-white/90">
+                                    <div className={`w-1.5 h-1.5 rounded-full ${selectedMoment.trackSource.service === 'youtube' ? 'bg-red-500' : 'bg-green-500'} shadow-[0_0_4px_rgba(0,0,0,0.5)]`} />
+                                    <span style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
+                                        {selectedMoment.trackSource.service === 'youtube' ? 'YouTube' : 'Spotify'}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
 
-                        {/* Share */}
+                </div>
+
+                {/* Shishkabob Timeline */}
+                <div className="px-3 pt-3 pb-1 relative">
+                    <div className="relative h-3 w-full flex items-center">
+                        {/* The Skewer Line */}
+                        <div className="absolute w-full h-[1px] bg-white/20 z-0" />
+
+                        {/* Segments */}
+                        <div className="relative w-full h-full z-10">
+                            {moments.map((m, idx) => {
+                                const widthPercent = ((m.endSec - m.startSec) / safeDuration) * 100;
+                                const leftPercent = (m.startSec / safeDuration) * 100;
+                                const isSelected = m.id === selectedMoment.id;
+
+                                return (
+                                    <button
+                                        key={m.id}
+                                        onClick={() => setSelectedMoment(m)}
+                                        className={`absolute top-0 bottom-0 rounded-full transition-all duration-200 cursor-pointer ${isSelected
+                                            ? 'bg-primary z-20 shadow-[0_0_8px_rgba(var(--primary),0.4)] scale-y-110'
+                                            : 'bg-primary/40 hover:bg-primary/70 z-10'
+                                            }`}
+                                        style={{
+                                            left: `${leftPercent}%`,
+                                            width: `${Math.max(widthPercent, 2)}%`, // Minimum visual width
+                                            minWidth: '6px'
+                                        }}
+                                        aria-label={`Select moment ${idx + 1}`}
+                                    />
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer Content */}
+                <div className="p-4 pt-2 flex items-end justify-between gap-4">
+                    {/* Left: Comment & Note & Date */}
+                    <div className="flex-1 space-y-2 min-w-0">
+                        {selectedMoment.note ? (
+                            <div className="space-y-1">
+                                <p className="text-xs font-bold text-white/50 uppercase tracking-wide">
+                                    Curator comment:
+                                </p>
+                                <p className="font-serif italic text-base text-gray-200 leading-snug line-clamp-2">
+                                    "{selectedMoment.note}"
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="h-1" />
+                        )}
+
+                        {/* Relative Time */}
+                        <p className="text-xs text-white/30 font-mono">
+                            {formatRelativeTime(selectedMoment.createdAt)}
+                        </p>
+                    </div>
+
+                    {/* Right: Actions Column (Socials + Open Button) */}
+                    <div className="flex flex-col items-end gap-3 shrink-0">
+                        {/* Primary CTA Button */}
                         <Link
                             href={`/room/view?url=${encodeURIComponent(selectedMoment.sourceUrl)}&start=${selectedMoment.startSec}&end=${selectedMoment.endSec}`}
-                            className="flex items-center gap-1.5 text-white/60 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/5"
-                            title="Share moment"
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-primary bg-neutral-900/50 hover:bg-primary/20 transition-all group/btn shadow-lg"
                         >
-                            <Share2 size={18} />
+                            <Play size={14} className="fill-white" />
+                            <span className="text-white font-bold text-xs">
+                                Open {moments.length} Moment{moments.length !== 1 ? 's' : ''}
+                            </span>
                         </Link>
+
+                        {/* Social Actions Row */}
+                        <div className="flex items-center gap-1">
+                            {/* Like */}
+                            <button
+                                onClick={handleLike}
+                                className={`flex items-center gap-1.5 transition-colors p-2 rounded-lg hover:bg-white/5 ${currentLikeState.isLiked ? 'text-red-500' : 'text-white/60 hover:text-red-500'
+                                    }`}
+                                title="Like this moment"
+                            >
+                                <Heart
+                                    size={18}
+                                    className={currentLikeState.isLiked ? 'fill-current' : ''}
+                                />
+                                <span className="text-xs font-medium">{currentLikeState.count}</span>
+                            </button>
+
+                            {/* Comment */}
+                            <button
+                                onClick={handleCommentClick}
+                                className="flex items-center gap-1.5 text-white/60 hover:text-blue-400 transition-colors p-2 rounded-lg hover:bg-white/5"
+                                title="View comments"
+                            >
+                                <MessageSquare size={18} />
+                                <span className="text-xs font-medium">{selectedMoment.replyCount || 0}</span>
+                            </button>
+
+                            {/* Share */}
+                            <button
+                                onClick={() => setShowShareModal(true)}
+                                className="flex items-center gap-1.5 text-white/60 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/5"
+                                title="Share moment"
+                            >
+                                <Share2 size={18} />
+                            </button>
+
+                            {/* Inspect (Admin Only) */}
+                            {isAdmin && (
+                                <Link
+                                    href={`/admin/inspector?url=${encodeURIComponent(selectedMoment.sourceUrl)}`}
+                                    className="flex items-center gap-1.5 text-white/60 hover:text-cyan-400 transition-colors p-2 rounded-lg hover:bg-white/5"
+                                    title="Inspect metadata"
+                                >
+                                    <Search size={18} />
+                                </Link>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+
+            {/* Share Modal */}
+            <ShareModal
+                isOpen={showShareModal}
+                onClose={() => setShowShareModal(false)}
+                momentId={selectedMoment.id}
+                title={selectedMoment.title || 'Untitled'}
+                note={selectedMoment.note}
+            />
+        </>
     );
 }
