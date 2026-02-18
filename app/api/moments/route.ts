@@ -159,6 +159,7 @@ export async function POST(request: Request) {
         // Detect service
         const service = body.service || detectService(body.sourceUrl);
         const youtubeVideoId = service === 'youtube' ? extractYouTubeId(body.sourceUrl) : null;
+        console.log('[TRACE 1] Extracted ID:', youtubeVideoId);
 
         // Step 1: Find or Create track_source (ALWAYS using Admin Client to bypass RLS)
         const adminClient = createAdminClient();
@@ -190,10 +191,12 @@ export async function POST(request: Request) {
                     .eq('id', trackSourceId);
             }
         } else {
-            // Create new track_source (even if duration is 0 or missing)
-            const { data: newTrackSource, error: trackSourceError } = await adminClient
+            // Create new track_source — Action 1: exclude created_at to bypass PGRST204 schema cache error.
+            // Using upsert with onConflict so concurrent requests don't race into a duplicate-key error.
+            const conflictColumn = youtubeVideoId ? 'youtube_video_id' : 'source_url';
+            const { data: trackSourceData, error: trackSourceError } = await adminClient
                 .from('track_sources')
-                .insert({
+                .upsert({
                     service: service,
                     source_url: body.sourceUrl,
                     youtube_video_id: youtubeVideoId,
@@ -201,22 +204,28 @@ export async function POST(request: Request) {
                     artist: body.artist || 'Unknown Artist',
                     artwork: body.artwork || null,
                     duration_sec: body.duration || 0,
-                    created_at: new Date().toISOString(),
-                })
+                    // created_at intentionally omitted — column not in PostgREST schema cache (PGRST204)
+                }, { onConflict: conflictColumn })
                 .select('id')
                 .single();
+            console.log('[TRACE 2] Upsert Result - Data:', trackSourceData, 'Error:', trackSourceError);
 
+            // Action 3: track_source is now MANDATORY. Stop here and return 500
+            // rather than inserting an orphaned moment with track_source_id = null.
             if (trackSourceError) {
-                console.error('❌ [API] Failed to create track_source with Admin Client:', {
+                console.error('❌ [API] Failed to upsert track_source — aborting moment creation:', {
                     message: trackSourceError.message,
                     details: trackSourceError.details,
                     code: trackSourceError.code
                 });
-                // Continue without track_source rather than failing if possible
-            } else {
-                trackSourceId = newTrackSource.id;
-                console.log('[API] Created new track_source:', trackSourceId);
+                return NextResponse.json(
+                    { error: `Failed to resolve track source: ${trackSourceError.message} (${trackSourceError.code})` },
+                    { status: 500 }
+                );
             }
+
+            trackSourceId = trackSourceData.id;
+            console.log('[API] Upserted track_source:', trackSourceId);
         }
 
         // Step 1.5: Fuzzy Threading & Heirarchy Flattening
@@ -264,6 +273,7 @@ export async function POST(request: Request) {
         }
 
         // Step 2: Prepare moment data for Supabase (snake_case columns)
+        console.log('[TRACE 3] ID being passed to Moment Insert:', trackSourceId);
         const momentData = {
             user_id: user.id,
             resource_id: body.sourceUrl,
