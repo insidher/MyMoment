@@ -2,6 +2,12 @@
 
 All notable changes to the MyMoment project will be documented in this file.
 
+## [1.1.1] - 2026-02-19
+
+### Hotfix
+- **Build Restoration**: Resolved duplicate identifier in `MomentDetailModal` and fixed reference errors.
+- **Playback Stability**: Added robust null checks for YouTube player component to prevent crashes during initialization.
+
 ## [1.1.0] - 2026-02-18
 
 ### Added

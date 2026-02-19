@@ -102,7 +102,7 @@ export function usePlaybackGuard({
 
                         // Seek Execution
                         if (queuedSeek.current !== null) {
-                            if (player && typeof player.seekTo === 'function') {
+                            if (player && typeof player.seekTo === 'function' && player.getInternalPlayer()) {
                                 player.seekTo(queuedSeek.current, true);
                             }
                             queuedSeek.current = null;

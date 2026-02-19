@@ -12,7 +12,6 @@ interface MomentDetailModalProps {
     onPauseMoment?: (moment: Moment) => void;
     isPlaying?: boolean;
     currentTime?: number;
-    currentTime?: number;
     currentUserId?: string;
     currentUser?: { id: string; name?: string | null; image?: string | null };
     onShare?: (moment: Moment) => void;
