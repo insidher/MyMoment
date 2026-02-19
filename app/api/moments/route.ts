@@ -18,12 +18,11 @@ export async function POST(request: Request) {
 
         const body = await request.json();
         const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-        console.log('[API] POST /api/moments - Payload:', JSON.stringify(body, null, 2));
-        console.log('[API] Admin Key Check:', serviceRoleKey ? 'PRESENT' : 'MISSING');
 
         if (!serviceRoleKey) {
+            console.error('[API] Critical: SUPABASE_SERVICE_ROLE_KEY is missing');
             return NextResponse.json(
-                { error: 'Server configuration error: SUPABASE_SERVICE_ROLE_KEY is missing' },
+                { error: 'Internal Server Error' },
                 { status: 500 }
             );
         }
@@ -159,7 +158,6 @@ export async function POST(request: Request) {
         // Detect service
         const service = body.service || detectService(body.sourceUrl);
         const youtubeVideoId = service === 'youtube' ? extractYouTubeId(body.sourceUrl) : null;
-        console.log('[TRACE 1] Extracted ID:', youtubeVideoId);
 
         // Step 1: Find or Create track_source (ALWAYS using Admin Client to bypass RLS)
         const adminClient = createAdminClient();
@@ -181,7 +179,6 @@ export async function POST(request: Request) {
         if (existingTrackSource) {
             // Use existing track_source
             trackSourceId = existingTrackSource.id;
-            console.log('[API] Using existing track_source:', trackSourceId);
 
             // Auto-Heal: If new TOTAL track duration provided > 0, update existing record (using admin context)
             if (body.duration && body.duration > 0) {
@@ -208,7 +205,6 @@ export async function POST(request: Request) {
                 }, { onConflict: conflictColumn })
                 .select('id')
                 .single();
-            console.log('[TRACE 2] Upsert Result - Data:', trackSourceData, 'Error:', trackSourceError);
 
             // Action 3: track_source is now MANDATORY. Stop here and return 500
             // rather than inserting an orphaned moment with track_source_id = null.
@@ -219,13 +215,12 @@ export async function POST(request: Request) {
                     code: trackSourceError.code
                 });
                 return NextResponse.json(
-                    { error: `Failed to resolve track source: ${trackSourceError.message} (${trackSourceError.code})` },
+                    { error: 'Internal Server Error' },
                     { status: 500 }
                 );
             }
 
             trackSourceId = trackSourceData.id;
-            console.log('[API] Upserted track_source:', trackSourceId);
         }
 
         // Step 1.5: Fuzzy Threading & Heirarchy Flattening
@@ -247,12 +242,10 @@ export async function POST(request: Request) {
 
             if (targetMoment) {
                 parentId = targetMoment.parent_id || targetMoment.id;
-                console.log(`[API] Resolved Parent: ${proposedParentId} -> ${parentId} (Flattened)`);
             }
         }
 
         // Step 2: Prepare moment data for Supabase (snake_case columns)
-        console.log('[TRACE 3] ID being passed to Moment Insert:', trackSourceId);
         const momentData = {
             user_id: user.id,
             resource_id: body.sourceUrl,
@@ -270,8 +263,6 @@ export async function POST(request: Request) {
             saved_by_count: 1,
             // moment_duration_sec removed - column does not exist in DB (calculated on read)
         };
-
-        console.log('[TRACE 4] Final Moment Payload:', JSON.stringify(momentData, null, 2));
 
         // Step 3: Insert moment into Supabase
         const { data: newMoment, error } = await supabase
@@ -295,12 +286,10 @@ export async function POST(request: Request) {
         if (error) {
             console.error('[API] Supabase Insert Error:', error);
             return NextResponse.json(
-                { error: `Database error: ${error.message} (${error.code})` },
+                { error: 'Internal Server Error' },
                 { status: 500 }
             );
         }
-
-        console.log('[API] Moment saved successfully:', newMoment.id);
 
         // Transform to match expected client format
         const transformedMoment = {
@@ -338,7 +327,7 @@ export async function POST(request: Request) {
     } catch (error: any) {
         console.error('[API] POST /api/moments Error:', error);
         return NextResponse.json(
-            { error: `Failed to save moment: ${error.message || 'Unknown error'}` },
+            { error: 'Internal Server Error' },
             { status: 500 }
         );
     }

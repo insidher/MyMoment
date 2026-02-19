@@ -322,17 +322,118 @@ export async function getRecentMoments(options: GetMomentsOptions = {}): Promise
             return [];
         }
 
-        if (!moments) return [];
+        if (!moments || moments.length === 0) return [];
 
-        // In-memory filtering for category
-        let filteredMoments = moments;
+        // ----------------------------------------------------
+        // ENRICHMENT: Fetch siblings for timeline context
+        // ----------------------------------------------------
+        // We want to show the full timeline for any video that appears in the feed.
+        // So we collect all unique resource_ids from the fetched moments,
+        // and fetch ALL top-level moments (siblings) for those videos.
+        const resourceIds = Array.from(new Set(moments.map((m: any) => m.resource_id))).filter(Boolean);
+
+        let finalMoments = moments;
+
+        if (resourceIds.length > 0) {
+            const { data: siblings, error: siblingsError } = await supabase
+                .from('moments')
+                .select(`
+                id,
+                platform,
+                resource_id,
+                start_time,
+                end_time,
+                moment_duration_sec,
+                track_duration_sec,
+                title,
+                artist,
+                artwork,
+                note,
+                like_count,
+                created_at,
+                updated_at,
+                user_id,
+                track_source_id,
+                profiles!user_id (
+                    name,
+                    image
+                ),
+                likes (
+                    user_id,
+                    user:profiles!user_id (
+                        name,
+                        image
+                    )
+                ),
+                track_sources!track_source_id (
+                    title,
+                    artist,
+                    artwork,
+                    duration_sec,
+                    category_id,
+                    youtube_category_id,
+                    source_url,
+                    tags,
+                    topics,
+                    moments (
+                        id,
+                        start_time,
+                        end_time
+                    )
+                ),
+                replies: moments!parent_id(count)
+            `)
+                .in('resource_id', resourceIds)
+                .is('parent_id', null) // Stacked Feed: Only Top-Level
+                .order('created_at', { ascending: false });
+
+            if (!siblingsError && siblings) {
+                // Merge siblings into the main list, deduplicating by ID
+                const momentMap = new Map<string, any>();
+
+                // Add original results first (to preserve sort order of primary feed)
+                moments.forEach((m: any) => momentMap.set(m.id, m));
+
+                // Add siblings (might overwrite, but data is same)
+                siblings.forEach((s: any) => momentMap.set(s.id, s));
+
+                finalMoments = Array.from(momentMap.values());
+            } else {
+                console.warn('Failed to fetch siblings for timeline context:', siblingsError);
+            }
+        }
+
+        // In-memory filtering for category (applied to strict results)
+        // If sorting was applied initially, we might have mixed in siblings that don't match the sort criteria contextually?
+        // Actually, we want siblings regardless of sort, to fill the timeline.
+        // But we might want to respect Category filter?
+        // The initial query respected category. Siblings share track_source, so they share category (mostly).
+        // Let's re-apply category filter just in case.
+
+        let filteredMoments = finalMoments;
         if (categoryId !== undefined) {
-            // Use loose equality (or robust conversion) to handle both string and number types
-            filteredMoments = moments.filter((m: any) => {
+            filteredMoments = finalMoments.filter((m: any) => {
                 const dbCatId = m.track_sources?.category_id;
                 return dbCatId != null && Number(dbCatId) === categoryId;
             });
         }
+
+        // Re-sort to ensure feed order (Primary Sort: Group by Video based on "Best/Newest" representative?)
+        // Actually, `app/page.tsx` groups by video.
+        // We want the LIST to be sorted by the CRITERIA (e.g. Newest).
+        // If we just return a flat list, `groupMomentsByVideo` iterates in order.
+        // So we should sort `filteredMoments` by the original `sort` param to ensure groupings appear in correct order.
+
+        filteredMoments.sort((a: any, b: any) => {
+            switch (sort) {
+                case 'oldest': return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+                case 'shortest': return (a.moment_duration_sec || 0) - (b.moment_duration_sec || 0);
+                case 'longest': return (b.moment_duration_sec || 0) - (a.moment_duration_sec || 0);
+                case 'newest':
+                default: return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+            }
+        });
+
 
         // Transform to camelCase format
         return filteredMoments.map((m: any) => ({

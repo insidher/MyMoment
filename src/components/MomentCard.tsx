@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Moment } from '@/types';
-import { X, Heart, MessageSquare, Play, Users, Send, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Heart, MessageSquare, Play, Users, Send, ChevronDown, ChevronUp, Share2, ExternalLink } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { toggleLike, createComment } from '../../app/actions/moments';
@@ -25,6 +25,8 @@ interface MomentCardProps {
     replyCount?: number;
     onReplyClick?: () => void;
     onNewReply?: (parentId: string, reply: any) => void;
+    variant?: 'feed' | 'modal';
+    onShare?: (moment: Moment) => void;
 }
 
 export default function MomentCard({
@@ -43,7 +45,9 @@ export default function MomentCard({
     isRepliesExpanded = false,
     replyCount: propsReplyCount,
     onReplyClick,
-    onNewReply
+    onNewReply,
+    variant = 'feed', // Default to 'feed'
+    onShare,
 }: MomentCardProps) {
     const [moment, setMoment] = useState(initialMoment);
 
@@ -61,6 +65,13 @@ export default function MomentCard({
     const [showCommentInput, setShowCommentInput] = useState(false);
     const [commentText, setCommentText] = useState('');
     const [isPostingComment, setIsPostingComment] = useState(false);
+
+    // Auto-expand when active
+    useEffect(() => {
+        if (isActive) {
+            setIsExpanded(true);
+        }
+    }, [isActive]);
 
     const MAX_NOTE_LENGTH = 40;
 
@@ -266,14 +277,29 @@ export default function MomentCard({
                 <div className="flex items-center justify-between px-3 py-1.5 bg-black/40 border-b border-white/5">
                     {/* User Info - Left */}
                     <div className="flex items-center gap-1.5">
-                        <UserAvatar
-                            name={moment.user?.name}
-                            image={moment.user?.image}
-                            size="w-5 h-5"
-                        />
-                        <span className="text-[11px] font-medium text-white/80">
-                            {moment.user?.name || 'Music Lover'}
-                        </span>
+                        {variant === 'modal' && moment.userId ? (
+                            <Link href={`/profile/${moment.userId}`} className="flex items-center gap-1.5 group/user hover:opacity-80 transition-opacity">
+                                <UserAvatar
+                                    name={moment.user?.name}
+                                    image={moment.user?.image}
+                                    size="w-5 h-5"
+                                />
+                                <span className="text-[11px] font-medium text-white/80 group-hover/user:text-cyan-400 transition-colors">
+                                    {moment.user?.name || 'Music Lover'}
+                                </span>
+                            </Link>
+                        ) : (
+                            <div className="flex items-center gap-1.5">
+                                <UserAvatar
+                                    name={moment.user?.name}
+                                    image={moment.user?.image}
+                                    size="w-5 h-5"
+                                />
+                                <span className="text-[11px] font-medium text-white/80">
+                                    {moment.user?.name || 'Music Lover'}
+                                </span>
+                            </div>
+                        )}
                     </div>
 
                     {/* Actions - Right */}
@@ -300,17 +326,35 @@ export default function MomentCard({
 
 
                         {/* Comment Button - Text Based */}
+                        {/* Comment Button - Text Based */}
                         {showCommentButton && (
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     setShowCommentInput(!showCommentInput);
                                 }}
-                                className="p-1 rounded-full bg-black/40 hover:bg-white/10 text-blue-200 transition-colors flex items-center gap-1"
+                                className={`p-1 rounded-full text-blue-200 transition-colors flex items-center gap-1
+                                    ${variant === 'modal' ? 'hover:bg-blue-500/20 px-2 bg-blue-500/10' : 'bg-black/40 hover:bg-white/10'}
+                                `}
                                 title="Add a comment"
                             >
                                 <MessageSquare size={12} />
                                 <span className="text-[10px] font-medium">Reply</span>
+                            </button>
+                        )}
+
+                        {/* Share Button (Modal Only) */}
+                        {variant === 'modal' && onShare && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onShare(moment);
+                                }}
+                                className="p-1 px-2 rounded-full bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 transition-colors flex items-center gap-1"
+                                title="Share this moment"
+                            >
+                                <Share2 size={12} />
+                                <span className="text-[10px] font-medium">Share</span>
                             </button>
                         )}
 
@@ -424,8 +468,27 @@ export default function MomentCard({
 
                         {/* Compact Metadata */}
                         <div className="flex-1 min-w-0 flex flex-col justify-center text-xs opacity-60 group-hover/track:opacity-100 transition-opacity">
-                            <h3 className="font-bold text-white break-words leading-tight">{trackCardData.title || 'Unknown Title'}</h3>
-                            <p className="text-white/60 break-words leading-tight">{trackCardData.artist || 'Unknown Artist'}</p>
+                            {variant === 'modal' ? (
+                                <a
+                                    href={moment.sourceUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="hover:text-cyan-400 transition-colors group/link"
+                                >
+                                    <h3 className="font-bold text-white break-words leading-tight flex items-center gap-1">
+                                        {trackCardData.title || 'Unknown Title'}
+                                        <ExternalLink size={10} className="opacity-0 group-hover/link:opacity-100 transition-opacity" />
+                                    </h3>
+                                    <p className="text-white/60 break-words leading-tight">{trackCardData.artist || 'Unknown Artist'}</p>
+                                    <span className="text-[9px] text-cyan-500/80 block mt-0.5 animate-pulse">Click to open on {moment.service === 'youtube' ? 'YouTube' : 'Spotify'}</span>
+                                </a>
+                            ) : (
+                                <>
+                                    <h3 className="font-bold text-white break-words leading-tight">{trackCardData.title || 'Unknown Title'}</h3>
+                                    <p className="text-white/60 break-words leading-tight">{trackCardData.artist || 'Unknown Artist'}</p>
+                                </>
+                            )}
                         </div>
                     </div>
 
@@ -433,6 +496,12 @@ export default function MomentCard({
                     {moment.note && (
                         <div className="mb-2 p-2 bg-black/20 rounded-lg border border-white/5">
                             <div className="relative">
+                                {variant === 'modal' && (
+                                    <div className="mb-1.5 flex items-center gap-1.5">
+                                        <span className="text-[10px] uppercase font-bold text-white/40 tracking-wider">Curator Comment</span>
+                                        <div className="h-px flex-1 bg-white/10" />
+                                    </div>
+                                )}
                                 <span className="absolute -top-2 -left-1 text-3xl text-white/10 font-serif leading-none">"</span>
                                 <div className="pl-3">
                                     <p className="text-sm font-medium text-white/90 leading-relaxed font-serif italic">

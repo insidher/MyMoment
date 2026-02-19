@@ -39,6 +39,7 @@ interface PlayerTimelineProps {
     expandedMomentId?: string | null;
     setExpandedMomentId?: (id: string | null) => void;
     onMomentClick?: (moment: Moment) => void;
+    onMomentView?: (moment: Moment) => void; // New prop for modal
     // State
     isPlaying: boolean;
     service?: 'youtube' | 'spotify';
@@ -87,6 +88,7 @@ export default function PlayerTimeline({
     moments = [],
     activeMomentId,
     onMomentClick,
+    onMomentView,
     isPlaying,
     isEditorOpen = false,
     onEditorOpenChange = () => { },
@@ -127,12 +129,18 @@ export default function PlayerTimeline({
         setDismissedMomentId(null);
     }, [activeMomentId]);
 
-    // Auto-expand menu when draft appears
     useEffect(() => {
         if (startSec !== null && endSec !== null) {
             setIsMenuExpanded(true);
         }
     }, [startSec !== null, endSec !== null]);
+
+    // Auto-expand menu for ACTIVE moment
+    useEffect(() => {
+        if (activeMomentId) {
+            setExpandedHighlightId(activeMomentId);
+        }
+    }, [activeMomentId]);
 
     // Derived State
     const activeMoment = useMemo(() =>
@@ -377,12 +385,12 @@ export default function PlayerTimeline({
     return (
         <div className="space-y-4 relative w-full select-none">
             {/* Timeline Container */}
-            <div className="glass-panel px-4 py-8 flex flex-col gap-1 relative group/timeline">
+            <div className="glass-panel px-4 py-8 flex flex-col gap-1 relative group/timeline bg-zinc-800/50">
 
                 {/* Visual Timeline Header & Time */}
                 <div className="absolute top-2 left-4 flex flex-col pointer-events-none">
                     <span className="text-[10px] font-bold text-white/90 tracking-wider uppercase mb-0.5">
-                        Visual Timeline:
+                        <span className="text-[#00E5FF]">Interactive</span> Visual Timeline:
                     </span>
                     <span className="text-xs font-mono text-white/40">
                         {formatTime(currentTime)} / {formatTime(duration)}
@@ -656,7 +664,7 @@ export default function PlayerTimeline({
                                             <RotateCcw size={14} />
                                         </button>
                                         <button
-                                            onClick={(e) => { e.stopPropagation(); onMomentClick?.(m); }}
+                                            onClick={(e) => { e.stopPropagation(); onMomentView?.(m); }}
                                             className="h-8 px-3 flex items-center justify-center text-primary text-[10px] font-bold uppercase hover:bg-primary/10 transition-colors whitespace-nowrap border-r border-white/10"
                                         >
                                             VIEW
@@ -721,6 +729,6 @@ export default function PlayerTimeline({
 
             {/* Note Editor removed. Handled by Parent (CreatorStudio). */}
 
-        </div>
+        </div >
     );
 }

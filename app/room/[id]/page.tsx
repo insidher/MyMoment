@@ -7,6 +7,8 @@ import { createPortal } from 'react-dom';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Play, Pause, Save, Clock, ArrowLeft, Check, RotateCcw, ListMusic, Loader2, X, Sparkles } from 'lucide-react';
 import Link from 'next/link';
+import MomentDetailModal from '@/components/MomentDetailModal';
+import ShareModal from '@/components/ShareModal';
 import YouTube, { YouTubeEvent } from 'react-youtube';
 import { toast } from 'sonner';
 import { Moment } from '@/types';
@@ -157,6 +159,8 @@ export default function Room({ params }: { params: { id: string } }) {
     const [youtubePlayer, setYoutubePlayer] = useState<any>(null);
     const [spotifyPlayer, setSpotifyPlayer] = useState<SpotifyController | null>(null);
     const [error, setError] = useState('');
+    const [viewingMoment, setViewingMoment] = useState<Moment | null>(null);
+    const [shareMoment, setShareMoment] = useState<Moment | null>(null);
     const [durationLimitError, setDurationLimitError] = useState(false);
     const [groupingConfirmation, setGroupingConfirmation] = useState<{
         payload: any;
@@ -1380,6 +1384,7 @@ export default function Room({ params }: { params: { id: string } }) {
                                     moments={moments}
                                     onSeek={handleSeek}
                                     onMomentClick={playMoment}
+                                    onMomentView={setViewingMoment}
                                     service={isYouTube ? 'youtube' : 'spotify'}
                                     onChapterClick={(chapter) => handleSeek(chapter.startSec)}
                                     onPause={() => {
@@ -1402,7 +1407,14 @@ export default function Room({ params }: { params: { id: string } }) {
                                         setStartSec(null); setEndSec(null); setCaptureState('idle'); setError(''); setNote(''); handleCreatorModeChange(false);
                                     }}
                                     onPreviewCapture={handlePreviewCapture}
-                                    onCaptureStart={(time) => { setStartSec(time); setCaptureState('start-captured'); setError(''); }}
+                                    onCaptureStart={(time) => {
+                                        setStartSec(time);
+                                        setCaptureState('start-captured');
+                                        setError('');
+                                        // Auto-seek to capture start for precision
+                                        if (isYouTube && youtubePlayer) youtubePlayer.seekTo(time, true);
+                                        else if (isSpotify && spotifyPlayer) spotifyPlayer.seek(time);
+                                    }}
                                     isEditorOpen={isCreatorMode}
                                     onEditorOpenChange={handleCreatorModeChange}
                                     onFocusRequest={() => setFocusTrigger(prev => prev + 1)}
@@ -1429,12 +1441,12 @@ export default function Room({ params }: { params: { id: string } }) {
                     {/* Left: Moments Feed */}
                     <div className="flex-1 p-4 lg:p-6 space-y-4">
                         {/* Header for Moments List */}
-                        <div className="flex items-center gap-3 pb-2">
-                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                <Sparkles size={18} className="text-cyan-500" />
+                        <div className="flex items-center gap-2 pb-0">
+                            <h3 className="text-[10px] font-bold text-white/90 tracking-wider uppercase flex items-center gap-1.5">
+                                <Sparkles size={12} className="text-cyan-500" />
                                 Saved Moments
                             </h3>
-                            <span className="text-xs font-mono text-white/40 px-2 py-0.5 rounded-full bg-white/5 border border-white/5">
+                            <span className="text-[9px] font-bold text-white/50 px-1.5 py-0.5 rounded-full bg-white/10">
                                 {moments.length}
                             </span>
                         </div>
@@ -1533,6 +1545,26 @@ export default function Room({ params }: { params: { id: string } }) {
                 onConfirm={() => { if (groupingConfirmation) { executeSmartGroup(groupingConfirmation.conflictMoment, groupingConfirmation.payload); setGroupingConfirmation(null); } }}
                 onCancel={() => { if (groupingConfirmation) { executeCreateMoment(groupingConfirmation.payload, null); setGroupingConfirmation(null); } }}
             />
+
+            <MomentDetailModal
+                moment={viewingMoment}
+                onClose={() => setViewingMoment(null)}
+                onPlayMoment={playMoment}
+                onPauseMoment={handlePauseMoment}
+                onShare={setShareMoment}
+                isPlaying={isPlaying}
+                currentTime={isSpotify ? spotifyProgress.current : playbackState.current}
+                currentUser={user ? { id: user.id, name: user.email, image: null } : undefined}
+            />
+
+            <ShareModal
+                isOpen={!!shareMoment}
+                onClose={() => setShareMoment(null)}
+                momentId={shareMoment?.id || ''}
+                title={shareMoment?.title || ''}
+                note={shareMoment?.note}
+            />
+
             {durationLimitError && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setDurationLimitError(false)}>
                     <div className="bg-neutral-900 border border-cyan-500/50 p-6 rounded-2xl shadow-2xl max-w-sm text-center space-y-4">

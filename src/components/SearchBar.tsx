@@ -165,6 +165,7 @@ export default function SearchBar({ placeholder = 'Search or paste link...' }: S
                 <div className={`flex-1 flex items-center bg-white/5 border border-white/5 border-r-0 rounded-l-full px-2 md:px-4 h-9 md:h-10 transition-all duration-300 ${isFocused ? 'bg-white/12 border-white/20 ring-1 ring-cyan-500/20' : 'focus-within:bg-white/10'}`}>
                     <Search size={14} className={`transition-colors duration-300 ${isFocused ? 'text-white' : 'text-white/40'} mr-2 md:mr-3 shrink-0`} />
                     <input
+                        suppressHydrationWarning
                         ref={inputRef}
                         type="text"
                         value={query}

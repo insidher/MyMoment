@@ -34,14 +34,12 @@ export async function syncTrackSource(payload: SyncPayload): Promise<{ success: 
 
     // Build the canonical source URL to match against (verify videoId first)
     const videoId = extractVideoId(payload.videoUrl);
-    console.log('[DEBUG SYNC] Extracted videoId:', videoId, '| from URL:', payload.videoUrl);
     if (!videoId) {
         return { success: false, error: 'Could not extract video ID from URL' };
     }
     const sourceUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
     const supabase = createAdminClient();
-    console.log('[DEBUG SYNC] Admin client created, looking up youtube_video_id:', videoId);
 
     // --- Build dynamic update object: only include non-null, non-empty fields ---
     const updates: Record<string, unknown> = {};
@@ -88,7 +86,6 @@ export async function syncTrackSource(payload: SyncPayload): Promise<{ success: 
         .or(`youtube_video_id.eq.${videoId},source_url.eq.${sourceUrl}`)
         .maybeSingle();
 
-    console.log('[DEBUG SYNC] Lookup result:', existing, '| error:', lookupError);
 
     let targetId: string;
 
@@ -96,7 +93,6 @@ export async function syncTrackSource(payload: SyncPayload): Promise<{ success: 
         targetId = existing.id;
     } else {
         // --- FALLBACK CREATION: auto-create the missing track_source ---
-        console.log('[DEBUG SYNC] Track source not found, creating fallback record for:', videoId);
         const { data: created, error: createError } = await supabase
             .from('track_sources')
             .insert({
@@ -113,11 +109,10 @@ export async function syncTrackSource(payload: SyncPayload): Promise<{ success: 
             .single();
 
         if (createError || !created) {
-            console.error('[DEBUG SYNC] Fallback creation failed:', createError);
+            console.error('Fallback creation failed:', createError);
             return { success: false, error: `Failed to create track source: ${createError?.message || 'Unknown error'}` };
         }
         targetId = created.id;
-        console.log('[DEBUG SYNC] Fallback track_source created:', targetId);
     }
 
     const { error } = await supabase
