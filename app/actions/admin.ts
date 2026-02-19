@@ -103,7 +103,7 @@ export async function syncTrackSource(payload: SyncPayload): Promise<{ success: 
                 artist: payload.channelTitle || 'Unknown Artist',
                 artwork: payload.thumbnailUrl || null,
                 duration_sec: payload.durationSec || 0,
-                created_at: new Date().toISOString(),
+                // created_at: new Date().toISOString(), // REMOVED: Causing PGRST204 error
             })
             .select('id')
             .single();
