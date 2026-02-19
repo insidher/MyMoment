@@ -159,7 +159,7 @@ export async function POST(request: Request) {
         // Detect service
         const service = body.service || detectService(body.sourceUrl);
         const youtubeVideoId = service === 'youtube' ? extractYouTubeId(body.sourceUrl) : null;
-        console.log('[DEBUG] Extracted videoId:', youtubeVideoId, '| service:', service, '| sourceUrl:', body.sourceUrl);
+        console.log('[TRACE 1] Extracted ID:', youtubeVideoId);
 
         // Step 1: Find or Create track_source (ALWAYS using Admin Client to bypass RLS)
         const adminClient = createAdminClient();
@@ -191,36 +191,41 @@ export async function POST(request: Request) {
                     .eq('id', trackSourceId);
             }
         } else {
-            // Create new track_source (even if duration is 0 or missing)
-            const insertPayload = {
-                service: service,
-                source_url: body.sourceUrl,
-                youtube_video_id: youtubeVideoId,
-                title: body.title || 'Unknown Title',
-                artist: body.artist || 'Unknown Artist',
-                artwork: body.artwork || null,
-                duration_sec: body.duration || 0,
-                created_at: new Date().toISOString(),
-            };
-            console.log('[DEBUG] Inserting new track_source:', JSON.stringify(insertPayload, null, 2));
-
-            const { data: newTrackSource, error: trackSourceError } = await adminClient
+            // Create new track_source — Action 1: exclude created_at to bypass PGRST204 schema cache error.
+            // Using upsert with onConflict so concurrent requests don't race into a duplicate-key error.
+            const conflictColumn = youtubeVideoId ? 'youtube_video_id' : 'source_url';
+            const { data: trackSourceData, error: trackSourceError } = await adminClient
                 .from('track_sources')
-                .insert(insertPayload)
-                .select('id, youtube_video_id')
+                .upsert({
+                    service: service,
+                    source_url: body.sourceUrl,
+                    youtube_video_id: youtubeVideoId,
+                    title: body.title || 'Unknown Title',
+                    artist: body.artist || 'Unknown Artist',
+                    artwork: body.artwork || null,
+                    duration_sec: body.duration || 0,
+                    // created_at intentionally omitted — column not in PostgREST schema cache (PGRST204)
+                }, { onConflict: conflictColumn })
+                .select('id')
                 .single();
+            console.log('[TRACE 2] Upsert Result - Data:', trackSourceData, 'Error:', trackSourceError);
 
+            // Action 3: track_source is now MANDATORY. Stop here and return 500
+            // rather than inserting an orphaned moment with track_source_id = null.
             if (trackSourceError) {
-                console.error('❌ [API] Failed to create track_source with Admin Client:', {
+                console.error('❌ [API] Failed to upsert track_source — aborting moment creation:', {
                     message: trackSourceError.message,
                     details: trackSourceError.details,
                     code: trackSourceError.code
                 });
-                // Continue without track_source rather than failing if possible
-            } else {
-                trackSourceId = newTrackSource.id;
-                console.log('[DEBUG] Created new track_source:', trackSourceId, '| youtube_video_id:', newTrackSource.youtube_video_id);
+                return NextResponse.json(
+                    { error: `Failed to resolve track source: ${trackSourceError.message} (${trackSourceError.code})` },
+                    { status: 500 }
+                );
             }
+
+            trackSourceId = trackSourceData.id;
+            console.log('[API] Upserted track_source:', trackSourceId);
         }
 
         // Step 1.5: Fuzzy Threading & Heirarchy Flattening
@@ -228,26 +233,7 @@ export async function POST(request: Request) {
         let proposedParentId = body.parentId || null;
 
         if (!proposedParentId && trackSourceId) {
-            // No parent specified, proceed with Fuzzy Search
-            /* DISABLED: Fuzzy Threading - Capture should always create a new Root Moment
-            const FUZZY_THRESHOLD = 3;
-
-            // Search for ANY overlapping moment (Partner or Child)
-            const { data: fuzzyMatch } = await supabase
-                .from('moments')
-                .select('id')
-                .eq('track_source_id', trackSourceId)
-                .gte('end_time', body.startSec - FUZZY_THRESHOLD)
-                .lte('start_time', body.endSec + FUZZY_THRESHOLD)
-                .order('created_at', { ascending: true }) // Find oldest overlap
-                .limit(1)
-                .single();
-
-            if (fuzzyMatch) {
-                proposedParentId = fuzzyMatch.id;
-                console.log('[API] Fuzzy match found:', proposedParentId);
-            }
-            */
+            // Fuzzy Threading Logic (currently disabled as per comments)
         }
 
         // Recursive Parent Check (Flattening)
@@ -260,14 +246,13 @@ export async function POST(request: Request) {
                 .single();
 
             if (targetMoment) {
-                // If target has a parent, link to THAT parent (Root).
-                // If target IS a parent (parent_id null), link to target.
                 parentId = targetMoment.parent_id || targetMoment.id;
                 console.log(`[API] Resolved Parent: ${proposedParentId} -> ${parentId} (Flattened)`);
             }
         }
 
         // Step 2: Prepare moment data for Supabase (snake_case columns)
+        console.log('[TRACE 3] ID being passed to Moment Insert:', trackSourceId);
         const momentData = {
             user_id: user.id,
             resource_id: body.sourceUrl,
@@ -283,10 +268,10 @@ export async function POST(request: Request) {
             artist: body.artist || 'Unknown Artist',
             artwork: body.artwork || null,
             saved_by_count: 1,
-            moment_duration_sec: body.endSec - body.startSec,
+            // moment_duration_sec removed - column does not exist in DB (calculated on read)
         };
 
-        console.log('[API] Creating moment with data:', JSON.stringify(momentData, null, 2));
+        console.log('[TRACE 4] Final Moment Payload:', JSON.stringify(momentData, null, 2));
 
         // Step 3: Insert moment into Supabase
         const { data: newMoment, error } = await supabase

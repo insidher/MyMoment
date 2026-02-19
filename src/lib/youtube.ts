@@ -206,6 +206,8 @@ export async function getYouTubeVideoMetadata(videoId: string): Promise<YouTubeM
         };
 
         // 3. Freeze (Update/Insert Cache)
+        // NOTE: created_at intentionally omitted — column not in PostgREST schema cache (PGRST204).
+        // The DB default (now()) handles it on INSERT; upsert will not overwrite it on conflict.
         const { error: upsertError } = await supabase.from('track_sources').upsert({
             youtube_video_id: videoId,
             source_url: `https://www.youtube.com/watch?v=${videoId}`,
@@ -223,8 +225,8 @@ export async function getYouTubeVideoMetadata(videoId: string): Promise<YouTubeM
             tags: snippet.tags || [],
             topics: cleanedTopics,
             metadata_updated_at: new Date().toISOString(),
-            created_at: cached ? (cached as any).created_at : new Date().toISOString(),
-        }, { onConflict: 'youtube_video_id' });
+        }, { onConflict: 'youtube_video_id' })
+            .select('id');
 
         if (upsertError) {
             console.error('❌ Failed to cache metadata in track_sources:', {
