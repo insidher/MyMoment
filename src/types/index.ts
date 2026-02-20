@@ -13,7 +13,6 @@ export interface TrackSource {
   source_url?: string;
   tags?: string[];
   topics?: string[];
-  canonicalTrackId?: string;
   moments?: Array<{ id: string; startSec: number; endSec: number }>; // For ghost clusters
 }
 
@@ -26,7 +25,6 @@ export interface Moment {
   // Source
   service: MusicService;
   sourceUrl: string;
-  canonicalTrackId?: string;
 
   trackSourceId?: string;
   trackSource?: TrackSource;

@@ -52,7 +52,6 @@ export interface Database {
                     artist: string | null
                     artwork: string | null
                     duration_sec: number | null
-                    canonical_track_id: string | null
                     youtube_video_id: string | null
                     description: string | null
                     channel_title: string | null
@@ -71,7 +70,6 @@ export interface Database {
                     artist?: string | null
                     artwork?: string | null
                     duration_sec?: number | null
-                    canonical_track_id?: string | null
                     youtube_video_id?: string | null
                     description?: string | null
                     channel_title?: string | null
@@ -90,7 +88,6 @@ export interface Database {
                     artist?: string | null
                     artwork?: string | null
                     duration_sec?: number | null
-                    canonical_track_id?: string | null
                     youtube_video_id?: string | null
                     description?: string | null
                     channel_title?: string | null
