@@ -64,6 +64,29 @@ export interface YouTubeMetadata {
 }
 
 /**
+ * Normalizes any valid YouTube URL variant into its canonical format.
+ * Canonical format: https://www.youtube.com/watch?v=VIDEO_ID
+ * Examples handled: youtu.be, youtube.com/shorts, youtube.com/v/
+ */
+export function normalizeYouTubeUrl(url: string): string {
+    if (!url) return url;
+
+    // Extract the 11-character video ID using the existing regex logic from lib/related.ts
+    // For safety and standalone usage, we reproduce the core regex here.
+    const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
+    const match = url.match(regex);
+
+    if (match && match[1]) {
+        // Enforce the standard watch URL format
+        return `https://www.youtube.com/watch?v=${match[1]}`;
+    }
+
+    // If we can't parse an ID, assume it might not be a YouTube URL or is heavily malformed.
+    // Return original, validation catches bad URLs upstream.
+    return url;
+}
+
+/**
  * Fetch video details including duration
  * Cache-First Logic: Checks track_sources before calling YouTube API
  */

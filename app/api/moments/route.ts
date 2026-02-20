@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { extractYouTubeId } from '@/lib/related';
+import { normalizeYouTubeUrl } from '@/lib/youtube';
 
 export async function POST(request: Request) {
     try {
@@ -157,71 +158,53 @@ export async function POST(request: Request) {
 
         // Detect service
         const service = body.service || detectService(body.sourceUrl);
+
+        // Normalize URL if it's YouTube
+        if (service === 'youtube') {
+            body.sourceUrl = normalizeYouTubeUrl(body.sourceUrl);
+        }
+
         const youtubeVideoId = service === 'youtube' ? extractYouTubeId(body.sourceUrl) : null;
 
         // Step 1: Find or Create track_source (ALWAYS using Admin Client to bypass RLS)
         const adminClient = createAdminClient();
         let trackSourceId: string | null = null;
 
-        // Check if track_source already exists for this URL or Video ID
-        let trackSourceQuery = adminClient
+        // We strictly use upsert with onConflict: 'source_url' to enforce the unique constraint.
+        // This gracefully handles concurrent insertions and avoids the need for a separate `maybeSingle()` check.
+        const { data: trackSourceData, error: trackSourceError } = await adminClient
             .from('track_sources')
-            .select('id');
+            .upsert({
+                service: service,
+                source_url: body.sourceUrl, // Normalized above
+                youtube_video_id: youtubeVideoId,
+                title: body.title || 'Unknown Title',
+                artist: body.artist || 'Unknown Artist',
+                artwork: body.artwork || null,
+                duration_sec: body.duration || 0,
+                // created_at intentionally omitted — column not in PostgREST schema cache (PGRST204)
+                // UPSERT BEHAVIOR: 
+                // By omitting created_at here, Supabase won't try to overwrite an existing row's created_at with null or a new date.
+            }, {
+                onConflict: 'source_url', // STRICTLY bounce off the new unique constraint
+                ignoreDuplicates: false   // Allow updates to existing rows (like duration_sec healing)
+            })
+            .select('id')
+            .single();
 
-        if (youtubeVideoId) {
-            trackSourceQuery = trackSourceQuery.eq('youtube_video_id', youtubeVideoId);
-        } else {
-            trackSourceQuery = trackSourceQuery.eq('source_url', body.sourceUrl);
+        if (trackSourceError) {
+            console.error('❌ [API] Failed to upsert track_source — aborting moment creation:', {
+                message: trackSourceError.message,
+                details: trackSourceError.details,
+                code: trackSourceError.code
+            });
+            return NextResponse.json(
+                { error: 'Internal Server Error' },
+                { status: 500 }
+            );
         }
 
-        const { data: existingTrackSource } = await trackSourceQuery.maybeSingle();
-
-        if (existingTrackSource) {
-            // Use existing track_source
-            trackSourceId = existingTrackSource.id;
-
-            // Auto-Heal: If new TOTAL track duration provided > 0, update existing record (using admin context)
-            if (body.duration && body.duration > 0) {
-                await adminClient
-                    .from('track_sources')
-                    .update({ duration_sec: body.duration })
-                    .eq('id', trackSourceId);
-            }
-        } else {
-            // Create new track_source — Action 1: exclude created_at to bypass PGRST204 schema cache error.
-            // Using upsert with onConflict so concurrent requests don't race into a duplicate-key error.
-            const conflictColumn = youtubeVideoId ? 'youtube_video_id' : 'source_url';
-            const { data: trackSourceData, error: trackSourceError } = await adminClient
-                .from('track_sources')
-                .upsert({
-                    service: service,
-                    source_url: body.sourceUrl,
-                    youtube_video_id: youtubeVideoId,
-                    title: body.title || 'Unknown Title',
-                    artist: body.artist || 'Unknown Artist',
-                    artwork: body.artwork || null,
-                    duration_sec: body.duration || 0,
-                    // created_at intentionally omitted — column not in PostgREST schema cache (PGRST204)
-                }, { onConflict: conflictColumn })
-                .select('id')
-                .single();
-
-            // Action 3: track_source is now MANDATORY. Stop here and return 500
-            // rather than inserting an orphaned moment with track_source_id = null.
-            if (trackSourceError) {
-                console.error('❌ [API] Failed to upsert track_source — aborting moment creation:', {
-                    message: trackSourceError.message,
-                    details: trackSourceError.details,
-                    code: trackSourceError.code
-                });
-                return NextResponse.json(
-                    { error: 'Internal Server Error' },
-                    { status: 500 }
-                );
-            }
-
-            trackSourceId = trackSourceData.id;
-        }
+        trackSourceId = trackSourceData.id;
 
         // Step 1.5: Fuzzy Threading & Heirarchy Flattening
         let parentId: string | null = null;
