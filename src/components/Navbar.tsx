@@ -90,6 +90,7 @@ export default function Navbar() {
                         <button
                             ref={buttonRef}
                             onClick={() => setShowMenu(!showMenu)}
+                            suppressHydrationWarning={true}
                             className="p-2 -ml-2 text-white/70 hover:text-white transition-colors"
                         >
                             {showMenu ? <X size={20} /> : <Menu size={20} />}
@@ -196,7 +197,7 @@ export default function Navbar() {
                                         <span className="text-sm">Settings</span>
                                     </button>
                                     <div className="mt-2 pt-2 border-t border-white/5 px-3 pb-1">
-                                        <span className="text-white/40 text-xs">v1.1.1</span>
+                                        <span className="text-white/40 text-xs">v1.1.3</span>
                                     </div>
                                 </div>
                             </div>

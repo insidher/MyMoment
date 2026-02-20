@@ -97,9 +97,12 @@ export default function Login() {
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-purple-600/10 rounded-full blur-[120px] -z-10" />
 
             <div className="w-full max-w-md space-y-8">
-                <div className="text-center space-y-2">
-                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 mb-4">
+                <div className="text-center space-y-2 relative">
+                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 mb-4 relative">
                         <Sparkles className="text-white" size={24} />
+                        <span className="absolute -top-2 -right-8 bg-purple-500 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                            v1.1.3
+                        </span>
                     </div>
                     <h1 className="text-3xl font-bold">{view === 'sign-in' ? 'Welcome Back' : 'Create Account'}</h1>
                     <p className="text-white/60">

@@ -1,0 +1,59 @@
+﻿diff --git a/supabase/migrations/20260220_fix_username_collision.sql b/supabase/migrations/20260220_fix_username_collision.sql
+new file mode 100644
+index 0000000..f572239
+--- /dev/null
++++ b/supabase/migrations/20260220_fix_username_collision.sql
+@@ -0,0 +1,53 @@
++-- Migration: Fix Username Collision in Trigger
++-- Issue: split_part(email, '@', 1) is not unique.
++-- Fix: Append 4 random characters to the fallback username.
++
++CREATE OR REPLACE FUNCTION public.handle_new_user() 
++RETURNS TRIGGER AS $$
++DECLARE
++    v_username TEXT;
++    v_name TEXT;
++    v_image TEXT;
++BEGIN
++    -- Extract or Generate Username with Random Suffix for Uniqueness
++    -- Priority: metadata.username -> email_handle_random
++    v_username := COALESCE(
++        new.raw_user_meta_data->>'username',
++        split_part(new.email, '@', 1) || '_' || substring(md5(random()::text) from 1 for 4)
++    );
++
++    -- Check if username exists (rare collision), loop or retry not strictly needed for 4 chars (16^4 = 65k possibilities), 
++    -- but ideally we relies on the random suffix colliding being rare enough for a hotfix. 
++    -- If extreme robustness needed, we'd loop, but simple suffix is standard for mvp.
++
++    -- Extract or Generate Name
++    v_name := COALESCE(
++        new.raw_user_meta_data->>'name',
++        new.raw_user_meta_data->>'full_name',
++        split_part(new.email, '@', 1)
++    );
++
++    -- Extract Image
++    v_image := COALESCE(
++        new.raw_user_meta_data->>'avatar_url',
++        new.raw_user_meta_data->>'image'
++    );
++
++    -- Insert into profiles
++    INSERT INTO public.profiles (id, email, username, name, image)
++    VALUES (
++        new.id, 
++        new.email,
++        v_username,
++        v_name,
++        v_image
++    )
++    ON CONFLICT (id) DO UPDATE SET
++        email = EXCLUDED.email,
++        username = COALESCE(public.profiles.username, EXCLUDED.username),
++        name = COALESCE(public.profiles.name, EXCLUDED.name),
++        image = COALESCE(public.profiles.image, EXCLUDED.image);
++
++    RETURN new;
++END;
++$$ LANGUAGE plpgsql SECURITY DEFINER;
