@@ -49,12 +49,22 @@ export default function Login() {
                 if (error) {
                     setError(error.message);
                 } else {
-                    // Success UX
-                    setSuccessMessage('Account created! Please check your email to confirm.');
-                    setView('sign-in'); // Switch back to login view automatically
-                    setEmail('');
-                    setPassword('');
-                    setConfirmPassword('');
+                    // Immediate Access: If session exists, redirect immediately
+                    // This works if "Confirm Email" is disabled in Supabase
+                    const { data: { session } } = await supabase.auth.getSession();
+
+                    if (session) {
+                        window.location.href = '/';
+                        return;
+                    }
+
+                    // Fallback to Success Message (if Confirm Email is still ON)
+                    setSuccessMessage('Account created! Logging you in...');
+
+                    // Attempt auto-login or redirect
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 1000);
                 }
             } else {
                 // Standard Sign In

@@ -48,10 +48,18 @@ export default function SignupPromptModal({ isOpen, onClose }: SignupPromptModal
                 if (error) {
                     setError(error.message);
                 } else {
-                    setSuccessMessage('Account created! Check your email to confirm and return to your moment.');
+                    // Immediate Access: If session exists, reload immediately
+                    const { data: { session } } = await supabase.auth.getSession();
+
+                    if (session) {
+                        window.location.reload();
+                        return;
+                    }
+
+                    setSuccessMessage('Account created! Preparing your moment...');
                     setTimeout(() => {
-                        // Optional: close or keep open with success message
-                    }, 4000);
+                        window.location.reload();
+                    }, 1500);
                 }
             } else {
                 // Sign In
