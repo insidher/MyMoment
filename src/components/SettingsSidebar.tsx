@@ -105,7 +105,7 @@ export default function SettingsSidebar({ isOpen, onClose, userEmail }: Settings
             )}
 
             {/* Sidebar */}
-            <div className={`fixed top-0 right-0 h-full w-80 bg-zinc-900 border-l border-white/10 p-6 z-50 transform transition-transform duration-300 ease-in-out shadow-2xl ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className={`fixed top-0 right-0 h-full w-80 bg-zinc-900 border-l border-white/10 p-6 z-50 overflow-y-auto overflow-x-hidden transform transition-transform duration-300 ease-in-out shadow-2xl ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
 
                 <div className="flex items-center justify-between mb-8">
                     <h2 className="text-xl font-bold text-white">Settings</h2>
