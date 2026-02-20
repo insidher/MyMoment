@@ -185,8 +185,8 @@ export default function MomentFeedCard({ moments, onComment, onDelete, isAdmin =
                                         key={m.id}
                                         onClick={() => setSelectedMoment(m)}
                                         className={`absolute top-0 bottom-0 rounded-full transition-all duration-200 cursor-pointer ${isSelected
-                                            ? 'bg-primary z-20 shadow-[0_0_8px_rgba(var(--primary),0.4)] scale-y-110'
-                                            : 'bg-primary/40 hover:bg-primary/70 z-10'
+                                            ? 'bg-primary z-20 shadow-[0_0_8px_rgba(var(--primary),0.8)] scale-y-125'
+                                            : 'bg-white/40 hover:bg-white/70 z-10'
                                             }`}
                                         style={{
                                             left: `${leftPercent}%`,

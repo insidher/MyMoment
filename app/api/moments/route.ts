@@ -238,13 +238,13 @@ export async function POST(request: Request) {
             group_id: body.groupId || null, // Peer-to-Peer Grouping
             start_time: body.startSec,
             end_time: body.endSec,
+            moment_duration_sec: body.endSec - body.startSec, // Explicitly calculate duration
             track_duration_sec: body.duration || 0, // Store track duration directly
             note: body.note || null,
             title: body.title || 'Unknown Title',
             artist: body.artist || 'Unknown Artist',
             artwork: body.artwork || null,
             saved_by_count: 1,
-            // moment_duration_sec removed - column does not exist in DB (calculated on read)
         };
 
         // Step 3: Insert moment into Supabase
