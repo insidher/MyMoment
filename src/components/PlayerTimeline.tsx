@@ -7,7 +7,11 @@ import {
     RotateCcw,
     Menu,
     Pin,
+    Info,
+    Share2,
+    Play
 } from 'lucide-react';
+import Link from 'next/link';
 import { Moment } from '@/types';
 
 // ============================================
@@ -40,6 +44,7 @@ interface PlayerTimelineProps {
     setExpandedMomentId?: (id: string | null) => void;
     onMomentClick?: (moment: Moment) => void;
     onMomentView?: (moment: Moment) => void; // New prop for modal
+    onShare?: (moment: Moment) => void;
     // State
     isPlaying: boolean;
     service?: 'youtube' | 'spotify';
@@ -89,6 +94,7 @@ export default function PlayerTimeline({
     activeMomentId,
     onMomentClick,
     onMomentView,
+    onShare,
     isPlaying,
     isEditorOpen = false,
     onEditorOpenChange = () => { },
@@ -115,14 +121,15 @@ export default function PlayerTimeline({
     // Boundary Detection State for Action Bar
     const [alignLeft, setAlignLeft] = useState(false);
 
-    // Onboarding State
-    const [showOnboarding, setShowOnboarding] = useState(false);
+    // UI State
 
     // UI State
     const [isMenuExpanded, setIsMenuExpanded] = useState(false);
     const [expandedHighlightId, setExpandedHighlightId] = useState<string | null>(null);
     const [pinnedMomentIds, setPinnedMomentIds] = useState<string[]>([]);
     const [dismissedMomentId, setDismissedMomentId] = useState<string | null>(null);
+
+    const [showInfoModal, setShowInfoModal] = useState<Moment | null>(null);
 
     // Reset dismissed moment when active ID changes
     useEffect(() => {
@@ -190,16 +197,6 @@ export default function PlayerTimeline({
             safeDuration,
         };
     }, [startSec, endSec, draggingMarker, duration, safeDuration]);
-
-    // Initial Onboarding Check
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            const hasSeenOnboarding = localStorage.getItem('timeline-onboarding-seen');
-            if (!hasSeenOnboarding) {
-                setShowOnboarding(true);
-            }
-        }
-    }, []);
 
     // Smart Alignment Logic for Action Bar
     useEffect(() => {
@@ -420,12 +417,6 @@ export default function PlayerTimeline({
                         setTouchStartY(null);
                     }}
                     onClick={(e) => {
-                        if (showOnboarding) {
-                            setShowOnboarding(false);
-                            if (typeof window !== 'undefined') localStorage.setItem('timeline-onboarding-seen', 'true');
-                            return;
-                        }
-
                         if (justDraggedRef.current) return;
 
                         // SMART CLICK LOGIC
@@ -446,13 +437,6 @@ export default function PlayerTimeline({
                         // Optional: triggerHeartbeat();
                     }}
                 >
-                    {/* Onboarding Overlay */}
-                    {showOnboarding && (
-                        <div className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-sm rounded-lg flex items-center justify-center cursor-pointer">
-                            <div className="text-center text-white text-sm font-bold animate-pulse">Tap anywhere to capture</div>
-                        </div>
-                    )}
-
                     {/* BASE TRACK (GREEN) */}
                     <div className="absolute inset-x-0 h-1 bg-green-500/30 rounded-full overflow-hidden">
                         <div
@@ -642,92 +626,125 @@ export default function PlayerTimeline({
                     )}
 
                     {/* ======================================================== */}
-                    {/* ACTIVE/PINNED MOMENTS HIGHLIGHT (Cyan) */}
+                    {/* ACTIVE/PINNED MOMENTS HIGHLIGHT (Dynamic Theme) */}
                     {/* ======================================================== */}
-                    {allMomentHighlights.map((m) => (
-                        <div
-                            key={`highlight-${m.id}`}
-                            className="absolute top-0 bottom-0 z-20 pointer-events-none"
-                            style={{
-                                left: `${(m.startSec / safeDuration) * 100}%`,
-                                width: `${((m.endSec - m.startSec) / safeDuration) * 100}%`
-                            }}
-                        >
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-10 flex flex-col items-center origin-bottom pointer-events-auto">
-                                {expandedHighlightId === m.id ? (
-                                    <div className="flex items-center bg-black/90 backdrop-blur-md border border-primary/50 rounded-lg overflow-hidden shadow-xl animate-in zoom-in-95 duration-200">
+                    {allMomentHighlights.map((m) => {
+                        const themeColor = m.user?.theme_color || '#06b6d4';
+
+                        return (
+                            <div
+                                key={`highlight-${m.id}`}
+                                className="absolute top-0 bottom-0 z-20 pointer-events-none"
+                                style={{
+                                    left: `${(m.startSec / safeDuration) * 100}%`,
+                                    width: `${((m.endSec - m.startSec) / safeDuration) * 100}%`
+                                }}
+                            >
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-10 flex flex-col items-center origin-top pointer-events-auto">
+                                    {expandedHighlightId === m.id ? (
+                                        <div className="flex items-center bg-black/90 backdrop-blur-md rounded-lg overflow-hidden shadow-xl animate-in zoom-in-95 duration-200" style={{ border: `1px solid ${themeColor}` }}>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onSeek(m.startSec); }}
+                                                className="h-8 w-8 relative flex items-center justify-center hover:bg-white/10 text-white/70 hover:text-white transition-colors border-r border-white/10"
+                                                title="Replay"
+                                            >
+                                                <RotateCcw size={14} />
+                                                <Play size={6} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 fill-current" />
+                                            </button>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setShowInfoModal(m); }}
+                                                className="h-8 px-2 flex items-center justify-center hover:bg-white/10 text-white/70 hover:text-white transition-colors border-r border-white/10"
+                                                title="Info"
+                                            >
+                                                <Info size={14} />
+                                            </button>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onShare?.(m); }}
+                                                className="h-8 px-2 flex items-center justify-center hover:bg-white/10 text-white/70 hover:text-white transition-colors border-r border-white/10"
+                                                title="Share"
+                                            >
+                                                <Share2 size={14} />
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setPinnedMomentIds(prev =>
+                                                        prev.includes(m.id) ? prev.filter(id => id !== m.id) : [...prev, m.id]
+                                                    );
+                                                }}
+                                                className="h-8 px-2 flex items-center justify-center transition-colors border-r border-white/10"
+                                                style={{
+                                                    backgroundColor: pinnedMomentIds.includes(m.id) ? themeColor : 'transparent',
+                                                    color: pinnedMomentIds.includes(m.id) ? '#000' : themeColor,
+                                                }}
+                                                title={pinnedMomentIds.includes(m.id) ? "Unpin" : "Pin"}
+                                            >
+                                                <Pin size={12} className={pinnedMomentIds.includes(m.id) ? "fill-black" : ""} />
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (pinnedMomentIds.includes(m.id)) {
+                                                        setPinnedMomentIds(prev => prev.filter(id => id !== m.id));
+                                                    }
+                                                    setDismissedMomentId(m.id);
+                                                }}
+                                                className="h-8 px-2 flex items-center justify-center hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+                                                title="Close"
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        </div>
+                                    ) : (
                                         <button
-                                            onClick={(e) => { e.stopPropagation(); onSeek(m.startSec); }}
-                                            className="h-8 px-2 flex items-center justify-center hover:bg-white/10 text-white/70 hover:text-white transition-colors border-r border-white/10"
-                                            title="Replay"
+                                            onClick={(e) => { e.stopPropagation(); setExpandedHighlightId(m.id); }}
+                                            className="w-8 h-8 flex items-center justify-center bg-black/40 backdrop-blur-sm border rounded-full text-white/50 hover:text-white transition-all shadow-lg hover:border-white/50"
+                                            style={{ borderColor: themeColor }}
+                                            title="Expand Menu"
                                         >
-                                            <RotateCcw size={14} />
+                                            <Menu size={14} />
                                         </button>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); onMomentView?.(m); }}
-                                            className="h-8 px-3 flex items-center justify-center text-primary text-[10px] font-bold uppercase hover:bg-primary/10 transition-colors whitespace-nowrap border-r border-white/10"
-                                        >
-                                            VIEW
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setPinnedMomentIds(prev =>
-                                                    prev.includes(m.id) ? prev.filter(id => id !== m.id) : [...prev, m.id]
-                                                );
-                                            }}
-                                            className={`h-8 px-2 flex items-center justify-center transition-colors ${pinnedMomentIds.includes(m.id) ? 'bg-primary text-black' : 'hover:bg-primary/20 text-primary'}`}
-                                            title={pinnedMomentIds.includes(m.id) ? "Unpin" : "Pin"}
-                                        >
-                                            <Pin size={12} className={pinnedMomentIds.includes(m.id) ? "fill-black" : ""} />
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (pinnedMomentIds.includes(m.id)) {
-                                                    setPinnedMomentIds(prev => prev.filter(id => id !== m.id));
-                                                }
-                                                setDismissedMomentId(m.id);
-                                            }}
-                                            className="h-8 px-2 flex items-center justify-center hover:bg-white/10 text-white/50 hover:text-white transition-colors"
-                                            title="Close"
-                                        >
-                                            <X size={14} />
-                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1 rounded-full border-x-2" style={{ backgroundColor: `${themeColor}33`, borderColor: themeColor }}>
+                                    <div className="absolute inset-0 rounded-full" style={{ backgroundColor: themeColor }} />
+                                    <div className="absolute top-1/2 left-0 -translate-y-1/2 -translate-x-1/2" style={{ marginTop: '-6px' }}>
+                                        <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: `7px solid ${themeColor}` }} />
                                     </div>
-                                ) : (
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); setExpandedHighlightId(m.id); }}
-                                        className="w-8 h-8 flex items-center justify-center bg-cyan-500/40 backdrop-blur-sm border border-cyan-500/20 rounded-full text-white/50 hover:text-white hover:bg-cyan-500/60 transition-all shadow-lg"
-                                        title="Expand Menu"
-                                    >
-                                        <Menu size={14} />
-                                    </button>
-                                )}
-                            </div>
-
-                            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1 bg-cyan-500/20 rounded-full border-x-2 border-cyan-500">
-                                <div className="absolute inset-0 bg-cyan-500 rounded-full" />
-                                <div className="absolute top-1/2 left-0 -translate-y-1/2 -translate-x-1/2" style={{ marginTop: '-6px' }}>
-                                    <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '7px solid #06b6d4' }} />
-                                </div>
-                                <div className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2" style={{ marginTop: '-6px' }}>
-                                    <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '7px solid #06b6d4' }} />
+                                    <div className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2" style={{ marginTop: '-6px' }}>
+                                        <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: `7px solid ${themeColor}` }} />
+                                    </div>
                                 </div>
                             </div>
-
-                            <div className="absolute top-full left-0 w-full">
-                                <div className="w-full h-4 bg-cyan-500/10 border-x border-b border-cyan-500/30 rounded-b-lg flex items-center justify-center">
-                                    <GripHorizontal size={10} className="text-cyan-500/50" />
-                                </div>
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
 
                 </div>
             </div>
 
             {/* Note Editor removed. Handled by Parent (CreatorStudio). */}
+
+            {/* Info Modal */}
+            {showInfoModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowInfoModal(null)}>
+                    <div className="bg-neutral-900 border border-white/20 p-6 rounded-2xl shadow-2xl max-w-sm text-center space-y-4" onClick={(e) => e.stopPropagation()}>
+                        <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Info size={24} className="text-white" />
+                        </div>
+                        <h2 className="text-xl font-bold text-white">Curated Moment</h2>
+                        <p className="text-white/60 text-sm leading-relaxed">
+                            This section was saved as a curated moment from a larger video by{' '}
+                            <Link href={`/profile/${showInfoModal.userId}`} className="text-white font-bold hover:underline transition-all" style={{ color: showInfoModal.user?.theme_color || '#06b6d4' }}>
+                                {showInfoModal.user?.name || 'User'}
+                            </Link>.
+                        </p>
+                        <button onClick={() => setShowInfoModal(null)} className="w-full mt-4 py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl transition-colors">
+                            Dismiss
+                        </button>
+                    </div>
+                </div>
+            )}
 
         </div >
     );

@@ -82,7 +82,7 @@ export default function Navbar() {
 
     return (
         <>
-            <nav className="fixed top-0 left-0 right-0 h-16 bg-black/50 backdrop-blur-xl border-b border-white/5 z-[50] flex items-center px-4 gap-4">
+            <nav className="absolute top-0 left-0 right-0 h-16 bg-black/50 backdrop-blur-xl border-b border-white/5 z-[50] flex items-center px-4 gap-4">
 
                 {/* Left Area: Menu & Logo */}
                 <div className={`flex-1 flex items-center transition-all duration-300 opacity-100 visible`}>

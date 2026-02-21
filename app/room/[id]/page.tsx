@@ -5,7 +5,7 @@ import { createComment } from '../../actions/moments';
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Play, Pause, Save, Clock, ArrowLeft, Check, RotateCcw, ListMusic, Loader2, X, Sparkles } from 'lucide-react';
+import { Play, Pause, Save, Clock, ArrowLeft, Check, RotateCcw, ListMusic, Loader2, X, Sparkles, Rewind, FastForward } from 'lucide-react';
 import Link from 'next/link';
 import MomentDetailModal from '@/components/MomentDetailModal';
 import ShareModal from '@/components/ShareModal';
@@ -1284,14 +1284,14 @@ export default function Room({ params }: { params: { id: string } }) {
     };
 
     return (
-        <main className="flex flex-col h-[calc(100vh-3.5rem)] bg-black text-white overflow-hidden">
+        <main className="flex flex-col min-h-screen bg-black text-white">
             <SignupPromptModal
                 isOpen={showSignupModal}
                 onClose={() => setShowSignupModal(false)}
             />
 
             {/* FIXED TOP: Video Player + Timeline */}
-            <section className="shrink-0 w-full z-20 bg-black shadow-2xl relative">
+            <section className="shrink-0 w-full z-50 bg-black shadow-2xl sticky top-0">
                 <div className="max-w-[1800px] mx-auto">
                     {/* Two-Column Layout for Desktop Player to reduce vertical height if needed, 
                         BUT for now we keep the stack: Video -> Timeline 
@@ -1362,13 +1362,13 @@ export default function Room({ params }: { params: { id: string } }) {
                         {(isYouTube || isSpotify) && (
                             <div className="flex items-center justify-center gap-2 py-2 border-b border-white/5">
                                 <button onClick={() => handleSeekRelative(-15)} disabled={controlsDisabled} className="p-1.5 rounded hover:bg-white/10 transition-colors disabled:opacity-30">
-                                    <RotateCcw size={16} className="text-white/70" />
+                                    <Rewind size={20} className="fill-white" />
                                 </button>
                                 <button onClick={() => handleTogglePlay(!isPlaying)} disabled={controlsDisabled} className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-30">
                                     {isPlaying ? <Pause size={20} className="fill-white" /> : <Play size={20} className="fill-white" />}
                                 </button>
                                 <button onClick={() => handleSeekRelative(15)} disabled={controlsDisabled} className="p-1.5 rounded hover:bg-white/10 transition-colors disabled:opacity-30">
-                                    <RotateCcw size={16} className="text-white/70 scale-x-[-1]" />
+                                    <FastForward size={20} className="fill-white" />
                                 </button>
                             </div>
                         )}
@@ -1385,6 +1385,7 @@ export default function Room({ params }: { params: { id: string } }) {
                                     onSeek={handleSeek}
                                     onMomentClick={playMoment}
                                     onMomentView={setViewingMoment}
+                                    onShare={setShareMoment}
                                     service={isYouTube ? 'youtube' : 'spotify'}
                                     onChapterClick={(chapter) => handleSeek(chapter.startSec)}
                                     onPause={() => {
@@ -1435,22 +1436,11 @@ export default function Room({ params }: { params: { id: string } }) {
             </section>
 
             {/* SCROLLABLE BOTTOM: Moments List + Sidebar */}
-            <div className="flex-1 overflow-y-auto min-h-0 bg-neutral-950 scrollbar-hide">
+            <div className="flex-1 bg-neutral-950 scrollbar-hide">
                 <div className="max-w-[1800px] mx-auto flex flex-col lg:flex-row h-full">
 
                     {/* Left: Moments Feed */}
-                    <div className="flex-1 p-4 lg:p-6 space-y-4">
-                        {/* Header for Moments List */}
-                        <div className="flex items-center gap-2 pb-0">
-                            <h3 className="text-[10px] font-bold text-white/90 tracking-wider uppercase flex items-center gap-1.5">
-                                <Sparkles size={12} className="text-cyan-500" />
-                                Saved Moments
-                            </h3>
-                            <span className="text-[9px] font-bold text-white/50 px-1.5 py-0.5 rounded-full bg-white/10">
-                                {moments.length}
-                            </span>
-                        </div>
-
+                    <div className="flex-1 px-4 lg:px-6 pt-0 pb-6 space-y-4">
                         {/* The Grid/List */}
                         <div className="space-y-4 pb-20">
                             {moments.length === 0 ? (

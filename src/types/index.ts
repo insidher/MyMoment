@@ -61,6 +61,7 @@ export interface Moment {
   user?: {
     name?: string | null;
     image?: string | null;
+    theme_color?: string;
   };
 }
 

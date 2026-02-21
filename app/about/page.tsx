@@ -35,7 +35,6 @@ const TimelineIcon = () => (
 
 export default function Home() {
     const [url, setUrl] = useState('');
-    const [showTutorial, setShowTutorial] = useState(false);
     const [showSourcePopup, setShowSourcePopup] = useState(false);
     const router = useRouter();
 
@@ -76,7 +75,6 @@ export default function Home() {
                         {/* Interactive Curate 'Capture' Pill */}
                         <div
                             className="relative group cursor-pointer inline-flex items-center justify-center px-6 py-1 bg-[#1a2332] rounded-lg hover:scale-105 transition-transform"
-                            onClick={() => setShowTutorial(true)}
                         >
                             <span className="text-[#431407] [-webkit-text-stroke:1.5px_rgb(6_182_212)] relative z-10">Curate</span>
 
@@ -85,28 +83,9 @@ export default function Home() {
                                 <div className="absolute right-[calc(50%+4px)] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-cyan-500 border-2 border-black shadow-md" />
                             </div>
 
-                            {/* Right Handle */}
                             <div className="absolute right-0 top-1/2 -translate-y-1/2 h-[140%] w-[3px] bg-cyan-500 rounded-full shadow-[0_0_10px_rgba(6,182,212,0.3)]">
                                 <div className="absolute left-[calc(50%+4px)] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-cyan-500 border-2 border-black shadow-md" />
                             </div>
-
-                            {/* Tutorial Tooltip */}
-                            {showTutorial && (
-                                <div className="absolute bottom-full mb-6 left-1/2 -translate-x-1/2 w-80 md:w-96 bg-zinc-900 border border-cyan-500/50 p-5 rounded-xl shadow-2xl z-50 animate-in fade-in zoom-in-95 tracking-normal">
-                                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-zinc-900 border-b border-r border-cyan-500/50 rotate-45" />
-                                    <p className="text-sm text-white/90 leading-relaxed font-medium text-left">
-                                        Paste a YouTube link of new long-form content.
-                                    </p>
-                                    <p className="text-xs text-white/50 mt-2 text-left">
-                                        Like a video podcast, music video, or learning video.
-                                    </p>
-
-                                    {/* Arrow pointing up to navbar search bar */}
-                                    <div className="flex justify-center mt-4">
-                                        <ArrowRight className="text-cyan-500 -rotate-90 animate-bounce" size={20} />
-                                    </div>
-                                </div>
-                            )}
                         </div>
 
                         <span className="text-[#022c22] [-webkit-text-stroke:1.5px_rgb(34_197_94)]">Share</span>
@@ -138,7 +117,7 @@ export default function Home() {
                 </div>
 
                 {/* Steps Section - Aligned Text */}
-                <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 w-full animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100 transition-opacity duration-300 ${showTutorial || showSourcePopup ? 'opacity-20 blur-sm pointer-events-none' : 'opacity-100'}`}>
+                <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 w-full animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100 transition-opacity duration-300 ${showSourcePopup ? 'opacity-20 blur-sm pointer-events-none' : 'opacity-100'}`}>
 
                     {/* Step 1: Find Source */}
                     <div
@@ -196,14 +175,6 @@ export default function Home() {
 
                 </div>
             </div>
-
-            {/* Tutorial Dimmer Overlay */}
-            {showTutorial && (
-                <div
-                    className="fixed inset-0 bg-black/80 backdrop-blur-sm z-10 animate-in fade-in duration-300"
-                    onClick={() => setShowTutorial(false)}
-                />
-            )}
 
             {/* Source Selection Popup */}
             {showSourcePopup && (

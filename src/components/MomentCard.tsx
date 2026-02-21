@@ -66,10 +66,15 @@ export default function MomentCard({
     const [commentText, setCommentText] = useState('');
     const [isPostingComment, setIsPostingComment] = useState(false);
 
-    // Auto-expand when active
+    const cardRef = useRef<HTMLDivElement>(null);
+
+    // Auto-expand and scroll when active
     useEffect(() => {
         if (isActive) {
             setIsExpanded(true);
+            if (cardRef.current) {
+                cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
         }
     }, [isActive]);
 
@@ -225,8 +230,17 @@ export default function MomentCard({
         progressPercent = Math.max(0, Math.min(100, progressPercent));
     }
 
+    const themeColor = moment.user?.theme_color || '#06b6d4';
+
     return (
-        <div className={`relative group transition-all duration-300 min-w-0 ${isDeleting ? 'scale-90 opacity-0' : 'scale-100 opacity-100'}`}>
+        <div
+            ref={cardRef}
+            className={`relative group transition-all duration-300 min-w-0 rounded-2xl ${isDeleting ? 'scale-90 opacity-0' : 'scale-100 opacity-100'}`}
+            style={{
+                border: isActive ? `2px solid ${themeColor}` : '2px solid transparent',
+                boxShadow: isActive ? `0 0 15px ${themeColor}33` : 'none',
+            }}
+        >
             {showCommentInput && (
                 <div
                     className="absolute inset-x-0 bottom-0 z-50 bg-black/90 p-2 backdrop-blur-md animate-in slide-in-from-bottom-2 duration-200 border-t border-white/10"
